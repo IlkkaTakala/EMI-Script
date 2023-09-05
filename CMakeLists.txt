@@ -7,4 +7,4 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_subdirectory(Script)
-#add_subdirectory(CLI)
+add_subdirectory(CLI)

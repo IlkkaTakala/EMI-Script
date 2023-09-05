@@ -2,10 +2,14 @@
 #define _ERIL_INC_GUARD_HPP
 #pragma once
 
+#ifdef SHARED_LIBS
 #ifdef SCRIPTEXPORT
 #define CORE_API __declspec(dllexport)
 #else
 #define CORE_API __declspec(dllimport) 
+#endif
+#else
+#define CORE_API
 #endif
 
 typedef unsigned long ScriptHandle;

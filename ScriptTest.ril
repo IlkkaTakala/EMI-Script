@@ -1,0 +1,13 @@
+
+extend Default:	
+
+public def Run()
+{
+	var TestVariable = 10;
+	+= - *= ? 
+	if(true == TestVariable)
+	|> || |
+	:test
+	0x42f x34a
+	return TestVariable + 100;
+}

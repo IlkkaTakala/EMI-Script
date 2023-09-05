@@ -1,20 +1,24 @@
 #include "Eril/Eril.hpp"
 #include "Core.h"
+#include "VM.h"
 
 using namespace Eril;
 
-VMHandle CreateEnvironment()
+VMHandle Eril::CreateEnvironment()
 {
 	uint idx = CreateVM();
-
-	VMHandle handle(idx);
-
-	return handle;
+	return VMHandle(idx);
 }
 
 Eril::VMHandle::VMHandle(unsigned int value) : Index(value)
 {
 
+}
+
+ScriptHandle Eril::VMHandle::CompileScript(const char* file)
+{
+	auto vm = GetVM(Index);
+	return vm->Compile(file);
 }
 
 void Eril::VMHandle::ReleaseVM()

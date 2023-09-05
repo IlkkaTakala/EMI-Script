@@ -21,3 +21,8 @@ void ReleaseVM(uint handle)
     delete VMs[handle];
     VMs.erase(handle);
 }
+
+VM* GetVM(uint handle)
+{
+    return VMs[handle];
+}

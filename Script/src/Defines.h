@@ -5,3 +5,6 @@
 #endif
 
 typedef unsigned int uint;
+typedef unsigned char uint8;
+typedef unsigned __int16 uint16;
+typedef unsigned long ScriptHandle;
