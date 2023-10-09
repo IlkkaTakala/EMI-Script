@@ -27,7 +27,7 @@ void Eril::VMHandle::ReleaseVM()
 	Index = 0;
 }
 
-void Eril::ReleaseVM(VMHandle handle)
+void Eril::ReleaseEnvironment(VMHandle handle)
 {
 	handle.ReleaseVM();
 }

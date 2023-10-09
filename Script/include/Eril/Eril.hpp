@@ -52,7 +52,7 @@ namespace Eril
 	};
 
 	VMHandle CreateEnvironment();
-	void ReleaseVM(VMHandle handle);
+	void ReleaseEnvironment(VMHandle handle);
 }
 
 #endif // !_ERIL_INC_GUARD_HPP
