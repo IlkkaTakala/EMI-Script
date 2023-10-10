@@ -99,6 +99,7 @@ public:
 	Lexer(const std::string& file);
 	~Lexer();
 
+	void Reset();
 	Token GetNext(std::string_view& Data);
 
 private:

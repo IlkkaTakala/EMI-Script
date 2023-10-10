@@ -81,6 +81,14 @@ inline bool ValidID(unsigned char c) {
 	return is_alpha(c) || c == 95;
 }
 
+void Lexer::Reset()
+{
+	Current.Ptr = FileData.c_str();
+	Current.Column = 1;
+	Current.Row = 1;
+	Current.Valid = true;
+}
+
 Token Lexer::GetNext(std::string_view& Data)
 {
 	Token token(Token::None);

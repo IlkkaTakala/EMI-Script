@@ -1,9 +1,11 @@
+(1 + 2) + 3;
+
 
 extend Default:	
 
 public def Run()
 {
-	var TestVariable = 10;
+	var 54564TestVariable = 10;
 	+= - *= ? 
 	if(true == TestVariable)
 	|> || |

@@ -6,18 +6,6 @@
 
 using namespace std::literals::chrono_literals;
 
-inline bool is_digit(unsigned char c) {
-	return c >= 48 && c <= 57;
-}
-
-inline bool is_alpha(unsigned char c) {
-	return (c >= 97 && c <= 122) || (c >= 65 && c <= 90);
-}
-
-inline bool is_alnum(unsigned char c) {
-	return is_alpha(c) || is_digit(c);
-}
-
 int main()
 {
 	auto vm = Eril::CreateEnvironment();
