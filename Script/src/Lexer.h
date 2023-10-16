@@ -3,8 +3,9 @@
 #include <string_view>
 #include <fstream>
 
-enum class Token
+enum Token
 {
+	// Terminals
 	None,
 	Skip,
 	Error,
@@ -63,6 +64,14 @@ enum class Token
 	Ws,
 
 	Hex,
+
+	// Non-terminals
+	Start,
+	Stmt,
+	Expr,
+	Value,
+	Arithmetic,
+	Priority,
 };
 
 struct Context

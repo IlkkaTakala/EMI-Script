@@ -1,15 +1,1 @@
-(1 + 2) + 3;
-
-
-extend Default:	
-
-public def Run()
-{
-	var 54564TestVariable = 10;
-	+= - *= ? 
-	if(true == TestVariable)
-	|> || |
-	:test
-	0x42f x34a
-	return TestVariable + 100;
-}
+2 = 1 + 2 + 1;
