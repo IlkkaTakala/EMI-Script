@@ -6,6 +6,7 @@
 class Parser
 {
 public:
+	static void InitializeParser();
 	static void ThreadedParse(VM* vm);
 	static void Parse(VM* vm, CompileOptions& options);
 };

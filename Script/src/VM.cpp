@@ -3,6 +3,7 @@
 
 VM::VM()
 {
+	Parser::InitializeParser();
 	auto counter = std::thread::hardware_concurrency();
 	CompileRunning = true;
 

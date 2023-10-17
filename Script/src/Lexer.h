@@ -2,6 +2,7 @@
 #include <string>
 #include <string_view>
 #include <fstream>
+#include <unordered_map>
 
 enum Token
 {
@@ -17,7 +18,6 @@ enum Token
 	Else,
 	For,
 	While,
-	Scope,
 	Break,
 	Continue,
 	Extend,
@@ -67,12 +67,25 @@ enum Token
 
 	// Non-terminals
 	Start,
+	Program,
+	RProgram,
+	ObjectDef,
+	FunctionDef,
+	NamespaceDef,
+	Scope,
+	MStmt,
 	Stmt,
 	Expr,
 	Value,
 	Arithmetic,
 	Priority,
+
+
+
+	Last
 };
+
+extern std::unordered_map<Token, const char*> TokensToName;
 
 struct Context
 {
