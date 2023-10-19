@@ -13,6 +13,7 @@ public:
 	VM();
 	~VM();
 
+	void ReinitializeGrammar(const char* grammar);
 	ScriptHandle Compile(const char* path, const CompileOptions& options);
 
 	//void Step();

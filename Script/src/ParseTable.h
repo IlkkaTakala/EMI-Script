@@ -33,6 +33,7 @@ struct Item
 	}
 
 	static int Count;
+	int source = 0;
 	int rule;
 	int dotIndex;
 	std::vector<Token> lookaheads;
@@ -43,8 +44,6 @@ struct Item
 	}
 
 	std::vector<Item*> TokensAfterDot(const Grammar& g) const;
-
-	bool AddToClosure(std::vector<Item*>& closure);
 
 	bool NextItemAfterShift(Item& result, const Rule& r) const;
 };

@@ -34,6 +34,7 @@ enum Token
 	TypeString,
 	TypeInteger,
 	TypeFloat,
+	AnyType,
 
 	Rcurly,
 	Lcurly,
@@ -46,6 +47,10 @@ enum Token
 	Not,
 	And,
 	Or,
+	Less,
+	Larger,
+	LessEqual,
+	LargerEqual,
 
 	Add,
 	Sub,
@@ -53,6 +58,9 @@ enum Token
 	Div,
 	Router,
 	Opt,
+
+	Increment,
+	Decrement,
 
 	Comma,
 	Dot,
@@ -70,6 +78,7 @@ enum Token
 	Program,
 	RProgram,
 	ObjectDef,
+	PublicFunctionDef,
 	FunctionDef,
 	NamespaceDef,
 	Scope,
@@ -77,10 +86,40 @@ enum Token
 	Stmt,
 	Expr,
 	Value,
+	Identifier,
 	Arithmetic,
 	Priority,
 
+	ObjectVar,
+	MObjectVar,
+	OExpr,
 
+	Typename,
+	OTypename,
+
+	VarDeclare,
+	OVarDeclare,
+
+	FuncionCall,
+	CallParams,
+
+	Conditional,
+
+	Array,
+	Indexer,
+
+	Pipe,
+	MPipe,
+
+	Control,
+	Flow,
+	IfFlow,
+	ForFlow,
+	WhileFlow,
+	ElseFlow,
+	FlowBlock,
+
+	Setter,
 
 	Last
 };
@@ -93,7 +132,6 @@ struct Context
 	const char* Last;
 	size_t Column{ 0 };
 	size_t Row{ 1 };
-	std::string Function;
 	bool Valid;
 
 	Token Previous;
@@ -124,6 +162,7 @@ public:
 	void Reset();
 	bool IsValid() const { return Valid; }
 	Token GetNext(std::string_view& Data);
+	const Context& GetContext() { return Current; }
 
 private:
 

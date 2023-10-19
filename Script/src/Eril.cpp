@@ -27,6 +27,12 @@ void Eril::VMHandle::ReleaseVM()
 	Index = 0;
 }
 
+void Eril::VMHandle::ReinitializeGrammar(const char* grammar)
+{
+	auto vm = GetVM(Index);
+	vm->ReinitializeGrammar(grammar);
+}
+
 void Eril::ReleaseEnvironment(VMHandle handle)
 {
 	handle.ReleaseVM();
@@ -63,5 +69,7 @@ Stmt -> x ;
 
 
 def id { x ; x ; { x ; { } } }
+
+
 
 */

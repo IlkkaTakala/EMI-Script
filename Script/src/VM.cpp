@@ -22,6 +22,11 @@ VM::~VM()
 	Parser::ReleaseParser();
 }
 
+void VM::ReinitializeGrammar(const char* grammar)
+{
+	Parser::InitializeGrammar(grammar);
+}
+
 ScriptHandle VM::Compile(const char* path, const CompileOptions& options)
 {
 	ScriptHandle handle;

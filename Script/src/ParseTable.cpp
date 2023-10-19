@@ -94,18 +94,19 @@ std::vector<Item*> Item::TokensAfterDot(const Grammar& g) const
 	return result;
 }
 
-bool Item::AddToClosure(std::vector<Item*>& closure)
+bool AddToClosure(std::vector<Item*>& closure, Item* item)
 {
 	bool result = false;
-	for (auto& item : closure) {
-		if (*this == *item) {
-			for (auto& l : lookaheads) {
+	for (auto& i : closure) {
+		if (*item == *i) {
+			for (auto& l : item->lookaheads) {
 				result |= AddUnique(item->lookaheads, l);
 			}
+			delete item;
 			return result;
 		}
 	}
-	closure.push_back(this);
+	closure.push_back(item);
 
 	return false;
 }
@@ -225,9 +226,7 @@ void UpdateClosure(const Grammar& g, Kernel& k) {
 		auto nextItems = (*std::next(k.closure.begin(), i))->TokensAfterDot(g);
 
 		for (auto& n : nextItems) {
-			if (n->AddToClosure(k.closure)) {
-				delete n;
-			}
+			AddToClosure(k.closure, n);
 		}
 	}
 }
@@ -246,8 +245,7 @@ bool AddGotos(Grammar& g, int k) {
 			Token symbolAfterDot = rule.development[item->dotIndex];
 
 			AddUnique(kernels[k].keys, symbolAfterDot);
-			if (next->AddToClosure(newKernels[symbolAfterDot]))
-				delete next;
+			AddToClosure(newKernels[symbolAfterDot], next);
 		}
 	}
 
@@ -265,9 +263,7 @@ bool AddGotos(Grammar& g, int k) {
 		}
 		else {
 			for (auto& item : newKernel.items) {
-				bool res = item->AddToClosure(kernels[targetKernelIndex].items);
-				if (res) delete item;
-				result |= res;
+				result |= AddToClosure(kernels[targetKernelIndex].items, item);
 			}
 		}
 
@@ -322,7 +318,7 @@ void CreateParseTable(Grammar& g) {
 					switch (state[k].type)
 					{
 					case REDUCE:
-						printf("Reduce-reduce error in state %d, token %d\n", i, k);
+						printf("Reduce-reduce error in state %d, token %d. Rules %d and %d\n", i, k, state[k].reduce, item->rule);
 						if (state[k].reduce > item->rule)
 							state[k].reduce = item->rule;
 						break;
@@ -364,8 +360,11 @@ void ReleaseGrammar(Grammar& g)
 		}
 	}
 
+	Item::Count;
+
 	g.ClosureKernels.clear();
 	g.Firsts.clear();
 	g.Follows.clear();
 	g.RuleTable.clear();
+	g.ParseTable.clear();
 };

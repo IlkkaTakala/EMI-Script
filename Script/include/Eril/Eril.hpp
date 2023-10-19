@@ -56,6 +56,8 @@ namespace Eril
 
 		void RegisterFunction();
 
+		void ReinitializeGrammar(const char* grammar);
+
 	private:
 		unsigned int Index;
 	};

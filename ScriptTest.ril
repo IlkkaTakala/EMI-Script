@@ -1,13 +1,57 @@
-def func()
+extend Script:
+
+object Test
 {
-	345 + 1 * 20; 
-	234 + 532 + 1 / 30;
-	{
-		1;
-		{ 
-			120 - 23;
-		}
-	}
+    test : string = "value";
+    time : int;
+    any;
 }
 
-# ../../ScriptTest.ril -s
+def func() {
+    var some = "test";
+    Delay(100);
+    some.append("hes", 29);
+    
+    var value = 56 + (423 - 34 - some ? 54 : 34); 
+    
+    var arr = [42,123,123];
+    {
+        var obje = Test;
+        obje.time = 10;
+        arr[2] = 23;
+    }
+    arr
+    |> funct(42)
+    |> funct("res")
+    if (some + 31) |> funct(342);
+    
+    if (arr) doThis();
+    
+    return some;
+	
+	
+	for (var i = 0; i <= 100; i++) {
+		while (true) {
+		
+		}
+	}
+    
+    :test_variable;
+	
+}
+
+public def funct(value, vel) {
+    if (value is array or null and !this) {
+        
+        set :ok;
+        return value + vel;
+    }
+    else 
+    {
+        set :bad;
+        return value;
+    }
+}
+
+
+# compile ../../ScriptTest.ril -s

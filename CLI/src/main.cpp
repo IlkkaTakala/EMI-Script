@@ -25,12 +25,29 @@ std::vector<std::string> split(const std::string& s, char delim) {
 
 int main()
 {
-	std::unordered_map<std::string, std::function<void(Eril::CompileOptions&)>> commandTable = {
-		{"exit", [](Eril::CompileOptions&) { exit(0); }},
-		{"-s", [](Eril::CompileOptions& options) { options.Simplify = true; }},
+	std::unordered_map<std::string, std::function<void(Eril::VMHandle&, const std::vector<std::string>&)>> commandTable = {
+		{"exit", [](Eril::VMHandle& vm, const std::vector<std::string>&) { exit(0); }},
+		{"compile", [](Eril::VMHandle& vm, const std::vector<std::string>& params) {
+			static std::unordered_map<std::string, std::function<void(Eril::CompileOptions&)>> optionMap = {
+				{"-s", [](Eril::CompileOptions& options) { options.Simplify = true; }}
+			};
+
+			Eril::CompileOptions options;
+			for (auto& s : params) {
+				if (auto it = optionMap.find(s); it != optionMap.end()) {
+					it->second(options);
+				}
+				else {
+					options.Path = s;
+				}
+			}
+			vm.CompileScript(options.Path.c_str(), options); 
+		}},
+		{"reinit", [](Eril::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); }},
 	};
 
 	auto vm = Eril::CreateEnvironment();
+	vm.ReinitializeGrammar("../../.grammar");
 
 	bool run = true;
 	std::string input;
@@ -39,17 +56,11 @@ int main()
 
 		auto res = split(input, ' ');
 
-		Eril::CompileOptions options;
-		for (auto& s : res) {
-			if (auto it = commandTable.find(s); it != commandTable.end()) {
-				it->second(options);
-			}
-			else {
-				options.Path = s;
-			}
-		}
+		if (res.size() < 1) continue;
 
-		vm.CompileScript(options.Path.c_str(), options);
+		if (auto it = commandTable.find(res[0]); it != commandTable.end()) {
+			it->second(vm, res);
+		}
 
 		printf("\n\n");
 	}

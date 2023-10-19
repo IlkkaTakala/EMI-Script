@@ -27,22 +27,29 @@ extern std::unordered_map<Token, const char*> TokensToName = {
 	{TypeString,	  "TypeString" },
 	{TypeInteger,	"TypeInteger"	   },
 	{TypeFloat,		"TypeFloat"	   },
+	{AnyType, 		"AnyType"		},
 	{Rcurly,		  "Rcurly"	   },
 	{Lcurly,		  "Lcurly"	   },
 	{Rbracket,		"Rbracket"	   },
 	{Lbracket,		"Lbracket"	   },
 	{Rparenthesis,	"Rparenthesis"   },
 	{Lparenthesis,	"Lparenthesis"   },
-	{Equal,			"Equal"		   },
-	{Not,			"Not"			   },
-	{And,			"And"			   },
-	{Or,			  "Or"		   },
+	{Equal,			"Equal"				},
+	{Not,			"Not"				},
+	{And,			"And"				},
+	{Or,			"Or"				},
+	{Less,			"Less"				},
+	{Larger,		"Larger"			},
+	{LessEqual,		"LessEqual"			},
+	{LargerEqual,	"LargerEqual"		},
 	{Add,			"Add"			   },
 	{Sub,			"Sub"			   },
 	{Mult,			"Mult"		   },
 	{Div,			"Div"			   },
 	{Router,		  "Router"	   },
 	{Opt,			"Opt"			   },
+	{Increment,		"Increment"		   },
+	{Decrement,		"Decrement"		   },
 	{Comma,			"Comma"		   },
 	{Dot,			"Dot"			   },
 	{Semi,			"Semi"		   },
@@ -56,14 +63,38 @@ extern std::unordered_map<Token, const char*> TokensToName = {
 	{RProgram,		"RProgram"	   },
 	{ObjectDef,		"ObjectDef"	   },
 	{FunctionDef,	"FunctionDef"	   },
+	{PublicFunctionDef,	"PublicFunctionDef"	   },
 	{NamespaceDef,	"NamespaceDef"   },
 	{Scope,			"Scope"		   },
 	{MStmt,			"MStmt"		   },
 	{Stmt,			"Stmt"		   },
 	{Expr,			"Expr"		   },
 	{Value,			"Value"		   },
+	{Identifier,	"Identifier"	},
 	{Arithmetic,		"Arithmetic" },
 	{Priority,		  "Priority"	   },
+	{ObjectVar,		  "ObjectVar"	   },
+	{MObjectVar,	 "MObjectVar"		},
+	{OExpr,			 "OExpr"		},		
+	{Typename,		 "Typename"		},	
+	{OTypename,		 "OTypename"		},	
+	{VarDeclare,	 "VarDeclare"		},
+	{OVarDeclare,	 "OVarDeclare"		},
+	{FuncionCall,	 "FuncionCall"		},
+	{CallParams,	 "CallParams"		},
+	{Conditional,	 "Conditional"		},
+	{Array,			 "Array"			},
+	{Indexer,		 "Indexer"			},
+	{Pipe,			 "Pipe"				},
+	{MPipe,			 "MPipe"			},
+	{Control,		 "Control"			},
+	{Flow,			 "Flow"				},
+	{IfFlow,		"IfFlow"			},
+	{ForFlow,		"ForFlow"			},
+	{WhileFlow,		"WhileFlow"			},
+	{ElseFlow,		"ElseFlow"			},
+	{FlowBlock,		"FlowBlock"			},
+	{Setter,		"Setter"			},
 	{Last,			  "Last"		   },
 };
 
@@ -210,55 +241,66 @@ Token Lexer::Analyse(std::string_view& Data)
 	else {
 		switch (*ptr) {
 			CASE(';', TOKEN(Semi);)
-				CASE('(', TOKEN(Lparenthesis);)
-				CASE(')', TOKEN(Rparenthesis);)
-				CASE('{', TOKEN(Lcurly);)
-				CASE('}', TOKEN(Rcurly);)
-				CASE('[', TOKEN(Lbracket);)
-				CASE(']', TOKEN(Rbracket);)
-				CASE(',', TOKEN(Comma);)
-				CASE('?', TOKEN(Opt);)
-				CASE('.', TOKEN(Dot);)
-				CASE(':',
-					if (is_alpha(*(ptr + 1))) {
-						TOKEN(ValueId);
-						Current.Advance();
-						while (is_alnum(*ptr)) Current.Advance();
-						endOffset = 1;
-					}
-					else TOKEN(Colon);)
-
-				CASE('+', TOKEN(Add);)
-						CASE('-', TOKEN(Sub);)
-						CASE('*', TOKEN(Mult);)
-						CASE('/', TOKEN(Div);)
-
-						CASE('"',
-							while (*ptr != '"') Current.Advance();
-			TOKEN(String);
-			start++; endOffset = 1;
-			)
-						CASE('=',
-							if (*(ptr + 1) == '=') {
-								TOKEN(Equal);
-								Current.Advance();
-							}
-							else TOKEN(Assign);
-			)
-
-				CASE('|',
+			CASE('(', TOKEN(Lparenthesis);)
+			CASE(')', TOKEN(Rparenthesis);)
+			CASE('{', TOKEN(Lcurly);)
+			CASE('}', TOKEN(Rcurly);)
+			CASE('[', TOKEN(Lbracket);)
+			CASE(']', TOKEN(Rbracket);)
+			CASE('!', TOKEN(Not);)
+			CASE('<', TOKEN(Less);)
+			CASE('>', TOKEN(Larger);)
+			CASE(',', TOKEN(Comma);)
+			CASE('?', TOKEN(Opt);)
+			CASE('.', TOKEN(Dot);)
+			CASE(':',
+				if (is_alpha(*(ptr + 1))) {
+					TOKEN(ValueId);
 					Current.Advance();
-			switch (*ptr) {
-				CASE('|', TOKEN(Or);)
-					CASE('>', TOKEN(Router);)
-			default:
-				TOKEN(Error);
-			})
+					while (ValidID(*(ptr + 1))) Current.Advance();
+				}
+				else TOKEN(Colon);)
 
-				CASE('#',
-					bool res = true;
-			while (*ptr != '\n' && res) res = Current.Advance();
-			TOKEN(Skip);
+			CASE('+', TOKEN(Add);)
+			CASE('-', TOKEN(Sub);)
+			CASE('*', TOKEN(Mult);)
+			CASE('/', 
+				if (*(ptr + 1) == '*') {
+					Current.Advance();
+					while (!(*ptr == '*' && *(ptr + 1) == '/')) Current.Advance();
+					Current.Advance();
+					TOKEN(Skip);
+				} else
+					TOKEN(Div);
+				)
+
+			CASE('"',
+				Current.Advance();
+				while (*ptr != '"') Current.Advance();
+				TOKEN(String);
+				start++; endOffset = 1;
+				)
+							CASE('=',
+								if (*(ptr + 1) == '=') {
+									TOKEN(Equal);
+									Current.Advance();
+								}
+								else TOKEN(Assign);
+				)
+
+			CASE('|',
+				Current.Advance();
+				switch (*ptr) {
+					CASE('|', TOKEN(Or);)
+						CASE('>', TOKEN(Router);)
+				default:
+					TOKEN(Error);
+				})
+
+			CASE('#',
+				bool res = true;
+				while (*ptr != '\n' && res) res = Current.Advance();
+				TOKEN(Skip);
 			)
 
 		default:
