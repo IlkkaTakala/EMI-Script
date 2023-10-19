@@ -12,16 +12,25 @@
 #define CORE_API
 #endif
 
+#include <string>
+
 typedef unsigned long ScriptHandle;
 
 namespace Eril
 {
+	struct CompileOptions
+	{
+		ScriptHandle Handle = 0;
+		std::string Path;
+		bool Simplify = false;
+	};
+
 	class CORE_API VMHandle
 	{
 	public:
 		VMHandle(unsigned int);
 
-		ScriptHandle CompileScript(const char* file);
+		ScriptHandle CompileScript(const char* file, const CompileOptions& options = {});
 
 		ScriptHandle CompileMod(const char* file);
 

@@ -19,9 +19,10 @@ VM::~VM()
 	for (auto& t : ParserPool) {
 		t.join();
 	}
+	Parser::ReleaseParser();
 }
 
-ScriptHandle VM::Compile(const char* path)
+ScriptHandle VM::Compile(const char* path, const CompileOptions& options)
 {
 	ScriptHandle handle;
 	{
@@ -29,11 +30,13 @@ ScriptHandle VM::Compile(const char* path)
 		handle = (ScriptHandle)++HandleCounter;
 	}
 
-	CompileOptions options{ handle, path };
+	CompileOptions fulloptions = options;
+	fulloptions.Handle = handle;
+	fulloptions.Path = path;
 
 	{
 		std::lock_guard lock(CompileMutex);
-		CompileQueue.push(options);
+		CompileQueue.push(fulloptions);
 	}
 	QueueNotify.notify_one();
 

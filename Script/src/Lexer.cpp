@@ -156,6 +156,16 @@ void Lexer::Reset()
 
 Token Lexer::GetNext(std::string_view& Data)
 {
+	Token token = None;
+	do {
+		token = Analyse(Data);
+	} while (token == Skip);
+
+	return token;
+}
+
+Token Lexer::Analyse(std::string_view& Data)
+{
 	Token token(Token::None);
 	auto& ptr = Current.Ptr;
 	if (!Current.Valid) return token;
@@ -200,50 +210,56 @@ Token Lexer::GetNext(std::string_view& Data)
 	else {
 		switch (*ptr) {
 			CASE(';', TOKEN(Semi);)
-			CASE('(', TOKEN(Lparenthesis);)
-			CASE(')', TOKEN(Rparenthesis);)
-			CASE('{', TOKEN(Lcurly);)
-			CASE('}', TOKEN(Rcurly);)
-			CASE('[', TOKEN(Lbracket);)
-			CASE(']', TOKEN(Rbracket);)
-			CASE(',', TOKEN(Comma);)
-			CASE('?', TOKEN(Opt);)
-			CASE('.', TOKEN(Dot);)
-			CASE(':',
-				if (is_alpha(*(ptr + 1))) {
-					TOKEN(ValueId);
-					Current.Advance();
-					while (is_alnum(*ptr)) Current.Advance();
-					endOffset = 1;
-				}
-				else TOKEN(Colon);)
+				CASE('(', TOKEN(Lparenthesis);)
+				CASE(')', TOKEN(Rparenthesis);)
+				CASE('{', TOKEN(Lcurly);)
+				CASE('}', TOKEN(Rcurly);)
+				CASE('[', TOKEN(Lbracket);)
+				CASE(']', TOKEN(Rbracket);)
+				CASE(',', TOKEN(Comma);)
+				CASE('?', TOKEN(Opt);)
+				CASE('.', TOKEN(Dot);)
+				CASE(':',
+					if (is_alpha(*(ptr + 1))) {
+						TOKEN(ValueId);
+						Current.Advance();
+						while (is_alnum(*ptr)) Current.Advance();
+						endOffset = 1;
+					}
+					else TOKEN(Colon);)
 
-			CASE('+', TOKEN(Add);)
-			CASE('-', TOKEN(Sub);)
-			CASE('*', TOKEN(Mult);)
-			CASE('/', TOKEN(Div);)
+				CASE('+', TOKEN(Add);)
+						CASE('-', TOKEN(Sub);)
+						CASE('*', TOKEN(Mult);)
+						CASE('/', TOKEN(Div);)
 
-			CASE('"',
-				while (*ptr != '"') Current.Advance();
-				TOKEN(String);
-				start++; endOffset = 1;
+						CASE('"',
+							while (*ptr != '"') Current.Advance();
+			TOKEN(String);
+			start++; endOffset = 1;
 			)
-			CASE('=',
-				if (*(ptr + 1) == '=') {
-					TOKEN(Equal);
-					Current.Advance();
-				}
-				else TOKEN(Assign);
+						CASE('=',
+							if (*(ptr + 1) == '=') {
+								TOKEN(Equal);
+								Current.Advance();
+							}
+							else TOKEN(Assign);
 			)
 
-			CASE('|',
-				Current.Advance();
-				switch (*ptr) {
-					CASE('|', TOKEN(Or);)
+				CASE('|',
+					Current.Advance();
+			switch (*ptr) {
+				CASE('|', TOKEN(Or);)
 					CASE('>', TOKEN(Router);)
-				default:
-					TOKEN(Error);
+			default:
+				TOKEN(Error);
 			})
+
+				CASE('#',
+					bool res = true;
+			while (*ptr != '\n' && res) res = Current.Advance();
+			TOKEN(Skip);
+			)
 
 		default:
 			TOKEN(Skip);

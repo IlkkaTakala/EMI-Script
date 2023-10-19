@@ -7,19 +7,13 @@
 
 #include "Function.h"
 
-struct CompileOptions
-{
-	ScriptHandle Handle;
-	const char* Path;
-};
-
 class VM
 {
 public:
 	VM();
 	~VM();
 
-	ScriptHandle Compile(const char* path);
+	ScriptHandle Compile(const char* path, const CompileOptions& options);
 
 	//void Step();
 	//void CallFunction();

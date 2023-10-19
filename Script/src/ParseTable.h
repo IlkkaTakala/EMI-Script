@@ -26,8 +26,13 @@ struct Item
 	Item(int r, int index) : rule(r), dotIndex(index) {
 		if (r == 0)
 			lookaheads.push_back(None);
+		Count++;
+	}
+	~Item() {
+		Count--;
 	}
 
+	static int Count;
 	int rule;
 	int dotIndex;
 	std::vector<Token> lookaheads;
@@ -37,20 +42,20 @@ struct Item
 		return rule == rhs.rule && dotIndex == rhs.dotIndex;
 	}
 
-	std::vector<Item> TokensAfterDot(const Grammar& g) const;
+	std::vector<Item*> TokensAfterDot(const Grammar& g) const;
 
-	bool AddToClosure(std::vector<Item>& closure) const;
+	bool AddToClosure(std::vector<Item*>& closure);
 
 	bool NextItemAfterShift(Item& result, const Rule& r) const;
 };
 
 struct Kernel
 {
-	Kernel(int i, const std::vector<Item>& itemList) : index(i), items(itemList), closure(itemList) {}
+	Kernel(int i, const std::vector<Item*>& itemList) : index(i), items(itemList), closure(itemList) {}
 
 	int index;
-	std::vector<Item> items;
-	std::vector<Item> closure;
+	std::vector<Item*> items;
+	std::vector<Item*> closure;
 	std::unordered_map<Token, int> gotos;
 	std::vector<Token> keys;
 
@@ -59,7 +64,7 @@ struct Kernel
 			return false;
 
 		for (const auto& e : items) {
-			if (std::find(rhs.items.begin(), rhs.items.end(), e) == rhs.items.end()) {
+			if (std::find_if(rhs.items.begin(), rhs.items.end(), [e](const Item* item) { return *e == *item; }) == rhs.items.end()) {
 				return false;
 			}
 		}
@@ -87,4 +92,5 @@ struct Grammar
 	std::vector<Token> GetSequenceFirsts(const std::vector<Token>& sequence, int start) const;
 };
 
-Grammar CreateParser(const RuleType& rules);
+Grammar& CreateParser(Grammar& g, const RuleType& rules);
+void ReleaseGrammar(Grammar& g);

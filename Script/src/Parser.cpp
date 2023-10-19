@@ -1,4 +1,4 @@
-#include "Parser.h"
+﻿#include "Parser.h"
 #include <functional>
 #include <set>
 #include <stack>
@@ -28,41 +28,35 @@ struct RuleData
 	Token dataToken = None;
 	Token nodeType = None;
 	Token mergeToken = None;
+	Token captureToken = None;
 };
-//
-//static const RuleType Rules = {
-//	{Start, Program},
-//	{Program, RProgram, Program},
-//	{Program, None},
-//
-//	{RProgram, ObjectDef},
-//	{RProgram, FunctionDef},
-//	{RProgram, NamespaceDef},
-//
-//	{ObjectDef, Object, Id},
-//	{FunctionDef, Definition, Id, Lparenthesis, Rparenthesis, Scope},
-//
-//	{Scope, Lcurly, MStmt, Rcurly},
-//	{MStmt, Stmt, MStmt},
-//	{MStmt, Scope, MStmt},
-//	{MStmt, None},
-//	{Stmt, Expr, Semi},
-//	{Expr, Expr, Add, Expr},
-//	{Expr, Integer},
-//
-//	{NamespaceDef, Extend, Id, Colon},
-//};
 
 static const RuleType Rules = {
-	{Start, FunctionDef},
-	{FunctionDef, Definition, Id, Scope},
+	{Start, Program},
+	{Program, RProgram, Program},
+	{Program, None},
+
+	{RProgram, ObjectDef},
+	{RProgram, FunctionDef},
+	{RProgram, NamespaceDef},
+
+	{ObjectDef, Object, Id},
+	{FunctionDef, Definition, Id, Lparenthesis, Rparenthesis, Scope},
+
 	{Scope, Lcurly, MStmt, Rcurly},
 	{MStmt, Stmt, MStmt},
 	{MStmt, Scope, MStmt},
 	{MStmt, None},
-	{Stmt, Integer, Semi},
+	{Stmt, Expr, Semi},
+	{Expr, Expr, Add, Expr},
+	{Expr, Expr, Sub, Expr},
+	{Expr, Expr, Div, Expr},
+	{Expr, Expr, Mult, Expr},
+	{Expr, Integer},
+
+	{NamespaceDef, Extend, Id, Colon},
 };
-/*
+
 static const std::vector<RuleData> Data = {
 	{},
 	{None, None, Program},
@@ -75,41 +69,35 @@ static const std::vector<RuleData> Data = {
 	{Id},
 	{Id},
 
+	{None, Scope, MStmt },
+	{None, Scope, MStmt },
+	{None, Scope, MStmt },
 	{None, Scope },
-	{None, None, MStmt },
-	{None, None, MStmt },
-	{ },
 	{ },
 	{Add, Add },
-	{Integer },
+	{Sub, Sub },
+	{Mult, Mult },
+	{Div, Div },
+	{Integer, Value },
 
 	{Id},
 };
-*/
-
-static const std::vector<RuleData> Data = {
-	{},
-	{},
-	{ },
-	{ },
-	{ },
-	{ },
-	{ },
-};
-
 
 void Parser::InitializeParser()
 {
-	G = CreateParser(Rules);
+	CreateParser(G, Rules);
 
 	TokenParseData[Add] = { 10, Association::Left };
 	TokenParseData[Mult] = { 20, Association::Left };
-	TokenParseData[Lcurly] = { 2, Association::Right };
-	TokenParseData[Rcurly] = { 1, Association::Left };
 
 	if (Rules.size() != Data.size()) {
 		throw std::range_error("Rule data does not match rules");
 	}
+}
+
+void Parser::ReleaseParser()
+{
+	ReleaseGrammar(G);
 }
 
 void Parser::ThreadedParse(VM* vm)
@@ -128,13 +116,28 @@ void Parser::ThreadedParse(VM* vm)
 	}
 }
 
+unsigned char first[] = {195, 196, 196};
+unsigned char last[] = {192, 196, 196};
+unsigned char add[] = {179, 32, 32, 32, 0};
+
 struct Node
 {
-	Token type;
+	Token type = None;
 	std::string_view data;
 
 	std::vector<Node*> parent;
 	std::list<Node*> children;
+
+	void print(const std::string& prefix, bool isLast = false)
+	{
+		std::cout << prefix;
+		std::cout.write(isLast ? (char*)last : (char*)first, 3);
+		std::cout << TokensToName[type] << ": " << data << '\n';
+
+		for (auto& node : children) {
+			node->print(prefix + (isLast ? "   " : (char*)add), node == children.back());
+		}
+	}
 };
 
 struct TokenHolder
@@ -147,6 +150,10 @@ struct TokenHolder
 void Parser::Parse(VM* vm, CompileOptions& options)
 {
 	Lexer lex(options.Path);
+
+	if (!lex.IsValid()) return;
+
+	bool useSimplify = options.Simplify;
 
 	int count = 0;
 	auto token = Token::None;
@@ -161,7 +168,10 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	TokenHolder holder;
 	holder.token = lex.GetNext(holder.data);
 
-	while (true) {
+	Node* ASTRoot = nullptr;
+
+	bool notDone = true;
+	while (notDone) {
 		int currentState = stateStack.top();
 
 		ActionNode action = G.ParseTable[currentState][holder.token];
@@ -184,9 +194,13 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 
 			TokenHolder next;
 			next.token = rule.nonTerminal;
-			if (data.mergeToken == None) {
+			if (data.mergeToken == None && useSimplify) {
 				next.ptr = new Node();
 				next.ptr->type = data.nodeType == None ? next.token : data.nodeType;
+			}
+			else {
+				next.ptr = new Node();
+				next.ptr->type = next.token;
 			}
 
 			for (int i = 0; i < rule.development.size(); ++i) {
@@ -194,14 +208,18 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 				if (!operatorStack.empty() && symbolStack.top().token == operatorStack.top()) operatorStack.pop();
 
 				auto& old = symbolStack.top();
-				if (data.mergeToken == old.token) {
-					next.ptr = old.ptr;
+				if (useSimplify) {
+					if (data.mergeToken == old.token) {
+						next.ptr = old.ptr;
+					}
+					else if (old.ptr && next.ptr)
+						next.ptr->children.push_front(old.ptr);
+					else if (old.token == data.dataToken) {
+						next.ptr->data = old.data;
+					}
 				}
-				else if (old.ptr && next.ptr)
+				else if(old.ptr && next.ptr)
 					next.ptr->children.push_front(old.ptr);
-				else if (old.token == data.dataToken){
-					next.ptr->data = old.data;
-				}
 
 				symbolStack.pop();
 				stateStack.pop();
@@ -242,14 +260,24 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 		} break;
 
 		case Action::ACCEPT: {
-			std::cout << "Accepted\n";
+			std::cout << "Parse successful\n";
+			notDone = false;
+			ASTRoot = symbolStack.top().ptr;
 		} break;
 
 		ERRORCASE:
 		default: {
-			std::cout << "Error\n";
+			std::cout << "Error found!\n";
 			break;
 		}
 		}
 	}
+
+	if (ASTRoot) {
+		std::cout << "AST\n";
+		ASTRoot->print("", true);
+		std::cout << "\n\n";
+	}
+
+
 }

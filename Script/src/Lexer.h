@@ -122,9 +122,12 @@ public:
 	~Lexer();
 
 	void Reset();
+	bool IsValid() const { return Valid; }
 	Token GetNext(std::string_view& Data);
 
 private:
+
+	Token Analyse(std::string_view& Data);
 
 	std::string FileData;
 
