@@ -92,50 +92,6 @@ bool CollectDevelopmentFirsts(Grammar& g, const std::vector<Token>& rhs, std::ve
 	return result;
 }
 
-void TokensAfterDot(std::vector<ItemHandle>& result, const Grammar& g, ItemHandle h)
-{
-	const Rule& actualRule = g.RuleTable[Items(h).rule];
-	int dotIndex = Items(h).dotIndex;
-
-	if (dotIndex < actualRule.development.size()) {
-		Token nonTerminal = actualRule.development[dotIndex];
-		for (const auto& r : g.RuleTable) {
-			if (r.nonTerminal != nonTerminal) continue;
-
-			auto item = NewItem(r.index, 0);
-			if (!AddUnique(result, item))
-				ReleaseItem(item);
-		}
-	}
-
-	if (result.size() == 0) {
-		return;
-	}
-
-	std::vector<Token> newLookAheads = {};
-	bool epsilonPresent = false;
-	auto firstsAfterSymbolAfterDot = g.GetSequenceFirsts(actualRule.development, dotIndex + 1);
-
-	for (const auto& first : firstsAfterSymbolAfterDot) {
-		if (None == first) {
-			epsilonPresent = true;
-		}
-		else {
-			AddUnique(newLookAheads, first);
-		}
-	}
-
-	if (epsilonPresent) {
-		for (auto& i : Items(h).lookaheads) {
-			AddUnique(newLookAheads, i);
-		}
-	}
-
-	for (auto& i : result) {
-		std::swap(Items(i).lookaheads, newLookAheads);
-	}
-}
-
 bool AddToClosure(std::vector<ItemHandle>& closure, ItemHandle item)
 {
 	bool result = false;
@@ -169,9 +125,8 @@ bool NextItemAfterShift(Item& result, const Rule& r, ItemHandle h)
 	return false;
 }
 
-std::vector<Token> Grammar::GetSequenceFirsts(const std::vector<Token>& sequence, int start) const
+void Grammar::GetSequenceFirsts(std::vector<Token>& result, const std::vector<Token>& sequence, int start) const
 {
-	std::vector<Token> result = {};
 	result.reserve(sequence.size() - start);
 	bool noneInFirsts = true;
 
@@ -196,11 +151,9 @@ std::vector<Token> Grammar::GetSequenceFirsts(const std::vector<Token>& sequence
 		}
 	}
 
-	if (noneInFirsts) {
-		AddUnique(result, None);
-	}
-
-	return result;
+	//if (noneInFirsts) {
+	//	AddUnique(result, None);
+	//}
 }
 
 void TransformGrammar(Grammar& grammar, const RuleType& rules) {
@@ -246,7 +199,8 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 
 				if (IsNonTerminal(symbol)) {
 					auto& symbolFollows = grammar.Follows[symbol];
-					auto afterSymbolFirsts = grammar.GetSequenceFirsts(rule.development, j + 1);
+					std::vector<Token> afterSymbolFirsts;
+					grammar.GetSequenceFirsts(afterSymbolFirsts, rule.development, j + 1);
 
 					for (auto& first : afterSymbolFirsts) {
 
@@ -269,11 +223,42 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 
 void UpdateClosure(const Grammar& g, Kernel& k) {
 	for (int i = 0; i < k.closure.size(); i++) {
-		std::vector<ItemHandle> nextItems;
-		TokensAfterDot(nextItems, g, k.closure[i]);
+		auto h = k.closure[i];
+		const Rule& actualRule = g.RuleTable[Items(h).rule];
+		int dotIndex = Items(h).dotIndex;
 
-		for (auto& n : nextItems) {
-			AddToClosure(k.closure, n);
+		if (dotIndex < actualRule.development.size()) {
+			Token nonTerminal = actualRule.development[dotIndex];
+			for (const auto& r : g.RuleTable) {
+				if (r.nonTerminal != nonTerminal) continue;
+
+				auto item = NewItem(r.index, 0);
+				
+
+				auto& lookahead = Items(item).lookaheads;
+				lookahead.clear();
+				bool epsilonPresent = false;
+				thread_local static std::vector<Token> firstsAfterSymbolAfterDot;
+				g.GetSequenceFirsts(firstsAfterSymbolAfterDot, actualRule.development, dotIndex + 1);
+
+				for (const auto& first : firstsAfterSymbolAfterDot) {
+					if (None == first) {
+						epsilonPresent = true;
+					}
+					else {
+						AddUnique(lookahead, first);
+					}
+				}
+
+				if (epsilonPresent) {
+					for (auto& i : Items(h).lookaheads) {
+						AddUnique(lookahead, i);
+					}
+				}
+
+				AddToClosure(k.closure, item);
+
+			}
 		}
 	}
 }
@@ -299,18 +284,32 @@ bool AddGotos(Grammar& g, int k) {
 
 	for (int i = 0; i < kernels[k].keys.size(); ++i) {
 		auto key = kernels[k].keys[i];
-		Kernel newKernel{ (int)kernels.size(), newKernels[key] };
+		//Kernel newKernel{ (int)kernels.size(), newKernels[key] };
+		auto& items = newKernels[key];
 		int targetKernelIndex = -1;
-		if (auto it = std::find(kernels.begin(), kernels.end(), newKernel); it != kernels.end()) {
-			targetKernelIndex = int(it - kernels.begin());
+		for (auto& k : kernels) {
+			if (k.items.size() != items.size())
+				continue;
+			bool found = true;
+
+			for (const auto& e : k.items) {
+				if (std::find_if(items.begin(), items.end(), [e](const ItemHandle item) { return e == item; }) == items.end()) {
+					found = false;
+					break;
+				}
+			}
+			if (found) {
+				targetKernelIndex = k.index;
+				break;
+			}
 		}
 
 		if (targetKernelIndex < 0) {
-			kernels.push_back(newKernel);
-			targetKernelIndex = newKernel.index;
+			targetKernelIndex = (int)kernels.size();
+			kernels.emplace_back(targetKernelIndex, items);
 		}
 		else {
-			for (auto& item : newKernel.items) {
+			for (auto& item : items) {
 				result |= AddToClosure(kernels[targetKernelIndex].items, item);
 			}
 		}

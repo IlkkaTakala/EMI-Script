@@ -85,7 +85,7 @@ struct Grammar
 	std::vector<Kernel> ClosureKernels;
 	std::vector<std::vector<ActionNode>> ParseTable;
 
-	std::vector<Token> GetSequenceFirsts(const std::vector<Token>& sequence, int start) const;
+	void GetSequenceFirsts(std::vector<Token>& result, const std::vector<Token>& sequence, int start) const;
 };
 
 Grammar& CreateParser(Grammar& g, const RuleType& rules);
