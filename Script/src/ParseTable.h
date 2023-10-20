@@ -7,6 +7,9 @@ struct Grammar;
 struct ActionNode;
 
 typedef std::vector<std::vector<Token>> RuleType;
+struct ItemHandle {
+	size_t id;
+};
 
 enum Action {
 	ACCEPT, SHIFT, REDUCE, DECIDE, ERROR, GOTO
@@ -23,17 +26,10 @@ struct Rule
 
 struct Item
 {
-	Item(int r, int index) : rule(r), dotIndex(index) {
-		if (r == 0)
-			lookaheads.push_back(None);
-		Count++;
-	}
-	~Item() {
-		Count--;
+	Item() {
+		
 	}
 
-	static int Count;
-	int source = 0;
 	int rule;
 	int dotIndex;
 	std::vector<Token> lookaheads;
@@ -42,19 +38,20 @@ struct Item
 
 		return rule == rhs.rule && dotIndex == rhs.dotIndex;
 	}
-
-	std::vector<Item*> TokensAfterDot(const Grammar& g) const;
-
-	bool NextItemAfterShift(Item& result, const Rule& r) const;
 };
+
+std::vector<Item>& Items();
+Item& Items(ItemHandle);
+
+bool operator==(const ItemHandle& lhs, const ItemHandle& rhs);
 
 struct Kernel
 {
-	Kernel(int i, const std::vector<Item*>& itemList) : index(i), items(itemList), closure(itemList) {}
+	Kernel(int i, const std::vector<ItemHandle>& itemList) : index(i), items(itemList), closure(itemList) {}
 
 	int index;
-	std::vector<Item*> items;
-	std::vector<Item*> closure;
+	std::vector<ItemHandle> items;
+	std::vector<ItemHandle> closure;
 	std::unordered_map<Token, int> gotos;
 	std::vector<Token> keys;
 
@@ -63,7 +60,7 @@ struct Kernel
 			return false;
 
 		for (const auto& e : items) {
-			if (std::find_if(rhs.items.begin(), rhs.items.end(), [e](const Item* item) { return *e == *item; }) == rhs.items.end()) {
+			if (std::find_if(rhs.items.begin(), rhs.items.end(), [e](const ItemHandle item) { return e == item; }) == rhs.items.end()) {
 				return false;
 			}
 		}
