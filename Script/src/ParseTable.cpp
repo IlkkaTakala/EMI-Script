@@ -113,12 +113,10 @@ bool AddToClosure(std::vector<ItemHandle>& closure, ItemHandle item)
 
 bool NextItemAfterShift(Item& result, const Rule& r, ItemHandle h)
 {
-	int dotIndex = Items(h).dotIndex;
-	if (dotIndex < r.development.size() && r.development[dotIndex] != None) {
-		result.rule = Items(h).rule;
-		result.dotIndex = dotIndex + 1;
-		result.lookaheads = Items(h).lookaheads;
-
+	auto& item = Items(h);
+	if (item.dotIndex < r.development.size() && r.development[item.dotIndex] != None) {
+		result.rule = item.rule;
+		result.dotIndex = item.dotIndex + 1;
 		return true;
 	}
 
@@ -127,12 +125,13 @@ bool NextItemAfterShift(Item& result, const Rule& r, ItemHandle h)
 
 void Grammar::GetSequenceFirsts(std::vector<Token>& result, const std::vector<Token>& sequence, int start) const
 {
+	result.clear();
 	result.reserve(sequence.size() - start);
-	bool noneInFirsts = true;
+	bool noneFound = true;
 
 	for (int i = start; i < sequence.size(); ++i) {
 		auto& symbol = sequence[i];
-		noneInFirsts = false;
+		noneFound = false;
 
 		if (IsTerminal(symbol)) {
 			AddUnique(result, symbol);
@@ -140,20 +139,20 @@ void Grammar::GetSequenceFirsts(std::vector<Token>& result, const std::vector<To
 		}
 
 		for (auto& first : Firsts.at(symbol)) {
-			noneInFirsts |= first == None;
+			noneFound |= first == None;
 			AddUnique(result, first);
 		}
 
-		noneInFirsts |= (Firsts.find(symbol) == Firsts.end() || Firsts.at(symbol).size() == 0);
+		noneFound |= Firsts.at(symbol).size() == 0;
 
-		if (!noneInFirsts) {
+		if (!noneFound) {
 			break;
 		}
 	}
 
-	//if (noneInFirsts) {
-	//	AddUnique(result, None);
-	//}
+	if (noneFound) {
+		AddUnique(result, None);
+	}
 }
 
 void TransformGrammar(Grammar& grammar, const RuleType& rules) {
@@ -199,7 +198,7 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 
 				if (IsNonTerminal(symbol)) {
 					auto& symbolFollows = grammar.Follows[symbol];
-					std::vector<Token> afterSymbolFirsts;
+					thread_local static std::vector<Token> afterSymbolFirsts;
 					grammar.GetSequenceFirsts(afterSymbolFirsts, rule.development, j + 1);
 
 					for (auto& first : afterSymbolFirsts) {
@@ -233,7 +232,7 @@ void UpdateClosure(const Grammar& g, Kernel& k) {
 				if (r.nonTerminal != nonTerminal) continue;
 
 				auto item = NewItem(r.index, 0);
-				
+
 
 				auto& lookahead = Items(item).lookaheads;
 				lookahead.clear();
@@ -274,7 +273,7 @@ bool AddGotos(Grammar& g, int k) {
 		Rule& rule = g.RuleTable[Items(i).rule];
 		if (NextItemAfterShift(temp, rule, i)) {
 			ItemHandle next = NewItem(temp.rule, temp.dotIndex);
-			Items(next).lookaheads = temp.lookaheads;
+			Items(next).lookaheads = Items(i).lookaheads;
 			Token symbolAfterDot = rule.development[Items(i).dotIndex];
 
 			AddUnique(kernels[k].keys, symbolAfterDot);
