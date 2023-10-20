@@ -100,7 +100,7 @@ bool AddToClosure(std::vector<Item*>& closure, Item* item)
 	for (auto& i : closure) {
 		if (*item == *i) {
 			for (auto& l : item->lookaheads) {
-				result |= AddUnique(item->lookaheads, l);
+				result |= AddUnique(i->lookaheads, l);
 			}
 			delete item;
 			return result;
@@ -223,7 +223,7 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 
 void UpdateClosure(const Grammar& g, Kernel& k) {
 	for (int i = 0; i < k.closure.size(); i++) {
-		auto nextItems = (*std::next(k.closure.begin(), i))->TokensAfterDot(g);
+		auto nextItems = k.closure[i]->TokensAfterDot(g);
 
 		for (auto& n : nextItems) {
 			AddToClosure(k.closure, n);
