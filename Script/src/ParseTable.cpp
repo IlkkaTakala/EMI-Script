@@ -92,9 +92,8 @@ bool CollectDevelopmentFirsts(Grammar& g, const std::vector<Token>& rhs, std::ve
 	return result;
 }
 
-std::vector<ItemHandle> TokensAfterDot(const Grammar& g, ItemHandle h)
+void TokensAfterDot(std::vector<ItemHandle>& result, const Grammar& g, ItemHandle h)
 {
-	std::vector<ItemHandle> result = {};
 	const Rule& actualRule = g.RuleTable[Items(h).rule];
 	int dotIndex = Items(h).dotIndex;
 
@@ -110,7 +109,7 @@ std::vector<ItemHandle> TokensAfterDot(const Grammar& g, ItemHandle h)
 	}
 
 	if (result.size() == 0) {
-		return result;
+		return;
 	}
 
 	std::vector<Token> newLookAheads = {};
@@ -133,10 +132,8 @@ std::vector<ItemHandle> TokensAfterDot(const Grammar& g, ItemHandle h)
 	}
 
 	for (auto& i : result) {
-		Items(i).lookaheads = newLookAheads;
+		std::swap(Items(i).lookaheads, newLookAheads);
 	}
-
-	return result;
 }
 
 bool AddToClosure(std::vector<ItemHandle>& closure, ItemHandle item)
@@ -272,7 +269,8 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 
 void UpdateClosure(const Grammar& g, Kernel& k) {
 	for (int i = 0; i < k.closure.size(); i++) {
-		auto nextItems = TokensAfterDot(g, k.closure[i]);
+		std::vector<ItemHandle> nextItems;
+		TokensAfterDot(nextItems, g, k.closure[i]);
 
 		for (auto& n : nextItems) {
 			AddToClosure(k.closure, n);
@@ -400,18 +398,20 @@ Grammar& CreateParser(Grammar& g, const RuleType& rules)
 	CreateClosureTables(g);
 	CreateParseTable(g);
 
-	return g;
-}
-
-void ReleaseGrammar(Grammar& g)
-{
 	Items().clear();
+	Items().shrink_to_fit();
 	while (!ItemFreeIdx.empty()) ItemFreeIdx.pop();
 	LastItem = 0;
 
 	g.ClosureKernels.clear();
 	g.Firsts.clear();
 	g.Follows.clear();
-	g.RuleTable.clear();
+
+	return g;
+}
+
+void ReleaseGrammar(Grammar& g)
+{
 	g.ParseTable.clear();
+	g.RuleTable.clear();
 };
