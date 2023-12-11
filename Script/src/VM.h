@@ -4,8 +4,29 @@
 #include <condition_variable>
 #include <queue>
 #include <unordered_map>
+#include <stack>
 
 #include "Function.h"
+
+class VM;
+
+struct CallObject {
+	const Function* function;
+	size_t location;
+};
+
+class Runner
+{
+public:
+	Runner(VM* vm);
+	~Runner();
+
+	void operator()(const Function& f);
+
+private:
+	VM* Owner;
+	std::stack<CallObject> CallStack;
+};
 
 class VM
 {
@@ -39,12 +60,5 @@ private:
 	std::unordered_map<uint16, Function> FunctionMap;
 	std::unordered_map<std::string, uint16> NameToFunctionMap;
 
-
-
-	// Call stack
-
-	// Stack
-
 	// Variable heap
-
 };

@@ -11,3 +11,15 @@ typedef unsigned char uint8;
 typedef unsigned __int16 uint16;
 typedef unsigned long ScriptHandle;
 
+enum class OpCodes : uint8
+{
+	LoadConst,
+	LoadSymbol,
+	Pop,
+	CallSymbol,
+
+	JumpBackward,
+	JumpForward,
+	Return,
+	ReturnValue,
+};

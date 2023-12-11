@@ -5,8 +5,10 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <charconv>
 
 #include "ParseTable.h"
+#include "AST.h"
 
 static Grammar G;
 
@@ -297,36 +299,35 @@ void Parser::ThreadedParse(VM* vm)
 	}
 }
 
-unsigned char first[] = {195, 196, 196};
-unsigned char last[] = {192, 196, 196};
-unsigned char add[] = {179, 32, 32, 32, 0};
-
-struct Node
-{
-	Token type = None;
-	std::string_view data;
-
-	std::vector<Node*> parent;
-	std::list<Node*> children;
-
-	void print(const std::string& prefix, bool isLast = false)
-	{
-		std::cout << prefix;
-		std::cout.write(isLast ? (char*)last : (char*)first, 3);
-		std::cout << TokensToName[type] << ": " << data << '\n';
-
-		for (auto& node : children) {
-			node->print(prefix + (isLast ? "    " : (char*)add), node == children.back());
-		}
-	}
-};
-
 struct TokenHolder
 {
 	Token token = None;
 	Node* ptr = nullptr;
 	std::string_view data;
 };
+
+void TypeConverter(Node* n, const TokenHolder& h) {
+	switch (h.token)
+	{
+	case Integer:
+		n->data = 0;
+		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<int>(n->data));
+		break;
+	case Float:
+		n->data = 0.f;
+		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<int>(n->data));
+		break;
+	case True:
+		n->data = true;
+		break;
+	case False:
+		n->data = false;
+		break;
+	default:
+		std::get<std::string>(n->data) = h.data;
+		break;
+	}
+}
 
 void Parser::Parse(VM* vm, CompileOptions& options)
 {
@@ -392,11 +393,12 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 				if (useSimplify) {
 					if (data.mergeToken == old.token) {
 						next.ptr = old.ptr;
+						if (data.nodeType != None) next.ptr->type = data.nodeType;
 					}
 					else if (old.ptr && next.ptr)
 						next.ptr->children.push_front(old.ptr);
 					else if (old.token == data.dataToken) {
-						next.ptr->data = old.data;
+						TypeConverter(next.ptr, old);
 					}
 				}
 				else if(old.ptr && next.ptr)
@@ -405,6 +407,8 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 				symbolStack.pop();
 				stateStack.pop();
 			}
+
+			Optimize(next.ptr);
 
 			symbolStack.push(next);
 			if (TokenParseData[rule.nonTerminal].Precedence != 0) operatorStack.push(rule.nonTerminal);

@@ -8,6 +8,7 @@ RProgram ObjectDef
 RProgram FunctionDef
 RProgram PublicFunctionDef
 RProgram NamespaceDef
+RProgram VarDeclare Semi
 
 Typename TypeString
 Typename TypeInteger
@@ -105,6 +106,8 @@ Indexer Expr Lbracket Expr Rbracket
 Indexer Expr Lbracket Rbracket
 
 VarDeclare Variable Id OVarDeclare
+VarDeclare Static Id OVarDeclare
+VarDeclare Const Id OVarDeclare
 OVarDeclare Assign Expr
 OVarDeclare None
 
@@ -123,6 +126,7 @@ None None ObjectDef
 None None FunctionDef
 None None PublicFunctionDef
 None None NamespaceDef
+None None VarDeclare
 
 None TypeString 
 None TypeInteger 
@@ -145,7 +149,7 @@ None Scope MStmt
 None Scope MStmt 
 None Scope MStmt 
 None Scope 
-.
+None None Expr
 None None Flow
 None None Setter
 
@@ -174,8 +178,8 @@ None None Expr
 
 None None Value 
 ValueId ValueId
-None True
-None False 
+True True
+False False 
 Integer Integer 
 String String 
 Float Float 
@@ -220,6 +224,8 @@ None None Scope
 .
 
 Id None OVarDeclare
+Id Static OVarDeclare
+Id Const OVarDeclare
 None VarDeclare
 None VarDeclare
 
