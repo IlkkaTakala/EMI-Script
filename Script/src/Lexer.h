@@ -24,6 +24,8 @@ enum Token
 	Variable,
 	Assign,
 	Set,
+	Static,
+	Const,
 
 	String,
 	Integer,
@@ -56,8 +58,6 @@ enum Token
 	Sub,
 	Mult,
 	Div,
-	Router,
-	Opt,
 
 	Increment,
 	Decrement,
@@ -66,11 +66,13 @@ enum Token
 	Dot,
 	Semi,
 	Colon,
+	Router,
+	Opt,
 
 	ValueId,
 	Id,
-	Ws,
 
+	Ws,
 	Hex,
 
 	// Non-terminals

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-class Function
+struct Function
 {
 	std::string Name;
 	std::string Path;

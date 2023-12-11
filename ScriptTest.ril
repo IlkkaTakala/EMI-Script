@@ -7,14 +7,17 @@ object Test
     any;
 }
 
+static Global = "test";
+
 def func() {
+	50 + true ? 51 : 49;
     var some = "test";
     Delay(100);
     some.append("hes", 29);
     
     var value = 56 + (423 - 34 - some ? 54 : 34); 
     
-    var arr = [42,123,123];
+    const arr = [42,123,123];
     {
         var obje = Test;
         obje.time = 10;

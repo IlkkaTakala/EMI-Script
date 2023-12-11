@@ -1,6 +1,5 @@
 #include "ParseTable.h"
-
-int Item::Count = 0;
+#include <stack>
 
 bool IsTerminal(Token token) {
 	return token < Start && token > None;
@@ -17,6 +16,51 @@ bool AddUnique(std::vector<T>& vector, const T& value) {
 		return true;
 	}
 	return false;
+}
+
+static std::stack<size_t> ItemFreeIdx;
+static size_t LastItem;
+
+std::vector<Item>& Items() {
+	static std::vector<Item> items;
+	return items;
+}
+
+Item& Items(ItemHandle h)
+{
+	return Items()[h.id];
+}
+
+ItemHandle NewItem(int rule = 0, int dot = 0) {
+	ItemHandle h{ 0 };
+	if (ItemFreeIdx.empty()) {
+		if (LastItem >= Items().size()) {
+			Items().emplace_back();
+		}
+		h.id = LastItem++;
+	}
+	else {
+		h.id = ItemFreeIdx.top();
+		ItemFreeIdx.pop();
+	}
+	Items(h).lookaheads.clear();
+	Items(h).lookaheads.reserve(3);
+	Items(h).rule = rule;
+	Items(h).dotIndex = dot;
+
+	if (rule == 0)
+		Items(h).lookaheads.push_back(None);
+
+	return h;
+}
+
+void ReleaseItem(ItemHandle h) {
+	ItemFreeIdx.push(h.id);
+}
+
+bool operator==(const ItemHandle& lhs, const ItemHandle& rhs)
+{
+	return lhs.id == rhs.id || Items(lhs) == Items(rhs);
 }
 
 bool CollectDevelopmentFirsts(Grammar& g, const std::vector<Token>& rhs, std::vector<Token>& nonTerminalFirsts) {
@@ -48,61 +92,17 @@ bool CollectDevelopmentFirsts(Grammar& g, const std::vector<Token>& rhs, std::ve
 	return result;
 }
 
-std::vector<Item*> Item::TokensAfterDot(const Grammar& g) const
-{
-	std::vector<Item*> result = {};
-	const Rule& actualRule = g.RuleTable[rule];
-
-	if (dotIndex < actualRule.development.size()) {
-		Token nonTerminal = actualRule.development[dotIndex];
-		for (const auto& r : g.RuleTable) {
-			if (r.nonTerminal != nonTerminal) continue;
-
-			auto item = new Item{ r.index, 0 };
-			if (!AddUnique(result, item))
-				delete item;
-		}
-	}
-
-	if (result.size() == 0) {
-		return result;
-	}
-
-	std::vector<Token> newLookAheads = {};
-	bool epsilonPresent = false;
-	auto firstsAfterSymbolAfterDot = g.GetSequenceFirsts(actualRule.development, dotIndex + 1);
-
-	for (const auto& first : firstsAfterSymbolAfterDot) {
-		if (None == first) {
-			epsilonPresent = true;
-		}
-		else {
-			AddUnique(newLookAheads, first);
-		}
-	}
-
-	if (epsilonPresent) {
-		for (auto& i : lookaheads) {
-			AddUnique(newLookAheads, i);
-		}
-	}
-
-	for (auto& i : result) {
-		i->lookaheads = newLookAheads;
-	}
-
-	return result;
-}
-
-bool AddToClosure(std::vector<Item*>& closure, Item* item)
+bool AddToClosure(std::vector<ItemHandle>& closure, ItemHandle item)
 {
 	bool result = false;
 	for (auto& i : closure) {
-		if (*item == *i) {
-			for (auto& l : item->lookaheads) {
-				result |= AddUnique(i->lookaheads, l);
+		auto& old = Items(i);
+		auto& next = Items(item);
+		if (item == i) {
+			for (auto& l : next.lookaheads) {
+				result |= AddUnique(old.lookaheads, l);
 			}
-			delete item;
+			ReleaseItem(item);
 			return result;
 		}
 	}
@@ -111,27 +111,27 @@ bool AddToClosure(std::vector<Item*>& closure, Item* item)
 	return false;
 }
 
-bool Item::NextItemAfterShift(Item& result, const Rule& r) const
+bool NextItemAfterShift(Item& result, const Rule& r, ItemHandle h)
 {
-	if (dotIndex < r.development.size() && r.development[dotIndex] != None) {
-		result = { rule, dotIndex + 1 };
-		result.lookaheads = lookaheads;
-
+	auto& item = Items(h);
+	if (item.dotIndex < r.development.size() && r.development[item.dotIndex] != None) {
+		result.rule = item.rule;
+		result.dotIndex = item.dotIndex + 1;
 		return true;
 	}
 
 	return false;
 }
 
-std::vector<Token> Grammar::GetSequenceFirsts(const std::vector<Token>& sequence, int start) const
+void Grammar::GetSequenceFirsts(std::vector<Token>& result, const std::vector<Token>& sequence, int start) const
 {
-	std::vector<Token> result = {};
+	result.clear();
 	result.reserve(sequence.size() - start);
-	bool noneInFirsts = true;
+	bool noneFound = true;
 
 	for (int i = start; i < sequence.size(); ++i) {
 		auto& symbol = sequence[i];
-		noneInFirsts = false;
+		noneFound = false;
 
 		if (IsTerminal(symbol)) {
 			AddUnique(result, symbol);
@@ -139,22 +139,20 @@ std::vector<Token> Grammar::GetSequenceFirsts(const std::vector<Token>& sequence
 		}
 
 		for (auto& first : Firsts.at(symbol)) {
-			noneInFirsts |= first == None;
+			noneFound |= first == None;
 			AddUnique(result, first);
 		}
 
-		noneInFirsts |= (Firsts.find(symbol) == Firsts.end() || Firsts.at(symbol).size() == 0);
+		noneFound |= Firsts.at(symbol).size() == 0;
 
-		if (!noneInFirsts) {
+		if (!noneFound) {
 			break;
 		}
 	}
 
-	if (noneInFirsts) {
+	if (noneFound) {
 		AddUnique(result, None);
 	}
-
-	return result;
 }
 
 void TransformGrammar(Grammar& grammar, const RuleType& rules) {
@@ -200,7 +198,8 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 
 				if (IsNonTerminal(symbol)) {
 					auto& symbolFollows = grammar.Follows[symbol];
-					auto afterSymbolFirsts = grammar.GetSequenceFirsts(rule.development, j + 1);
+					thread_local static std::vector<Token> afterSymbolFirsts;
+					grammar.GetSequenceFirsts(afterSymbolFirsts, rule.development, j + 1);
 
 					for (auto& first : afterSymbolFirsts) {
 
@@ -223,26 +222,59 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 
 void UpdateClosure(const Grammar& g, Kernel& k) {
 	for (int i = 0; i < k.closure.size(); i++) {
-		auto nextItems = k.closure[i]->TokensAfterDot(g);
+		auto h = k.closure[i];
+		const Rule& actualRule = g.RuleTable[Items(h).rule];
+		int dotIndex = Items(h).dotIndex;
 
-		for (auto& n : nextItems) {
-			AddToClosure(k.closure, n);
+		if (dotIndex < actualRule.development.size()) {
+			Token nonTerminal = actualRule.development[dotIndex];
+			for (const auto& r : g.RuleTable) {
+				if (r.nonTerminal != nonTerminal) continue;
+
+				auto item = NewItem(r.index, 0);
+
+
+				auto& lookahead = Items(item).lookaheads;
+				lookahead.clear();
+				bool epsilonPresent = false;
+				thread_local static std::vector<Token> firstsAfterSymbolAfterDot;
+				g.GetSequenceFirsts(firstsAfterSymbolAfterDot, actualRule.development, dotIndex + 1);
+
+				for (const auto& first : firstsAfterSymbolAfterDot) {
+					if (None == first) {
+						epsilonPresent = true;
+					}
+					else {
+						AddUnique(lookahead, first);
+					}
+				}
+
+				if (epsilonPresent) {
+					for (auto& i : Items(h).lookaheads) {
+						AddUnique(lookahead, i);
+					}
+				}
+
+				AddToClosure(k.closure, item);
+
+			}
 		}
 	}
 }
 
 bool AddGotos(Grammar& g, int k) {
 	bool result = false;
-	std::unordered_map<Token, std::vector<Item*>> newKernels;
+	std::unordered_map<Token, std::vector<ItemHandle>> newKernels;
 	auto& kernels = g.ClosureKernels;
 
-	for (auto& item : kernels[k].closure) {
-		Item temp{ 0, 0 };
+	for (auto& i : kernels[k].closure) {
+		Item temp{ };
 		
-		Rule& rule = g.RuleTable[item->rule];
-		if (item->NextItemAfterShift(temp, rule)) {
-			Item* next = new Item(temp);
-			Token symbolAfterDot = rule.development[item->dotIndex];
+		Rule& rule = g.RuleTable[Items(i).rule];
+		if (NextItemAfterShift(temp, rule, i)) {
+			ItemHandle next = NewItem(temp.rule, temp.dotIndex);
+			Items(next).lookaheads = Items(i).lookaheads;
+			Token symbolAfterDot = rule.development[Items(i).dotIndex];
 
 			AddUnique(kernels[k].keys, symbolAfterDot);
 			AddToClosure(newKernels[symbolAfterDot], next);
@@ -251,18 +283,32 @@ bool AddGotos(Grammar& g, int k) {
 
 	for (int i = 0; i < kernels[k].keys.size(); ++i) {
 		auto key = kernels[k].keys[i];
-		Kernel newKernel{ (int)kernels.size(), newKernels[key] };
+		//Kernel newKernel{ (int)kernels.size(), newKernels[key] };
+		auto& items = newKernels[key];
 		int targetKernelIndex = -1;
-		if (auto it = std::find(kernels.begin(), kernels.end(), newKernel); it != kernels.end()) {
-			targetKernelIndex = int(it - kernels.begin());
+		for (auto& k : kernels) {
+			if (k.items.size() != items.size())
+				continue;
+			bool found = true;
+
+			for (const auto& e : k.items) {
+				if (std::find_if(items.begin(), items.end(), [e](const ItemHandle item) { return e == item; }) == items.end()) {
+					found = false;
+					break;
+				}
+			}
+			if (found) {
+				targetKernelIndex = k.index;
+				break;
+			}
 		}
 
 		if (targetKernelIndex < 0) {
-			kernels.push_back(newKernel);
-			targetKernelIndex = newKernel.index;
+			targetKernelIndex = (int)kernels.size();
+			kernels.emplace_back(targetKernelIndex, items);
 		}
 		else {
-			for (auto& item : newKernel.items) {
+			for (auto& item : items) {
 				result |= AddToClosure(kernels[targetKernelIndex].items, item);
 			}
 		}
@@ -275,7 +321,7 @@ bool AddGotos(Grammar& g, int k) {
 
 void CreateClosureTables(Grammar& g) {
 
-	g.ClosureKernels.push_back({ 0, {new Item{0, 0}} });
+	g.ClosureKernels.push_back({ 0, { NewItem() } });
 
 	size_t i = 0;
 	while (i < g.ClosureKernels.size()) {
@@ -311,26 +357,27 @@ void CreateParseTable(Grammar& g) {
 			state[key].shift = nextState;
 		}
 
-		for (const auto& item : kernel.closure) {
-			Rule& rule = g.RuleTable[item->rule];
-			if (item->dotIndex == rule.development.size() || rule.development[0] == None) {
-				for (const auto& k : item->lookaheads) {
+		for (const auto& it : kernel.closure) {
+			auto& item = Items(it);
+			Rule& rule = g.RuleTable[item.rule];
+			if (item.dotIndex == rule.development.size() || rule.development[0] == None) {
+				for (const auto& k : item.lookaheads) {
 					switch (state[k].type)
 					{
 					case REDUCE:
-						printf("Reduce-reduce error in state %d, token %d. Rules %d and %d\n", i, k, state[k].reduce, item->rule);
-						if (state[k].reduce > item->rule)
-							state[k].reduce = item->rule;
+						printf("Reduce-reduce error in state %d, token %d. Rules %d and %d\n", i, (int)k, state[k].reduce, item.rule);
+						if (state[k].reduce > item.rule)
+							state[k].reduce = item.rule;
 						break;
 
 					case SHIFT:
 						state[k].type = DECIDE;
-						state[k].reduce = item->rule;
+						state[k].reduce = item.rule;
 						break;
 					case ACCEPT:
 					case ERROR:
-						state[k].type = item->rule == 0 ? ACCEPT : REDUCE;
-						state[k].reduce = item->rule;
+						state[k].type = item.rule == 0 ? ACCEPT : REDUCE;
+						state[k].reduce = item.rule;
 						break;
 					default:
 						break;
@@ -345,26 +392,24 @@ void CreateParseTable(Grammar& g) {
 Grammar& CreateParser(Grammar& g, const RuleType& rules)
 {
 	TransformGrammar(g, rules);
+	Items().reserve((size_t)pow(g.RuleTable.size(), 1.75f));
 	CreateClosureTables(g);
 	CreateParseTable(g);
+
+	Items().clear();
+	Items().shrink_to_fit();
+	while (!ItemFreeIdx.empty()) ItemFreeIdx.pop();
+	LastItem = 0;
+
+	g.ClosureKernels.clear();
+	g.Firsts.clear();
+	g.Follows.clear();
 
 	return g;
 }
 
 void ReleaseGrammar(Grammar& g)
 {
-	for (auto& c : g.ClosureKernels) {
-		for (auto& closure : c.closure) {
-			std::erase(c.items, closure);
-			delete closure;
-		}
-	}
-
-	Item::Count;
-
-	g.ClosureKernels.clear();
-	g.Firsts.clear();
-	g.Follows.clear();
-	g.RuleTable.clear();
 	g.ParseTable.clear();
+	g.RuleTable.clear();
 };

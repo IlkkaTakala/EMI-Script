@@ -1,5 +1,6 @@
 #include "VM.h"
 #include "Parser.h"
+#include "NativeFuncs.h"
 
 VM::VM()
 {
@@ -46,4 +47,46 @@ ScriptHandle VM::Compile(const char* path, const CompileOptions& options)
 	QueueNotify.notify_one();
 
 	return handle;
+}
+
+std::vector<void(*)(const uint8*& ptr, const uint8* end)> OpCodeTable = {
+	IntAdd
+};
+
+Runner::Runner(VM* vm) : Owner(vm)
+{
+
+}
+
+Runner::~Runner()
+{
+
+}
+
+#define TARGET(Op) case OpCodes::Op
+
+void Runner::operator()(const Function& f)
+{
+	CallStack.emplace(&f, 0);
+
+	auto& target = CallStack.top();
+	bool interrupt = true;
+	const uint8* bytecodePtr = f.Bytecode.data();
+	const uint8* codeEnd = bytecodePtr + f.Bytecode.size();
+
+	while (interrupt && bytecodePtr < codeEnd) {
+		switch ((OpCodes)*bytecodePtr)
+		{
+			TARGET(JumpForward) : {
+				bytecodePtr += 0;
+			} break;
+
+
+
+
+		default:
+			OpCodeTable[*bytecodePtr](++bytecodePtr, codeEnd);
+			break;
+		}
+	}
 }

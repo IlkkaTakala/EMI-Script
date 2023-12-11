@@ -19,6 +19,8 @@ extern std::unordered_map<Token, const char*> TokensToName = {
 	{Variable,		"Variable"	   },
 	{Assign,		  "Assign"	   },
 	{Set,			"Set"			   },
+	{Static,		"Static"		   },
+	{Const,			"Const"			   },
 	{String,		  "String"	   },
 	{Integer,		"Integer"		   },
 	{Float,			"Float"		   },
@@ -112,6 +114,8 @@ std::unordered_map<std::string_view, Token> TokenMap = {
 	{"extend", Token::Extend },
 	{"var", Token::Variable },
 	{"set", Token::Set },
+	{"static", Token::Static },
+	{"const", Token::Const },
 
 	{"string", Token::TypeString},
 	{"int", Token::TypeInteger},
@@ -140,8 +144,7 @@ Lexer::Lexer(const std::string& file)
 		data.seekg(0);
 		data.read(&FileData[0], size);
 
-		Current.Ptr = FileData.c_str();
-		Current.Last = Current.Ptr + FileData.length();
+		Reset();
 	}
 }
 
