@@ -14,7 +14,7 @@ inline float StrToFloat(const char* i) { return (float)std::atof(i); }
 inline float IntToFloat(int i) { return (float)i; }
 inline float BoolToFloat(bool i) { return (float)i; }
 
-inline bool StrToBool(const char* i) { return false; }
+inline bool StrToBool(const char*) { return false; }
 inline bool FloatToBool(float i) { return bool(i); }
 inline bool IntToBool(int i) { return i; }
 

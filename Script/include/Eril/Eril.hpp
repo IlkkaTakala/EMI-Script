@@ -18,10 +18,8 @@ typedef unsigned long ScriptHandle;
 
 namespace Eril
 {
-	struct CompileOptions
+	struct Options
 	{
-		ScriptHandle Handle = 0;
-		std::string Path;
 		bool Simplify = false;
 	};
 
@@ -30,7 +28,7 @@ namespace Eril
 	public:
 		VMHandle(unsigned int);
 
-		ScriptHandle CompileScript(const char* file, const CompileOptions& options = {});
+		ScriptHandle CompileScript(const char* file, const Options& options = {});
 
 		ScriptHandle CompileMod(const char* file);
 

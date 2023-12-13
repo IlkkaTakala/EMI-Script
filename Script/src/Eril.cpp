@@ -15,7 +15,7 @@ Eril::VMHandle::VMHandle(unsigned int value) : Index(value)
 
 }
 
-ScriptHandle Eril::VMHandle::CompileScript(const char* file, const CompileOptions& options)
+ScriptHandle Eril::VMHandle::CompileScript(const char* file, const Options& options)
 {
 	auto vm = GetVM(Index);
 	return vm->Compile(file, options);

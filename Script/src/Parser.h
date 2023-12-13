@@ -10,5 +10,5 @@ public:
 	static void InitializeGrammar(const char* grammar);
 	static void ReleaseParser();
 	static void ThreadedParse(VM* vm);
-	static void Parse(VM* vm, CompileOptions& options);
+	static void Parse(VM* vm, const CompileOptions& options);
 };

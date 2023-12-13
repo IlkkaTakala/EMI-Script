@@ -28,7 +28,7 @@ void VM::ReinitializeGrammar(const char* grammar)
 	Parser::InitializeGrammar(grammar);
 }
 
-ScriptHandle VM::Compile(const char* path, const CompileOptions& options)
+ScriptHandle VM::Compile(const char* path, const Options& options)
 {
 	ScriptHandle handle;
 	{
@@ -36,9 +36,10 @@ ScriptHandle VM::Compile(const char* path, const CompileOptions& options)
 		handle = (ScriptHandle)++HandleCounter;
 	}
 
-	CompileOptions fulloptions = options;
+	CompileOptions fulloptions{};
 	fulloptions.Handle = handle;
 	fulloptions.Path = path;
+	fulloptions.UserOptions = options;
 
 	{
 		std::lock_guard lock(CompileMutex);
@@ -69,7 +70,7 @@ void Runner::operator()(const Function& f)
 {
 	CallStack.emplace(&f, 0);
 
-	auto& target = CallStack.top();
+	//auto& target = CallStack.top();
 	bool interrupt = true;
 	const uint8* bytecodePtr = f.Bytecode.data();
 	const uint8* codeEnd = bytecodePtr + f.Bytecode.size();

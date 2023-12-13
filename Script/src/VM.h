@@ -9,6 +9,12 @@
 #include "Function.h"
 
 class VM;
+struct CompileOptions
+{
+	std::string Path;
+	ScriptHandle Handle = 0;
+	Options UserOptions;
+};
 
 struct CallObject {
 	const Function* function;
@@ -35,7 +41,7 @@ public:
 	~VM();
 
 	void ReinitializeGrammar(const char* grammar);
-	ScriptHandle Compile(const char* path, const CompileOptions& options);
+	ScriptHandle Compile(const char* path, const Options& options);
 
 	//void Step();
 	//void CallFunction();

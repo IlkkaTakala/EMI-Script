@@ -250,8 +250,8 @@ void UpdateClosure(const Grammar& g, Kernel& k) {
 				}
 
 				if (epsilonPresent) {
-					for (auto& i : Items(h).lookaheads) {
-						AddUnique(lookahead, i);
+					for (auto& it : Items(h).lookaheads) {
+						AddUnique(lookahead, it);
 					}
 				}
 
@@ -286,19 +286,19 @@ bool AddGotos(Grammar& g, int k) {
 		//Kernel newKernel{ (int)kernels.size(), newKernels[key] };
 		auto& items = newKernels[key];
 		int targetKernelIndex = -1;
-		for (auto& k : kernels) {
-			if (k.items.size() != items.size())
+		for (auto& kernel : kernels) {
+			if (kernel.items.size() != items.size())
 				continue;
 			bool found = true;
 
-			for (const auto& e : k.items) {
+			for (const auto& e : kernel.items) {
 				if (std::find_if(items.begin(), items.end(), [e](const ItemHandle item) { return e == item; }) == items.end()) {
 					found = false;
 					break;
 				}
 			}
 			if (found) {
-				targetKernelIndex = k.index;
+				targetKernelIndex = kernel.index;
 				break;
 			}
 		}

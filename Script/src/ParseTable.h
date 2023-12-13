@@ -27,7 +27,8 @@ struct Rule
 struct Item
 {
 	Item() {
-		
+		dotIndex = 0;
+		rule = 0;
 	}
 
 	int rule;

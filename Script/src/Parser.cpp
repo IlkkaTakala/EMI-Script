@@ -291,7 +291,7 @@ void Parser::ThreadedParse(VM* vm)
 		vm->QueueNotify.wait(lk, [vm] {return !vm->CompileQueue.empty() || !vm->CompileRunning; });
 		if (!vm->CompileRunning) return;
 
-		auto options = vm->CompileQueue.front();
+		CompileOptions options = vm->CompileQueue.front();
 		vm->CompileQueue.pop();
 		lk.unlock();
 
@@ -329,16 +329,14 @@ void TypeConverter(Node* n, const TokenHolder& h) {
 	}
 }
 
-void Parser::Parse(VM* vm, CompileOptions& options)
+void Parser::Parse(VM*, const CompileOptions& options)
 {
 	Lexer lex(options.Path);
 
 	if (!lex.IsValid()) return;
 
-	bool useSimplify = options.Simplify;
+	bool useSimplify = options.UserOptions.Simplify;
 
-	int count = 0;
-	auto token = Token::None;
 	std::stack<Token> ss;
 
 	std::stack<int> stateStack;
