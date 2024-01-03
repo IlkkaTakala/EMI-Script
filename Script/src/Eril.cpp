@@ -27,7 +27,7 @@ FunctionHandle Eril::VMHandle::GetFunctionHandle(const char* name)
 	return 0;
 }
 
-std::future<Variable> Eril::VMHandle::CallFunction(FunctionHandle handle, const std::vector<Variable>& args)
+VariableHandle Eril::VMHandle::CallFunction(FunctionHandle handle, const std::vector<Variable>& args)
 {
 	return ((VM*)Vm)->CallFunction(handle, args);
 }

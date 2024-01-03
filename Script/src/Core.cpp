@@ -1,9 +1,9 @@
 #include "Core.h"
-#include <unordered_map>
+#include <ankerl/unordered_dense.h>
 #include "VM.h"
 
 uint Index = 0;
-std::unordered_map<uint, VM*> VMs = {};
+ankerl::unordered_dense::map<uint, VM*> VMs = {};
 
 uint CreateVM()
 {

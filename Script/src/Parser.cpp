@@ -4,7 +4,7 @@
 #include <stack>
 #include <iostream>
 #include <sstream>
-#include <unordered_map>
+#include <ankerl/unordered_dense.h>
 #include <charconv>
 #include <filesystem>
 

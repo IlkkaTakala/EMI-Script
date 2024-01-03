@@ -2,131 +2,16 @@
 #include <string>
 #include <string_view>
 #include <fstream>
-#include <unordered_map>
+#include <ankerl/unordered_dense.h>
 
+#define X(name) name,
 enum Token
 {
-	// Terminals
-	None,
-	Skip,
-	Error,
-	Object,
-	Definition,
-	Public,
-	Return,
-	If,
-	Else,
-	For,
-	While,
-	Break,
-	Continue,
-	Extend,
-	Variable,
-	Assign,
-	Set,
-	Static,
-	Const,
-
-	String,
-	Integer,
-	Float,
-	True,
-	False,
-
-	TypeString,
-	TypeInteger,
-	TypeFloat,
-	AnyType,
-
-	Rcurly,
-	Lcurly,
-	Rbracket,
-	Lbracket,
-	Rparenthesis,
-	Lparenthesis,
-
-	Equal,
-	Not,
-	And,
-	Or,
-	Less,
-	Larger,
-	LessEqual,
-	LargerEqual,
-
-	Add,
-	Sub,
-	Mult,
-	Div,
-
-	Increment,
-	Decrement,
-
-	Comma,
-	Dot,
-	Semi,
-	Colon,
-	Router,
-	Opt,
-
-	ValueId,
-	Id,
-
-	Ws,
-	Hex,
-
-	// Non-terminals
-	Start,
-	Program,
-	RProgram,
-	ObjectDef,
-	PublicFunctionDef,
-	FunctionDef,
-	NamespaceDef,
-	Scope,
-	MStmt,
-	Stmt,
-	Expr,
-	Value,
-	Identifier,
-	Arithmetic,
-	Priority,
-
-	ObjectVar,
-	MObjectVar,
-	OExpr,
-
-	Typename,
-	OTypename,
-
-	VarDeclare,
-	OVarDeclare,
-
-	FuncionCall,
-	CallParams,
-
-	Conditional,
-
-	Array,
-	Indexer,
-
-	Pipe,
-	MPipe,
-
-	Control,
-	Flow,
-	IfFlow,
-	ForFlow,
-	WhileFlow,
-	ElseFlow,
-	FlowBlock,
-
-	Setter,
-
-	Last
+#include "Lexemes.h"
 };
+#undef X 
 
-extern std::unordered_map<Token, const char*> TokensToName;
+extern ankerl::unordered_dense::map<Token, const char*> TokensToName;
 
 struct Context
 {
@@ -171,8 +56,6 @@ private:
 	Token Analyse(std::string_view& Data);
 
 	std::string FileData;
-
 	Context Current;
-
 	bool Valid;
 };

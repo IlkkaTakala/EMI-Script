@@ -32,6 +32,19 @@ namespace Eril
 			id = in;
 		}
 	};
+	struct VariableHandle
+	{
+		unsigned long id = 0;
+		VMHandle* vm = nullptr;
+
+		operator unsigned long() {
+			return id;
+		}
+		explicit VariableHandle() {}
+		VariableHandle(unsigned long in) {
+			id = in;
+		}
+	};
 
 	struct Options
 	{
@@ -57,7 +70,7 @@ namespace Eril
 
 		FunctionHandle GetFunctionHandle(const char* name);
 
-		std::future<Variable> CallFunction(FunctionHandle handle, const std::vector<Variable>& args);
+		VariableHandle CallFunction(FunctionHandle handle, const std::vector<Variable>& args);
 
 		void ExecuteScript();
 

@@ -3,9 +3,9 @@
 #include <mutex>
 #include <condition_variable>
 #include <queue>
-#include <unordered_map>
 #include <stack>
 #include <future>
+#include "ankerl/unordered_dense.h"
 
 #include "Eril/Eril.hpp"
 #include "Eril/Variable.h"
@@ -56,7 +56,7 @@ public:
 	void ReinitializeGrammar(const char* grammar);
 	ScriptHandle Compile(const char* path, const Options& options);
 
-	std::future<Variable> CallFunction(FunctionHandle handle, const std::vector<Variable>& args);
+	VariableHandle CallFunction(FunctionHandle handle, const std::vector<Variable>& args);
 
 	inline bool IsRunning() const { return VMRunning; }
 	//void Step();
@@ -85,8 +85,8 @@ private:
 	std::vector<std::thread> RunnerPool;
 	bool VMRunning;
 
-	std::unordered_map<uint16, Function> FunctionMap;
-	std::unordered_map<std::string, uint16> NameToFunctionMap;
+	ankerl::unordered_dense::map<uint16, Function> FunctionMap;
+	ankerl::unordered_dense::map<std::string, uint16> NameToFunctionMap;
 
 
 	std::vector<Variable> GlobalVariables;

@@ -264,7 +264,7 @@ void UpdateClosure(const Grammar& g, Kernel& k) {
 
 bool AddGotos(Grammar& g, int k) {
 	bool result = false;
-	std::unordered_map<Token, std::vector<ItemHandle>> newKernels;
+	ankerl::unordered_dense::map<Token, std::vector<ItemHandle>> newKernels;
 	auto& kernels = g.ClosureKernels;
 
 	for (auto& i : kernels[k].closure) {

@@ -57,10 +57,10 @@ ScriptHandle VM::Compile(const char* path, const Options& options)
 	return handle;
 }
 
-std::future<Variable> VM::CallFunction(FunctionHandle handle, const std::vector<Variable>& args)
+VariableHandle VM::CallFunction(FunctionHandle handle, const std::vector<Variable>& args)
 {
 	auto it = FunctionMap.find((uint16)handle);
-	if (it == FunctionMap.end()) return {};
+	if (it == FunctionMap.end()) return {0};
 
 	CallObject* call = new CallObject(&it->second);
 	call->Arguments = args;
@@ -69,7 +69,8 @@ std::future<Variable> VM::CallFunction(FunctionHandle handle, const std::vector<
 	CallQueue.push(call);
 	CallQueueNotify.notify_one();
 
-	return call->Return.get_future();
+	//call->Return.get_future();
+	return { 0 };
 }
 
 std::vector<void(*)(const uint8*& ptr, const uint8* end)> OpCodeTable = {

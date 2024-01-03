@@ -1,6 +1,5 @@
 #pragma once
 #include <vector>
-#include <unordered_map>
 #include "Lexer.h"
 
 struct Grammar;
@@ -53,7 +52,7 @@ struct Kernel
 	int index;
 	std::vector<ItemHandle> items;
 	std::vector<ItemHandle> closure;
-	std::unordered_map<Token, int> gotos;
+	ankerl::unordered_dense::map<Token, int> gotos;
 	std::vector<Token> keys;
 
 	bool operator==(const Kernel& rhs) const {
@@ -80,8 +79,8 @@ struct Grammar
 {
 	Token Axiom = Start;
 	std::vector<Rule> RuleTable;
-	std::unordered_map<Token, std::vector<Token>> Firsts;
-	std::unordered_map<Token, std::vector<Token>> Follows;
+	ankerl::unordered_dense::map<Token, std::vector<Token>> Firsts;
+	ankerl::unordered_dense::map<Token, std::vector<Token>> Follows;
 
 	std::vector<Kernel> ClosureKernels;
 	std::vector<std::vector<ActionNode>> ParseTable;
