@@ -7,10 +7,10 @@ using namespace Eril;
 VMHandle Eril::CreateEnvironment()
 {
 	uint idx = CreateVM();
-	return VMHandle(idx);
+	return VMHandle(idx, GetVM(idx));
 }
 
-Eril::VMHandle::VMHandle(unsigned int value) : Index(value)
+Eril::VMHandle::VMHandle(unsigned int value, void* ptr) : Index(value), Vm(ptr)
 {
 
 }
@@ -19,6 +19,17 @@ ScriptHandle Eril::VMHandle::CompileScript(const char* file, const Options& opti
 {
 	auto vm = GetVM(Index);
 	return vm->Compile(file, options);
+}
+
+FunctionHandle Eril::VMHandle::GetFunctionHandle(const char* name)
+{
+	name;
+	return 0;
+}
+
+std::future<Variable> Eril::VMHandle::CallFunction(FunctionHandle handle, const std::vector<Variable>& args)
+{
+	return ((VM*)Vm)->CallFunction(handle, args);
 }
 
 void Eril::VMHandle::ReleaseVM()

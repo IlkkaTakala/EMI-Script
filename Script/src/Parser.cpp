@@ -6,7 +6,9 @@
 #include <sstream>
 #include <unordered_map>
 #include <charconv>
+#include <filesystem>
 
+#include "Lexer.h"
 #include "ParseTable.h"
 #include "AST.h"
 
@@ -213,11 +215,11 @@ std::vector<std::string> splits(const std::string& s, char delim) {
 
 void Parser::InitializeGrammar(const char* grammar)
 {
-	printf("Initializing grammar...\n");
+	gLogger() << LogLevel::Debug << "Initializing grammar...\n";
 
 	std::fstream in(grammar, std::ios::in);
 	if (!in.is_open()) {
-		printf("No grammar found\n");
+		gLogger() << LogLevel::Debug << "No grammar found\n";
 		return;
 	}
 
@@ -269,13 +271,13 @@ void Parser::InitializeGrammar(const char* grammar)
 	}
 
 	if (Rules.size() != Data.size()) {
-		printf("Invalid grammar\n");
+		gLogger() << LogLevel::Debug << "Invalid grammar\n";
 		return;
 	}
 
 	ReleaseGrammar(G);
 	CreateParser(G, Rules);
-	printf("Grammar compiled\n");
+	gLogger()<< LogLevel::Debug << "Grammar compiled\n";
 }
 
 void Parser::ReleaseParser()
@@ -286,16 +288,17 @@ void Parser::ReleaseParser()
 void Parser::ThreadedParse(VM* vm)
 {
 	while (vm->CompileRunning) {
+		CompileOptions options;
+		{
+			std::unique_lock lk(vm->CompileMutex);
+			vm->QueueNotify.wait(lk, [vm] {return !vm->CompileQueue.empty() || !vm->CompileRunning; });
+			if (!vm->CompileRunning) return;
 
-		std::unique_lock lk(vm->CompileMutex);
-		vm->QueueNotify.wait(lk, [vm] {return !vm->CompileQueue.empty() || !vm->CompileRunning; });
-		if (!vm->CompileRunning) return;
-
-		CompileOptions options = vm->CompileQueue.front();
-		vm->CompileQueue.pop();
-		lk.unlock();
-
-		Parse(vm, options);
+			options = vm->CompileQueue.front();
+			vm->CompileQueue.pop();
+		}
+		if (options.Path != "")
+			Parse(vm, options);
 	}
 }
 
@@ -331,6 +334,11 @@ void TypeConverter(Node* n, const TokenHolder& h) {
 
 void Parser::Parse(VM*, const CompileOptions& options)
 {
+	if (!std::filesystem::exists(options.Path)) {
+		gLogger() << LogLevel::Warning << MakePath(options.Path) << ": File not found\n";
+		return;
+	}
+
 	Lexer lex(options.Path);
 
 	if (!lex.IsValid()) return;
@@ -444,26 +452,28 @@ void Parser::Parse(VM*, const CompileOptions& options)
 		} break;
 
 		case Action::ACCEPT: {
-			std::cout << "Parse successful\n";
+			gLogger() << LogLevel::Info << "Parse successful\n";
 			notDone = false;
 			ASTRoot = symbolStack.top().ptr;
 		} break;
 
 		ERRORCASE:
 		default: {
-			std::cout << "Error found at '" << holder.data << "': ";
 			const auto& c = lex.GetContext();
-			printf("Line %lld, column %lld\n", c.Row, c.Column);
+			gLogger() << LogLevel::Error << MakePath(options.Path) 
+				<< std::format(" (%lld, %lld)", c.Row, c.Column) 
+				<< ": Critical error found '" << holder.data << "\n";
 			notDone = false;
 			break;
 		}
 		}
 	}
 
+	// @todo: remove debug code
 	if (ASTRoot) {
-		std::cout << "AST\n";
+		gLogger() << "AST\n";
 		ASTRoot->print("", true);
-		std::cout << "\n\n";
+		gLogger() << "\n\n";
 	}
 
 

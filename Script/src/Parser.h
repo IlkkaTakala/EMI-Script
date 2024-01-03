@@ -1,7 +1,6 @@
 #pragma once
 #include "Defines.h"
 #include "VM.h"
-#include "Lexer.h"
 
 class Parser
 {

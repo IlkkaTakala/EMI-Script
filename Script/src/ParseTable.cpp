@@ -365,7 +365,6 @@ void CreateParseTable(Grammar& g) {
 					switch (state[k].type)
 					{
 					case REDUCE:
-						printf("Reduce-reduce error in state %d, token %d. Rules %d and %d\n", i, (int)k, state[k].reduce, item.rule);
 						if (state[k].reduce > item.rule)
 							state[k].reduce = item.rule;
 						break;

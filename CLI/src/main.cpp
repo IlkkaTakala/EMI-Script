@@ -25,25 +25,28 @@ std::vector<std::string> split(const std::string& s, char delim) {
 
 int main()
 {
-	std::unordered_map<std::string, std::function<void(Eril::VMHandle&, const std::vector<std::string>&)>> commandTable = {
-		{"exit", [](Eril::VMHandle& vm, const std::vector<std::string>&) { exit(0); }},
+	std::unordered_map<std::string, std::function<bool(Eril::VMHandle&, const std::vector<std::string>&)>> commandTable = {
+		{"exit", [](Eril::VMHandle& vm, const std::vector<std::string>&) { exit(0); return false; }},
 		{"compile", [](Eril::VMHandle& vm, const std::vector<std::string>& params) {
-			static std::unordered_map<std::string, std::function<void(Eril::CompileOptions&)>> optionMap = {
-				{"-s", [](Eril::CompileOptions& options) { options.Simplify = true; }}
+			static std::unordered_map<std::string, std::function<void(Eril::Options&)>> optionMap = {
+				{"-s", [](Eril::Options& options) { options.Simplify = true; }}
 			};
-
-			Eril::CompileOptions options;
-			for (auto& s : params) {
-				if (auto it = optionMap.find(s); it != optionMap.end()) {
+			std::vector<std::string> path;
+			Eril::Options options;
+			for (int i = 1; i < params.size(); i++) {
+				if (auto it = optionMap.find(params[i]); it != optionMap.end()) {
 					it->second(options);
 				}
 				else {
-					options.Path = s;
+					path.push_back(params[i]);
 				}
 			}
-			vm.CompileScript(options.Path.c_str(), options); 
+			bool result = false;
+			for (const auto& p : path) 
+				result |= vm.CompileScript(p.c_str(), options); 
+			return result;
 		}},
-		{"reinit", [](Eril::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); }},
+		{"reinit", [](Eril::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); return false; }},
 	};
 
 	auto vm = Eril::CreateEnvironment();
@@ -58,15 +61,32 @@ int main()
 
 		if (res.size() < 1) continue;
 
+		bool result = false;
 		if (auto it = commandTable.find(res[0]); it != commandTable.end()) {
-			it->second(vm, res);
+			result = it->second(vm, res);
 		}
 
 		printf("\n\n");
+		if (!result) continue;
+
+		bool runScriptMode = true;
+		while (runScriptMode)
+		{
+			printf(">> ");
+			std::getline(std::cin, input);
+			if (input == "quit") {
+				runScriptMode = false;
+				break;
+			}
+
+			Eril::FunctionHandle h = vm.GetFunctionHandle("");
+			
+		}
+		printf("Exiting script stage\n\n");
 	}
 
-	std::this_thread::sleep_for(10ms);
 	Eril::ReleaseEnvironment(vm);
+	std::this_thread::sleep_for(10ms);
 
 	/*srand(time(NULL));
 

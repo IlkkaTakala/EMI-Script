@@ -5,8 +5,13 @@
 #include <queue>
 #include <unordered_map>
 #include <stack>
+#include <future>
 
+#include "Eril/Eril.hpp"
+#include "Eril/Variable.h"
 #include "Function.h"
+
+using namespace Eril;
 
 class VM;
 struct CompileOptions
@@ -16,9 +21,17 @@ struct CompileOptions
 	Options UserOptions;
 };
 
-struct CallObject {
-	const Function* function;
-	size_t location;
+struct CallObject 
+{
+	const Function* FunctionPtr;
+	size_t Location;
+	uint16 StackOffset;
+	std::vector<Variable> Arguments;
+	std::promise<Variable> Return;
+
+	CallObject(Function* function);
+	CallObject(const CallObject& obj) = delete;
+	CallObject operator=(const CallObject& obj) = delete;
 };
 
 class Runner
@@ -27,11 +40,11 @@ public:
 	Runner(VM* vm);
 	~Runner();
 
-	void operator()(const Function& f);
+	void operator()();
 
 private:
 	VM* Owner;
-	std::stack<CallObject> CallStack;
+	std::stack<CallObject*> CallStack;
 };
 
 class VM
@@ -43,11 +56,14 @@ public:
 	void ReinitializeGrammar(const char* grammar);
 	ScriptHandle Compile(const char* path, const Options& options);
 
+	std::future<Variable> CallFunction(FunctionHandle handle, const std::vector<Variable>& args);
+
+	inline bool IsRunning() const { return VMRunning; }
 	//void Step();
-	//void CallFunction();
 
 private:
 	friend class Parser;
+	friend class Runner;
 
 	// When adding new compile targets
 	std::mutex CompileMutex;
@@ -55,6 +71,8 @@ private:
 	std::mutex MergeMutex;
 	// When getting new handles
 	std::mutex HandleMutex;
+	// When editing call queue
+	std::mutex CallMutex;
 
 	std::condition_variable QueueNotify;
 	std::queue<CompileOptions> CompileQueue;
@@ -62,9 +80,15 @@ private:
 	size_t HandleCounter = 0;
 	bool CompileRunning;
 
+	std::condition_variable CallQueueNotify;
+	std::queue<CallObject*> CallQueue;
+	std::vector<std::thread> RunnerPool;
+	bool VMRunning;
 
 	std::unordered_map<uint16, Function> FunctionMap;
 	std::unordered_map<std::string, uint16> NameToFunctionMap;
 
-	// Variable heap
+
+	std::vector<Variable> GlobalVariables;
+	// Variable heap?
 };

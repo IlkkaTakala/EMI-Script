@@ -12,12 +12,27 @@
 #define CORE_API
 #endif
 
-#include <string>
-
-typedef unsigned long ScriptHandle;
+#include <future>
+#include "Eril/Variable.h"
 
 namespace Eril
 {
+	class VMHandle;
+	typedef unsigned long ScriptHandle; // @todo: fix type
+	struct FunctionHandle
+	{
+		unsigned long id = 0;
+		VMHandle* vm = nullptr;
+
+		operator unsigned long() {
+			return id;
+		}
+		explicit FunctionHandle() {}
+		FunctionHandle(unsigned long in) {
+			id = in;
+		}
+	};
+
 	struct Options
 	{
 		bool Simplify = false;
@@ -26,7 +41,7 @@ namespace Eril
 	class CORE_API VMHandle
 	{
 	public:
-		VMHandle(unsigned int);
+		VMHandle(unsigned int, void*);
 
 		ScriptHandle CompileScript(const char* file, const Options& options = {});
 
@@ -40,9 +55,9 @@ namespace Eril
 
 		bool ExportCompiledMod(const char* file);
 
-		void GetFunctionHandle();
+		FunctionHandle GetFunctionHandle(const char* name);
 
-		void CallFunction();
+		std::future<Variable> CallFunction(FunctionHandle handle, const std::vector<Variable>& args);
 
 		void ExecuteScript();
 
@@ -58,6 +73,7 @@ namespace Eril
 
 	private:
 		unsigned int Index;
+		void* Vm;
 	};
 
 	VMHandle CreateEnvironment();

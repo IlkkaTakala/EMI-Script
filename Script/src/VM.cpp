@@ -8,16 +8,23 @@ VM::VM()
 	auto counter = std::thread::hardware_concurrency();
 	CompileRunning = true;
 
+	VMRunning = true;
 	for (uint i = 0; i < counter; i++) {
 		ParserPool.emplace_back(Parser::ThreadedParse, this);
+		RunnerPool.emplace_back(Runner(this));
 	}
 }
 
 VM::~VM()
 {
 	CompileRunning = false;
+	VMRunning = false;
 	QueueNotify.notify_all();
+	CallQueueNotify.notify_all();
 	for (auto& t : ParserPool) {
+		t.join();
+	}
+	for (auto& t : RunnerPool) {
 		t.join();
 	}
 	Parser::ReleaseParser();
@@ -50,6 +57,21 @@ ScriptHandle VM::Compile(const char* path, const Options& options)
 	return handle;
 }
 
+std::future<Variable> VM::CallFunction(FunctionHandle handle, const std::vector<Variable>& args)
+{
+	auto it = FunctionMap.find((uint16)handle);
+	if (it == FunctionMap.end()) return {};
+
+	CallObject* call = new CallObject(&it->second);
+	call->Arguments = args;
+
+	std::unique_lock lk(CallMutex);
+	CallQueue.push(call);
+	CallQueueNotify.notify_one();
+
+	return call->Return.get_future();
+}
+
 std::vector<void(*)(const uint8*& ptr, const uint8* end)> OpCodeTable = {
 	IntAdd
 };
@@ -66,28 +88,48 @@ Runner::~Runner()
 
 #define TARGET(Op) case OpCodes::Op
 
-void Runner::operator()(const Function& f)
+void Runner::operator()()
 {
-	CallStack.emplace(&f, 0);
+	while (Owner->IsRunning()) {
 
-	//auto& target = CallStack.top();
-	bool interrupt = true;
-	const uint8* bytecodePtr = f.Bytecode.data();
-	const uint8* codeEnd = bytecodePtr + f.Bytecode.size();
-
-	while (interrupt && bytecodePtr < codeEnd) {
-		switch ((OpCodes)*bytecodePtr)
+		CallObject * f;
 		{
-			TARGET(JumpForward) : {
-				bytecodePtr += 0;
-			} break;
+			std::unique_lock lk(Owner->CallMutex);
+			Owner->CallQueueNotify.wait(lk, [&]() {return !Owner->CallQueue.empty() || !Owner->IsRunning(); });
+			if (!Owner->IsRunning()) return;
+
+			f = Owner->CallQueue.front();
+			Owner->CallQueue.pop();
+		}
+		CallStack.emplace(f);
+
+		//auto& target = CallStack.top();
+		bool interrupt = true;
+		const uint8* bytecodePtr = f->FunctionPtr->Bytecode.data();
+		const uint8* codeEnd = bytecodePtr + f->FunctionPtr->Bytecode.size();
+
+		while (interrupt && bytecodePtr < codeEnd && Owner->IsRunning()) {
+			switch ((OpCodes)*bytecodePtr)
+			{
+				TARGET(JumpForward) : {
+					bytecodePtr += 0;
+				} break;
 
 
 
 
-		default:
-			OpCodeTable[*bytecodePtr](++bytecodePtr, codeEnd);
-			break;
+			default:
+				OpCodeTable[*bytecodePtr](++bytecodePtr, codeEnd);
+				break;
+			}
 		}
 	}
+}
+
+CallObject::CallObject(Function* function)
+{
+	FunctionPtr = function;
+	StackOffset = 0;
+	Location = 0;
+	
 }

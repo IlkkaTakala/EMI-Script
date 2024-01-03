@@ -1,5 +1,7 @@
 #include "Lexer.h"
 #include <unordered_map>
+#include "Defines.h"
+#include <filesystem>
 
 extern std::unordered_map<Token, const char*> TokensToName = {
 	{None,			"None"		   },
@@ -146,6 +148,9 @@ Lexer::Lexer(const std::string& file)
 
 		Reset();
 	}
+	else {
+		gLogger() << LogLevel::Warning << MakePath(file) << ": Cannot open file\n";
+	}
 }
 
 Lexer::~Lexer()
@@ -183,6 +188,7 @@ inline bool ValidID(unsigned char c) {
 void Lexer::Reset()
 {
 	Current.Ptr = FileData.c_str();
+	Current.Last = FileData.c_str() + FileData.size();
 	Current.Column = 1;
 	Current.Row = 1;
 	Current.Valid = true;

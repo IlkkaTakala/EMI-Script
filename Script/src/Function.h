@@ -10,7 +10,7 @@ struct Function
 
 	// Definition/Signature?
 	// Call statistics?
-
+	uint8 ArgCount;
 
 	std::vector<uint8> Bytecode;
 };
