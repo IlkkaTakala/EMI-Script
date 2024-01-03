@@ -11,7 +11,7 @@ struct Node
 		}
 	}
 	Token type = None;
-	std::variant<std::string, int, float, bool> data;
+	std::variant<std::string, double, bool> data;
 
 	std::vector<Node*> parent;
 	std::list<Node*> children;

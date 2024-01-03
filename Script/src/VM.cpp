@@ -1,6 +1,7 @@
 #include "VM.h"
 #include "Parser.h"
 #include "NativeFuncs.h"
+#include "Helpers.h"
 
 VM::VM()
 {
@@ -57,20 +58,49 @@ ScriptHandle VM::Compile(const char* path, const Options& options)
 	return handle;
 }
 
-VariableHandle VM::CallFunction(FunctionHandle handle, const std::vector<Variable>& args)
+size_t VM::GetFunctionID(const std::string& name)
+{
+	if (auto it = NameToFunctionMap.find(name); it != NameToFunctionMap.end()) {
+		return it->second;
+	}
+	return 0;
+}
+
+size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 {
 	auto it = FunctionMap.find((uint16)handle);
 	if (it == FunctionMap.end()) return {0};
 
 	CallObject* call = new CallObject(&it->second);
-	call->Arguments = args;
+
+	call->Arguments.reserve(args.size());
+	for (auto& v : args) {
+		moveOwnershipToVM(v);
+		call->Arguments.push_back(v);
+	}
+
+	size_t idx = 0;
+	if (ReturnFreeList.empty()) {
+		ReturnValues.push_back(call->Return.get_future());
+		idx = ReturnValues.size();
+	}
+	else {
+		idx = ReturnFreeList.top();
+		ReturnFreeList.pop();
+		ReturnValues[idx] = call->Return.get_future();
+	}
 
 	std::unique_lock lk(CallMutex);
 	CallQueue.push(call);
 	CallQueueNotify.notify_one();
 
-	//call->Return.get_future();
-	return { 0 };
+	return idx;
+}
+
+Variable VM::GetReturnValue(size_t index)
+{
+	if (ReturnValues.size() <= index) return {};
+	return ReturnValues[index].get();
 }
 
 std::vector<void(*)(const uint8*& ptr, const uint8* end)> OpCodeTable = {

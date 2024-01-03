@@ -312,13 +312,9 @@ struct TokenHolder
 void TypeConverter(Node* n, const TokenHolder& h) {
 	switch (h.token)
 	{
-	case Integer:
-		n->data = 0;
-		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<int>(n->data));
-		break;
 	case Float:
 		n->data = 0.f;
-		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<int>(n->data));
+		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<double>(n->data));
 		break;
 	case True:
 		n->data = true;

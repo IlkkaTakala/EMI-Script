@@ -43,7 +43,7 @@ int main()
 			}
 			bool result = false;
 			for (const auto& p : path) 
-				result |= vm.CompileScript(p.c_str(), options); 
+				result |= (bool)vm.CompileScript(p.c_str(), options); 
 			return result;
 		}},
 		{"reinit", [](Eril::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); return false; }},
@@ -79,8 +79,9 @@ int main()
 				break;
 			}
 
-			Eril::FunctionHandle h = vm.GetFunctionHandle("");
-			
+			Eril::FunctionHandle h = vm.GetFunctionHandle("test");
+			auto handle = h(10, 5423.453, "Test", true, &input, 34.f);
+			std::cout << handle.get<int>();
 		}
 		printf("Exiting script stage\n\n");
 	}

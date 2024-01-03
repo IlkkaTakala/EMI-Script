@@ -23,13 +23,20 @@ ScriptHandle Eril::VMHandle::CompileScript(const char* file, const Options& opti
 
 FunctionHandle Eril::VMHandle::GetFunctionHandle(const char* name)
 {
-	name;
-	return 0;
+	auto id = ((VM*)Vm)->GetFunctionID(name);
+	return FunctionHandle{id, this};
 }
 
-VariableHandle Eril::VMHandle::CallFunction(FunctionHandle handle, const std::vector<Variable>& args)
+VariableHandle Eril::VMHandle::_internal_call(FunctionHandle handle, size_t count, Variable* args)
 {
-	return ((VM*)Vm)->CallFunction(handle, args);
+	const std::span<Variable> s(args, count);
+	size_t out = ((VM*)Vm)->CallFunction(handle, s);
+	return VariableHandle{ out, this };
+}
+
+Variable Eril::VMHandle::GetReturn(VariableHandle handle)
+{
+	return ((VM*)Vm)->GetReturnValue(handle);
 }
 
 void Eril::VMHandle::ReleaseVM()

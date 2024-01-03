@@ -5,6 +5,7 @@
 #include <queue>
 #include <stack>
 #include <future>
+#include <span>
 #include "ankerl/unordered_dense.h"
 
 #include "Eril/Eril.hpp"
@@ -45,6 +46,7 @@ public:
 private:
 	VM* Owner;
 	std::stack<CallObject*> CallStack;
+	std::stack<Variable, std::vector<Variable>> Stack;
 };
 
 class VM
@@ -56,7 +58,10 @@ public:
 	void ReinitializeGrammar(const char* grammar);
 	ScriptHandle Compile(const char* path, const Options& options);
 
-	VariableHandle CallFunction(FunctionHandle handle, const std::vector<Variable>& args);
+	size_t GetFunctionID(const std::string& name);
+
+	size_t CallFunction(FunctionHandle handle, const std::span<Variable>& args);
+	Variable GetReturnValue(size_t index);
 
 	inline bool IsRunning() const { return VMRunning; }
 	//void Step();
@@ -83,10 +88,12 @@ private:
 	std::condition_variable CallQueueNotify;
 	std::queue<CallObject*> CallQueue;
 	std::vector<std::thread> RunnerPool;
+	std::vector<std::future<Variable>> ReturnValues;
+	std::stack<size_t> ReturnFreeList;
 	bool VMRunning;
 
-	ankerl::unordered_dense::map<uint16, Function> FunctionMap;
-	ankerl::unordered_dense::map<std::string, uint16> NameToFunctionMap;
+	ankerl::unordered_dense::map<uint32, Function> FunctionMap;
+	ankerl::unordered_dense::map<std::string, uint32> NameToFunctionMap;
 
 
 	std::vector<Variable> GlobalVariables;

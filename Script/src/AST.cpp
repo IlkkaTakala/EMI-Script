@@ -10,9 +10,8 @@ std::string VariantToStr(Node* n) {
 	switch (n->data.index())
 	{
 	case 0: return std::get<std::string>(n->data);
-	case 1: return IntToStr(std::get<int>(n->data));
-	case 2: return FloatToStr(std::get<float>(n->data));
-	case 3: return BoolToStr(std::get<bool>(n->data));
+	case 1: return FloatToStr(std::get<double>(n->data));
+	case 2: return BoolToStr(std::get<bool>(n->data));
 	default:
 		return "";
 		break;
@@ -23,22 +22,20 @@ int VariantToInt(Node* n) {
 	switch (n->data.index())
 	{
 	case 0: return StrToInt(std::get<std::string>(n->data).c_str());
-	case 1: return std::get<int>(n->data);
-	case 2: return FloatToInt(std::get<float>(n->data));
-	case 3: return BoolToInt(std::get<bool>(n->data));
+	case 1: return FloatToInt(std::get<double>(n->data));
+	case 2: return BoolToInt(std::get<bool>(n->data));
 	default:
 		return 0;
 		break;
 	}
 }
 
-float VariantToFloat(Node* n) {
+double VariantToFloat(Node* n) {
 	switch (n->data.index())
 	{
 	case 0: return StrToFloat(std::get<std::string>(n->data).c_str());
-	case 1: return IntToFloat(std::get<int>(n->data));
-	case 2: return (std::get<float>(n->data));
-	case 3: return BoolToFloat(std::get<bool>(n->data));
+	case 1: return (std::get<double>(n->data));
+	case 2: return BoolToFloat(std::get<bool>(n->data));
 	default:
 		return 0.f;
 		break;
@@ -49,9 +46,8 @@ bool VariantToBool(Node* n) {
 	switch (n->data.index())
 	{
 	case 0: return StrToBool(std::get<std::string>(n->data).c_str());
-	case 1: return IntToBool(std::get<int>(n->data));
-	case 2: return FloatToBool(std::get<float>(n->data));
-	case 3: return (std::get<bool>(n->data));
+	case 1: return FloatToBool(std::get<double>(n->data));
+	case 2: return (std::get<bool>(n->data));
 	default:
 		return false;
 		break;
@@ -88,15 +84,12 @@ void OpAdd(Node* n, Node* l, Node* r) {
 	case String: {
 		n->data = VariantToStr(l) + VariantToStr(r);
 	} break;
-	case Integer: {
-		n->data = VariantToInt(l) + VariantToInt(r);
-	} break;
 	case Float: {
 		n->data = VariantToFloat(l) + VariantToFloat(r);
 	} break;
 	case False: 
 	case True: {
-		n->data = VariantToBool(l) + VariantToBool(r);
+		n->data = VariantToBool(l) || VariantToBool(r);
 	} break;
 	default:
 		break;
@@ -110,15 +103,12 @@ void OpSub(Node* n, Node* l, Node* r) {
 	case String: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Integer: {
-		n->data = VariantToInt(l) - VariantToInt(r);
-	} break;
 	case Float: {
 		n->data = VariantToFloat(l) - VariantToFloat(r);
 	} break;
 	case False: 
 	case True: {
-		n->data = VariantToBool(l) - VariantToBool(r);
+		n->data = VariantToBool(l) && VariantToBool(r);
 	} break;
 	default:
 		break;
@@ -132,15 +122,12 @@ void OpMult(Node* n, Node* l, Node* r) {
 	case String: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Integer: {
-		n->data = VariantToInt(l) * VariantToInt(r);
-	} break;
 	case Float: {
 		n->data = VariantToFloat(l) * VariantToFloat(r);
 	} break;
 	case False: 
 	case True: {
-		n->data = VariantToBool(l) * VariantToBool(r);
+		n->data = VariantToBool(l) || VariantToBool(r);
 	} break;
 	default:
 		break;
@@ -153,9 +140,6 @@ void OpDiv(Node* n, Node* l, Node* r) {
 	{
 	case String: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
-	} break;
-	case Integer: {
-		n->data = VariantToInt(l) / VariantToInt(r);
 	} break;
 	case Float: {
 		n->data = VariantToFloat(l) / VariantToFloat(r);

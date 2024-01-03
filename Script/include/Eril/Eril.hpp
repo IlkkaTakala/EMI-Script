@@ -12,37 +12,48 @@
 #define CORE_API
 #endif
 
-#include <future>
+#include <vector>
 #include "Eril/Variable.h"
 
 namespace Eril
 {
 	class VMHandle;
 	typedef unsigned long ScriptHandle; // @todo: fix type
-	struct FunctionHandle
+	
+	class VariableHandle
 	{
-		unsigned long id = 0;
+		size_t id = 0;
 		VMHandle* vm = nullptr;
 
-		operator unsigned long() {
+	public:
+		operator size_t() {
 			return id;
 		}
-		explicit FunctionHandle() {}
-		FunctionHandle(unsigned long in) {
+
+		template<typename T>
+		T get();
+
+		explicit VariableHandle(size_t in, VMHandle* handle) {
 			id = in;
+			vm = handle;
 		}
 	};
-	struct VariableHandle
+
+	class FunctionHandle
 	{
-		unsigned long id = 0;
+		size_t id = 0;
 		VMHandle* vm = nullptr;
 
-		operator unsigned long() {
+	public:
+		template<typename ...Args> requires (std::is_convertible_v<Args, Variable> && ...)
+		VariableHandle operator()(Args... args);
+
+		operator size_t() {
 			return id;
 		}
-		explicit VariableHandle() {}
-		VariableHandle(unsigned long in) {
+		explicit FunctionHandle(size_t in, VMHandle* handle) {
 			id = in;
+			vm = handle;
 		}
 	};
 
@@ -58,25 +69,17 @@ namespace Eril
 
 		ScriptHandle CompileScript(const char* file, const Options& options = {});
 
-		ScriptHandle CompileMod(const char* file);
-
-		ScriptHandle RecompileScript(ScriptHandle);
-
-		ScriptHandle RecompileMod(ScriptHandle);
-
-		ScriptHandle LoadMod(const char* data);
-
-		bool ExportCompiledMod(const char* file);
-
 		FunctionHandle GetFunctionHandle(const char* name);
 
-		VariableHandle CallFunction(FunctionHandle handle, const std::vector<Variable>& args);
+		VariableHandle _internal_call(FunctionHandle handle, size_t count, Variable* args);
 
-		void ExecuteScript();
+		template<typename ...Args> requires (std::is_convertible_v<Args, Variable> && ...)
+		VariableHandle CallFunction(FunctionHandle handle, Args... args) {
+			std::vector<Variable> params = { Variable(args)... };
+			return _internal_call(handle, params.size(), params.data());
+		}
 
-		void ReleaseMod();
-
-		void ReleaseUnbound();
+		Variable GetReturn(VariableHandle handle);
 
 		void ReleaseVM();
 
@@ -91,6 +94,15 @@ namespace Eril
 
 	VMHandle CreateEnvironment();
 	void ReleaseEnvironment(VMHandle handle);
+
+	template<typename T>
+	T VariableHandle::get() {
+		return vm->GetReturn(*this).as<T>();
+	}
+	template<typename ...Args> requires (std::is_convertible_v<Args, Variable> && ...)
+		VariableHandle FunctionHandle::operator()(Args... args) {
+		return vm->CallFunction(*this, args...);
+	}
 }
 
 #endif // !_ERIL_INC_GUARD_HPP
