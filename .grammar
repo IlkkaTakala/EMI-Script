@@ -11,8 +11,7 @@ RProgram NamespaceDef
 RProgram VarDeclare Semi
 
 Typename TypeString
-Typename TypeInteger
-Typename TypeFloat
+Typename TypeNumber
 
 ObjectDef Object Id Lcurly MObjectVar Rcurly
 MObjectVar ObjectVar MObjectVar
@@ -23,9 +22,13 @@ OTypename None
 OExpr Assign Expr
 OExpr None
 
-FunctionDef Definition Id Lparenthesis CallParams Rparenthesis Scope
+FunctionDef Definition Id Lparenthesis MFunctionVar Rparenthesis Scope
 PublicFunctionDef Public FunctionDef
 NamespaceDef Extend Id Colon
+MFunctionVar FunctionVar Comma MFunctionVar
+MFunctionVar FunctionVar
+MFunctionVar None
+FunctionVar Id OTypename
 
 Scope Lcurly MStmt Rcurly
 MStmt Stmt MStmt
@@ -62,9 +65,8 @@ Expr Value
 Expr ValueId
 Value True
 Value False
-Value Integer
 Value String
-Value Float
+Value Number
 Value Identifier
 Identifier Id
 Identifier Identifier Dot Id
@@ -73,12 +75,12 @@ Array Lbracket CallParams Rbracket
 
 MPipe Pipe MPipe
 MPipe Pipe
-Pipe Router FuncionCall
+Pipe Router FunctionCall
 Pipe If Lparenthesis Expr Rparenthesis Pipe
 
 Expr Expr Assign Expr
 Expr VarDeclare
-Expr FuncionCall
+Expr FunctionCall
 Expr Indexer
 Expr Expr MPipe
 Expr Control
@@ -105,13 +107,13 @@ FlowBlock Scope
 Indexer Expr Lbracket Expr Rbracket
 Indexer Expr Lbracket Rbracket
 
-VarDeclare Variable Id OVarDeclare
+VarDeclare Var Id OVarDeclare
 VarDeclare Static Id OVarDeclare
 VarDeclare Const Id OVarDeclare
 OVarDeclare Assign Expr
 OVarDeclare None
 
-FuncionCall Expr Lparenthesis CallParams Rparenthesis
+FunctionCall Expr Lparenthesis CallParams Rparenthesis
 CallParams Expr
 CallParams Expr Comma CallParams
 CallParams None
@@ -129,8 +131,7 @@ None None NamespaceDef
 None None VarDeclare
 
 None TypeString 
-None TypeInteger 
-None TypeFloat 
+None TypeNumber
 
 Id None MObjectVar
 None None MObjectVar
@@ -142,7 +143,11 @@ None None Expr
 .
 
 Id
-None PublicFunctionDef FunctionDefion
+None PublicFunctionDef FunctionDef
+Id
+None CallParams MFunctionVar
+None CallParams
+None CallParams
 Id
 
 None Scope MStmt 
@@ -180,9 +185,8 @@ None None Value
 ValueId ValueId
 True True
 False False 
-Integer Integer 
 String String 
-Float Float 
+Number Number 
 None None Identifier 
 Id Id 
 Id Id 
@@ -191,12 +195,12 @@ None Array CallParams
 
 None None MPipe
 None Pipe 
-None None FuncionCall
+None None FunctionCall
 None If
 
 Assign Assign
 None None VarDeclare
-None None FuncionCall
+None None FunctionCall
 None None Indexer
 None None MPipe
 None None Control

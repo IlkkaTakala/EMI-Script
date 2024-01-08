@@ -13,8 +13,6 @@ https://craftinginterpreters.com/optimization.html#nan-boxing
 
 */
 
-void* memcpy(void*, void const*,size_t);
-
 #define SIGN_BIT		((uint64_t)0x8000000000000000)
 #define QNAN			((uint64_t)0x7ffc000000000000)
 #define TAG_NIL			1
@@ -32,8 +30,8 @@ enum class VariableType
 	Undefined,
 	Number,
 	Boolean,
-	Object,
-	External
+	External,
+	Object
 };
 
 class Variable
@@ -47,7 +45,11 @@ public:
 		value = *(uint64_t*)&val;
 	}
 	Variable(double v) {
-		memcpy(&value, &v, sizeof(double));
+		value = *(uint64_t*)&v;
+	}
+	Variable(uint64_t v) {
+		if (v == 0) value = NIL_VAL;
+		else value = OBJ_VAL(v);
 	}
 	Variable(bool v) {
 		value = BOOL_VAL(v);
@@ -97,7 +99,7 @@ public:
 	template<typename T> requires (std::is_convertible_v<T, double>)
 	T as() const {
 		double num;
-		memcpy(&num, &value, sizeof(uint64_t));
+		num = *(double*)&value;
 		return static_cast<T>(num);
 	}
 
@@ -109,6 +111,10 @@ public:
 	template<typename T> requires std::is_pointer_v<T>
 	T as() const {
 		return ((T)(uintptr_t)((value) & ~(SIGN_BIT | QNAN | TAG_NIL)));
+	}
+
+	bool operator==(const Variable& rhs) {
+		return value == rhs.value;
 	}
 };
 

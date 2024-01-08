@@ -4,7 +4,7 @@ object Test
 {
     test : string = "value";
     time : int;
-    any;
+    any = "anyval";
 }
 
 static Global = "test";
@@ -14,7 +14,7 @@ def func() {
     var some = "test";
     Delay(100);
     some.append("hes", 29);
-    
+    45;
     var value = 56 + (423 - 34 - some ? 54 : 34); 
     
     const arr = [42,123,123];

@@ -21,14 +21,13 @@ ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
 	{"break", Token::Break },
 	{"continue", Token::Continue },
 	{"extend", Token::Extend },
-	{"var", Token::Variable },
+	{"var", Token::Var },
 	{"set", Token::Set },
 	{"static", Token::Static },
 	{"const", Token::Const },
 
 	{"string", Token::TypeString},
-	{"int", Token::TypeInteger},
-	{"float", Token::TypeFloat},
+	{"number", Token::TypeNumber},
 
 	{"true", Token::True},
 	{"false", Token::False},
@@ -124,7 +123,7 @@ Token Lexer::Analyse(std::string_view& Data)
 
 	if (ValidID(*ptr)) {
 		if ((*ptr == 'x' || *ptr == '.') && is_digit(*(ptr + 1))) {
-			TOKEN(Integer);
+			TOKEN(Number);
 			while (is_alnum(*ptr)) Current.Advance();
 		}
 		else {
@@ -143,15 +142,15 @@ Token Lexer::Analyse(std::string_view& Data)
 			CASE('.',
 				Current.Advance();
 			while (is_digit(*ptr)) Current.Advance();
-			TOKEN(Float);
+			TOKEN(Number);
 			)
 				CASE('x',
 					Current.Advance();
 			while (is_alnum(*ptr)) Current.Advance();
-			TOKEN(Integer);
+			TOKEN(Number);
 			)
 		default:
-			TOKEN(Integer);
+			TOKEN(Number);
 		}
 	}
 	else {

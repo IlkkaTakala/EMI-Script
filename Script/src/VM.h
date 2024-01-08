@@ -11,6 +11,7 @@
 #include "Eril/Eril.hpp"
 #include "Eril/Variable.h"
 #include "Function.h"
+#include "Object.h"
 
 using namespace Eril;
 
@@ -95,7 +96,7 @@ private:
 	ankerl::unordered_dense::map<uint32, Function> FunctionMap;
 	ankerl::unordered_dense::map<std::string, uint32> NameToFunctionMap;
 
-
+	ObjectManager Manager;
 	std::vector<Variable> GlobalVariables;
 	// Variable heap?
 };

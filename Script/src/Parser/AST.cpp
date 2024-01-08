@@ -1,5 +1,6 @@
 #include "AST.h"
 #include "NativeFuncs.h"
+#include "Helpers.h"
 #include <iostream>
 
 constexpr unsigned char first[] = { 195, 196, 196 };
@@ -54,6 +55,21 @@ bool VariantToBool(Node* n) {
 	}
 }
 
+Variable Node::toVariable() const
+{
+	Variable v;
+	switch (data.index())
+	{
+	case 0: v = std::get<0>(data).c_str(); break;
+	case 1: v = std::get<1>(data); break;
+	case 2: v = std::get<2>(data); break;
+	default:
+		break;
+	}
+	moveOwnershipToVM(v);
+	return v;
+}
+
 void Node::print(const std::string& prefix, bool isLast)
 {
 	std::cout << prefix;
@@ -84,7 +100,7 @@ void OpAdd(Node* n, Node* l, Node* r) {
 	case String: {
 		n->data = VariantToStr(l) + VariantToStr(r);
 	} break;
-	case Float: {
+	case Number: {
 		n->data = VariantToFloat(l) + VariantToFloat(r);
 	} break;
 	case False: 
@@ -103,7 +119,7 @@ void OpSub(Node* n, Node* l, Node* r) {
 	case String: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Float: {
+	case Number: {
 		n->data = VariantToFloat(l) - VariantToFloat(r);
 	} break;
 	case False: 
@@ -122,7 +138,7 @@ void OpMult(Node* n, Node* l, Node* r) {
 	case String: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Float: {
+	case Number: {
 		n->data = VariantToFloat(l) * VariantToFloat(r);
 	} break;
 	case False: 
@@ -141,7 +157,7 @@ void OpDiv(Node* n, Node* l, Node* r) {
 	case String: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Float: {
+	case Number: {
 		n->data = VariantToFloat(l) / VariantToFloat(r);
 	} break;
 	case False: 
@@ -159,10 +175,7 @@ void OpEqual(Node* n, Node* l, Node* r) {
 	case String: {
 		n->data = VariantToStr(l) == VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Integer: {
-		n->data = VariantToInt(l) == VariantToInt(r);
-	} break;
-	case Float: {
+	case Number: {
 		n->data = VariantToFloat(l) == VariantToFloat(r);
 	} break;
 	case False: 
@@ -191,6 +204,7 @@ bool Optimize(Node*& n)
 	} break;
 
 	case Stmt: {
+		if (n->children.empty()) break;
 		if (IsConstant(n->children.front()->type)) {
 			delete n;
 			n = nullptr;
@@ -216,6 +230,26 @@ bool Optimize(Node*& n)
 		}
 		n->children.erase(end, n->children.end());
 
+		auto i = n->children.begin();
+		while (i != n->children.end())
+		{
+			if (IsConstant((*i)->type))
+			{
+				n->children.erase(i++);
+			}
+			++i;
+		}
+
+	} break;
+
+	case Static: {
+		if (n->children.size() > 0) {
+			if (!IsConstant(n->children.front()->type)) {
+				delete n;
+				n = nullptr;
+				return false;
+			}
+		}
 	} break;
 
 	default:
@@ -253,4 +287,177 @@ bool Optimize(Node*& n)
 	}
 
 	return true;
+}
+
+void TypeConverter(Node* n, const TokenHolder& h)
+{
+	switch (h.token)
+	{
+	case Number:
+		n->data = 0.f;
+		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<double>(n->data));
+		break;
+	case True:
+		n->data = true;
+		break;
+	case False:
+		n->data = false;
+		break;
+	default:
+		std::get<std::string>(n->data) = h.data;
+		break;
+	}
+}
+
+ASTWalker::ASTWalker(VM*, Node* n)
+{
+	root = n;
+	auto it = namespaces.emplace("Global", Namespace{});
+	currentNamespace = &it.first->second;
+}
+
+void ASTWalker::Run()
+{
+	for (auto& c : root->children) {
+		switch (c->type)
+		{
+		case NamespaceDef:
+		{
+			currentNamespace = &namespaces[std::get<0>(c->data)];
+		} break;
+		
+		case ObjectDef:
+		{
+			auto& data = std::get<0>(c->data);
+			auto s = findSymbol(data);
+			if (!s) {
+				auto it = currentNamespace->symbols.emplace(data, Symbol{});
+				auto& symbol = it.first->second;
+				symbol.setType(SymbolType::Object);
+				auto& object = currentNamespace->objects.emplace(data, UserDefined{}).first->second;
+				
+				for (auto& field : c->children) {
+					Symbol flags;
+					flags.flags = SymbolFlags::None;
+					Variable var;
+
+					if (field->children.size() == 2) {
+						if (field->children.front()->type != AnyType) {
+							flags.flags = SymbolFlags::Typed;
+						}
+						if (IsConstant(field->children.back()->type)) {
+							if (TypesMatch(field->children.front()->type, field->children.back()->type)) {
+								var = field->children.back()->toVariable(); // @todo: Add implicit conversions
+							}
+							else {
+								gError() << "Trying to initialize with wrong type: In object " << data << ", field " << std::get<0>(field->data) << '\n';
+							}
+						}
+						else if (field->children.back()->type == OExpr) {
+							switch (field->children.front()->type)
+							{
+							case TypeNumber:
+								var = Variable(0.0);
+							default:
+								break;
+							}
+						}
+						else {
+							gError() << "Trying to initialize to non-static: In object " << data << ", field " << std::get<0>(field->data) << ", line " << field->line << '\n';
+						}
+					} 
+					else {
+						gError() << "Parse error in object " << data << '\n';
+					}
+					
+					object.AddField(std::get<0>(field->data), var, flags);
+				}
+
+				symbol.resolved = true;
+			}
+			else {
+				gError() << "Line " << c->line << ": Symbol '" << data << "' already defined\n";
+			}
+		} break;
+		
+		case PublicFunctionDef:
+		case FunctionDef:
+		{
+			auto& data = std::get<0>(c->data);
+			auto s = findSymbol(data);
+			if (!s) {
+				auto it = currentNamespace->symbols.emplace(data, Symbol{});
+				auto& symbol = it.first->second;
+				symbol.setType(SymbolType::Function);
+				auto& function = currentNamespace->functions.emplace(data, Function{}).first->second;
+				
+				handleFunction(c, function, symbol);
+			}
+			else {
+				gError() << "Line " << c->line << ": Symbol '" << data << "' already defined\n";
+			}
+		} break;
+
+		case Static:
+		{
+		} break;
+
+		case Const:
+		{
+		} break;
+
+		case VarDeclare:
+		{
+		} break;
+
+		default:
+			break;
+		}
+	}
+}
+
+void ASTWalker::Walk(Node* n)
+{
+	for (auto& c : n->children) {
+		Walk(c);
+	}
+}
+
+bool ASTWalker::findSymbol(const std::string& name)
+{
+	if (namespaces.find(name) != namespaces.end()) return true;
+	return currentNamespace->findSymbol(name);
+}
+
+void ASTWalker::handleFunction(Node* n, Function& f, Symbol& s)
+{
+	f.Name = std::get<0>(n->data);
+
+	f.scope = new Scoped();
+
+	for (auto& c : n->children) {
+		switch (c->type)
+		{
+		case CallParams: {
+			f.ArgCount = (uint8)c->children.size();
+			for (auto& v : c->children) {
+				auto symbol = f.scope->addSymbol(std::get<0>(v->data));
+				symbol->setType(SymbolType::Variable);
+				symbol->resolved = true;
+			}
+		} break;
+
+		case Scope: {
+
+			Walk(c);
+
+		} break;
+
+		default:
+			gWarn() << "Something unexpected in function " << f.Name << '\n';
+			break;
+		}
+	}
+
+	s.resolved = true;
 }

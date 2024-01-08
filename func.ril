@@ -1,0 +1,19 @@
+extend Script:
+
+object Test
+{
+    test : string = "value";
+    time : number;
+    any = "anyval";
+}
+
+def func() {
+	print(2 == 2);
+	print(1 + 1);
+}
+
+public def funct(value, vel, ) {
+    
+}
+
+# compile ../../ScriptTest.ril -s

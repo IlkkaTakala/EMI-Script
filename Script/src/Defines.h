@@ -11,6 +11,21 @@ inline Logger& gLogger()
 	return log;
 }
 
+inline Logger& gDebug()
+{
+	return gLogger() << LogLevel::Debug;
+}
+
+inline Logger& gWarn()
+{
+	return gLogger() << LogLevel::Warning;
+}
+
+inline Logger& gError()
+{
+	return gLogger() << LogLevel::Error;
+}
+
 typedef unsigned int uint;
 typedef unsigned char uint8;
 typedef unsigned __int16 uint16;

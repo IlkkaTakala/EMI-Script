@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # set the project name
 project(ScriptCore)
 
@@ -13,8 +14,6 @@ if (MSVC)
 else()
     add_compile_options(-Wall -Wextra -pedantic -Werror)
 endif()
-
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 macro(add_dependency)
     SET(dependency_name ${ARGV0})
@@ -54,10 +53,18 @@ file(
     "${_header_path}/*.h*"
 )
 
+foreach(_source IN ITEMS ${_source_list})
+    get_filename_component(_source_path "${_source}" PATH)
+    file(RELATIVE_PATH _source_path_rel "${_src_root_path}" "${_source_path}")
+    string(REPLACE "/" "\\" _group_path "${_source_path_rel}")
+    source_group("${_group_path}" FILES "${_source}")
+endforeach()
+
 add_library(Script ${_source_list})
 
 target_compile_definitions(Script PRIVATE SCRIPTEXPORT)
 target_include_directories(Script PUBLIC ${_header_path})
+target_include_directories(Script PRIVATE ${_src_root_path})
 target_include_directories(Script INTERFACE ${_header_path})
 
 target_link_libraries(Script PUBLIC unordered_dense)

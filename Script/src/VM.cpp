@@ -1,5 +1,5 @@
 #include "VM.h"
-#include "Parser.h"
+#include "Parser/Parser.h"
 #include "NativeFuncs.h"
 #include "Helpers.h"
 
@@ -100,7 +100,9 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 Variable VM::GetReturnValue(size_t index)
 {
 	if (ReturnValues.size() <= index) return {};
-	return ReturnValues[index].get();
+	Variable var = ReturnValues[index].get();
+	moveOwnershipToHost(var);
+	return var;
 }
 
 std::vector<void(*)(const uint8*& ptr, const uint8* end)> OpCodeTable = {
