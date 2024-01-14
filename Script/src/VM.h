@@ -12,6 +12,7 @@
 #include "Eril/Variable.h"
 #include "Function.h"
 #include "Object.h"
+#include "Namespace.h"
 
 using namespace Eril;
 
@@ -19,6 +20,7 @@ class VM;
 struct CompileOptions
 {
 	std::string Path;
+	std::string Data;
 	ScriptHandle Handle = 0;
 	Options UserOptions;
 };
@@ -26,6 +28,8 @@ struct CompileOptions
 struct CallObject 
 {
 	const Function* FunctionPtr;
+	const uint8* Ptr;
+	const uint8* End;
 	size_t Location;
 	uint16 StackOffset;
 	std::vector<Variable> Arguments;
@@ -34,6 +38,43 @@ struct CallObject
 	CallObject(Function* function);
 	CallObject(const CallObject& obj) = delete;
 	CallObject operator=(const CallObject& obj) = delete;
+};
+
+template <typename T>
+class stack
+{
+public:
+	T pop() {
+		if (top == 0) return T();
+		top--;
+		return _stack[top];
+	}
+
+	T& peek() {
+		return _stack[top - 1];
+	}
+
+	void push(const T& v) {
+		top++;
+		if (_stack.size() <= top) _stack.push_back(v);
+		else _stack[top - 1] = v;
+	}
+
+	void pop(size_t count) {
+		if (top < count)
+			top -= count;
+		else
+			top = 0;
+	}
+
+	void to(size_t i) {
+		top = i;
+	}
+
+private:
+
+	size_t top;
+	std::vector<T> _stack;
 };
 
 class Runner
@@ -47,7 +88,7 @@ public:
 private:
 	VM* Owner;
 	std::stack<CallObject*> CallStack;
-	std::stack<Variable, std::vector<Variable>> Stack;
+	stack<Variable> Stack;
 };
 
 class VM
@@ -58,11 +99,14 @@ public:
 
 	void ReinitializeGrammar(const char* grammar);
 	ScriptHandle Compile(const char* path, const Options& options);
+	void CompileTemporary(const char* data);
 
 	size_t GetFunctionID(const std::string& name);
 
 	size_t CallFunction(FunctionHandle handle, const std::span<Variable>& args);
 	Variable GetReturnValue(size_t index);
+
+	void AddNamespace(ankerl::unordered_dense::map<std::string, Namespace>& space);
 
 	inline bool IsRunning() const { return VMRunning; }
 	//void Step();
@@ -90,11 +134,15 @@ private:
 	std::queue<CallObject*> CallQueue;
 	std::vector<std::thread> RunnerPool;
 	std::vector<std::future<Variable>> ReturnValues;
-	std::stack<size_t> ReturnFreeList;
+	std::vector<size_t> ReturnFreeList;
 	bool VMRunning;
 
-	ankerl::unordered_dense::map<uint32, Function> FunctionMap;
+	ankerl::unordered_dense::map<uint32, Function*> FunctionMap;
 	ankerl::unordered_dense::map<std::string, uint32> NameToFunctionMap;
+	ankerl::unordered_dense::map<std::string, Namespace> Namespaces;
+	std::stack<uint32> FunctionFreeList;
+	uint32 FunctionHandleCounter = 0;
+
 
 	ObjectManager Manager;
 	std::vector<Variable> GlobalVariables;

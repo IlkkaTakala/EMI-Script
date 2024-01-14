@@ -31,6 +31,8 @@ struct Symbol
 	SymbolFlags flags = SymbolFlags::None;
 	VariableType varType = VariableType::Undefined;
 	bool resolved = false;
+	int startLife;
+	int endLife;
 
 	void setType(SymbolType t);
 

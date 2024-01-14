@@ -9,6 +9,7 @@ RProgram FunctionDef
 RProgram PublicFunctionDef
 RProgram NamespaceDef
 RProgram VarDeclare Semi
+RProgram Stmt
 
 Typename TypeString
 Typename TypeNumber
@@ -88,6 +89,7 @@ Expr Control
 Setter Set ValueId
 
 Control Return Expr
+Control Return
 Control Continue
 Control Break
 
@@ -129,6 +131,7 @@ None None FunctionDef
 None None PublicFunctionDef
 None None NamespaceDef
 None None VarDeclare
+None None Stmt
 
 None TypeString 
 None TypeNumber
@@ -207,6 +210,7 @@ None None Control
 
 ValueId
 
+None Return
 None Return
 None Continue
 None Break

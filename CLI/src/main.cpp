@@ -25,8 +25,8 @@ std::vector<std::string> split(const std::string& s, char delim) {
 
 int main()
 {
-	std::unordered_map<std::string, std::function<bool(Eril::VMHandle&, const std::vector<std::string>&)>> commandTable = {
-		{"exit", [](Eril::VMHandle& vm, const std::vector<std::string>&) { exit(0); return false; }},
+	std::unordered_map<std::string, std::function<int(Eril::VMHandle&, const std::vector<std::string>&)>> commandTable = {
+		{"exit", [](Eril::VMHandle& vm, const std::vector<std::string>&) { exit(0); return 0; }},
 		{"compile", [](Eril::VMHandle& vm, const std::vector<std::string>& params) {
 			static std::unordered_map<std::string, std::function<void(Eril::Options&)>> optionMap = {
 				{"-s", [](Eril::Options& options) { options.Simplify = true; }}
@@ -41,12 +41,13 @@ int main()
 					path.push_back(params[i]);
 				}
 			}
-			bool result = false;
+			int result = 0;
 			for (const auto& p : path) 
-				result |= (bool)vm.CompileScript(p.c_str(), options); 
-			return result;
+				result += vm.CompileScript(p.c_str(), options); 
+			return result > 0 ? 1 : 0;
 		}},
-		{"reinit", [](Eril::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); return false; }},
+		{"reinit", [](Eril::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
+		{"eril", [](Eril::VMHandle& vm, const std::vector<std::string>& params) { return 2; }},
 	};
 
 	auto vm = Eril::CreateEnvironment();
@@ -61,29 +62,54 @@ int main()
 
 		if (res.size() < 1) continue;
 
-		bool result = false;
+		int result = 0;
 		if (auto it = commandTable.find(res[0]); it != commandTable.end()) {
 			result = it->second(vm, res);
 		}
 
 		printf("\n\n");
-		if (!result) continue;
+		if (result == 0) continue;
 
-		bool runScriptMode = true;
-		while (runScriptMode)
+		switch (result)
 		{
-			printf(">> ");
-			std::getline(std::cin, input);
-			if (input == "quit") {
-				runScriptMode = false;
-				break;
-			}
+		case 1: {
+			bool runScriptMode = true;
+			while (runScriptMode)
+			{
+				printf(">> ");
+				std::getline(std::cin, input);
+				if (input == "quit") {
+					runScriptMode = false;
+					break;
+				}
 
-			Eril::FunctionHandle h = vm.GetFunctionHandle("test");
-			auto handle = h(10, 5423.453, "Test", true, &input, 34.f);
-			std::cout << handle.get<int>();
+				Eril::FunctionHandle h = vm.GetFunctionHandle(input.c_str());
+				auto handle = h(10, 5423.453, "Test", true, &input, 34.f);
+				std::cout << handle.get<int>() << '\n';
+			}
+			printf("Exiting script stage\n\n");
+		} break;
+
+		case 2: {
+			printf("Running in scripting mode\n");
+			bool runScriptMode = true;
+			while (runScriptMode)
+			{
+				printf(">> ");
+				std::getline(std::cin, input);
+				if (input == "quit") {
+					runScriptMode = false;
+					break;
+				}
+
+				vm.CompileTemporary(input.c_str());
+			}
+			printf("Exiting script stage\n\n");
+		} break;
+		default:
+			break;
 		}
-		printf("Exiting script stage\n\n");
+		
 	}
 
 	Eril::ReleaseEnvironment(vm);

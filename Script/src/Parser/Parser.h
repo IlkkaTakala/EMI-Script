@@ -2,7 +2,7 @@
 #include "Defines.h"
 #include "VM.h"
 
-struct Node;
+class Node;
 class Parser
 {
 public:
@@ -10,6 +10,6 @@ public:
 	static void InitializeGrammar(const char* grammar);
 	static void ReleaseParser();
 	static void ThreadedParse(VM* vm);
-	static void Parse(VM* vm, const CompileOptions& options);
-	static Node* ConstructAST(const CompileOptions& options);
+	static void Parse(VM* vm, CompileOptions& options);
+	static Node* ConstructAST(CompileOptions& options);
 };

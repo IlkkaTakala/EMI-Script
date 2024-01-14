@@ -314,6 +314,8 @@ ASTWalker::ASTWalker(VM*, Node* n)
 	root = n;
 	auto it = namespaces.emplace("Global", Namespace{});
 	currentNamespace = &it.first->second;
+	currentFunction = nullptr;
+	currentScope = nullptr;
 }
 
 void ASTWalker::Run()
@@ -389,7 +391,9 @@ void ASTWalker::Run()
 				auto it = currentNamespace->symbols.emplace(data, Symbol{});
 				auto& symbol = it.first->second;
 				symbol.setType(SymbolType::Function);
-				auto& function = currentNamespace->functions.emplace(data, Function{}).first->second;
+				Function* function = new Function();
+				function->Name = data;
+				currentNamespace->functions.emplace(function->Name.c_str(), function).first->second;
 				
 				handleFunction(c, function, symbol);
 			}
@@ -416,10 +420,45 @@ void ASTWalker::Run()
 	}
 }
 
+#define _Op(code) f->Bytecode.push_back((uint8)OpCodes::code)
+#define _N(n, func) case Token::n: {func} break;
+#define _Walk for(auto& child : n->children) Walk(child);
+
 void ASTWalker::Walk(Node* n)
 {
-	for (auto& c : n->children) {
-		Walk(c);
+	Function* f = currentFunction;
+	switch (n->type) {
+		_N(Number, {
+			_Op(LoadNumber);
+			auto res = f->numberTable.emplace(std::get<double>(n->data)); 
+			uint16 idx = (uint16)std::distance(f->numberTable.begin(), res.first);
+			auto t = f->Bytecode.size();
+			f->Bytecode.resize(f->Bytecode.size() + 2);
+			f->Bytecode[t] = *(uint8*)(&idx);
+			}
+		)
+
+		_N(String,
+			f->stringTable.emplace(std::get<std::string>(n->data));
+			_Op(LoadString);
+		)
+
+		_N(Add,
+			_Walk;
+			_Op(NumAdd);
+			)
+
+
+
+		_N(Return,
+			_Walk;
+			if (n->children.empty()) _Op(PushUndefined);
+			_Op(Return);
+		)
+
+	default:
+		_Walk;
+		break;
 	}
 }
 
@@ -429,19 +468,18 @@ bool ASTWalker::findSymbol(const std::string& name)
 	return currentNamespace->findSymbol(name);
 }
 
-void ASTWalker::handleFunction(Node* n, Function& f, Symbol& s)
+void ASTWalker::handleFunction(Node* n, Function* f, Symbol& s)
 {
-	f.Name = std::get<0>(n->data);
-
-	f.scope = new Scoped();
+	f->scope = new Scoped();
+	currentFunction = f;
 
 	for (auto& c : n->children) {
 		switch (c->type)
 		{
 		case CallParams: {
-			f.ArgCount = (uint8)c->children.size();
+			f->ArgCount = (uint8)c->children.size();
 			for (auto& v : c->children) {
-				auto symbol = f.scope->addSymbol(std::get<0>(v->data));
+				auto symbol = f->scope->addSymbol(std::get<0>(v->data));
 				symbol->setType(SymbolType::Variable);
 				symbol->resolved = true;
 			}
@@ -449,12 +487,13 @@ void ASTWalker::handleFunction(Node* n, Function& f, Symbol& s)
 
 		case Scope: {
 
+			currentScope = f->scope;
 			Walk(c);
 
 		} break;
 
 		default:
-			gWarn() << "Something unexpected in function " << f.Name << '\n';
+			gWarn() << "Something unexpected in function " << f->Name << '\n';
 			break;
 		}
 	}

@@ -76,9 +76,12 @@ class ObjectManager
 public:
 	ObjectManager() {}
 
-	void AddType(const std::string& name, UserDefined& obj) {
-		obj.type = (ObjectType)++typeCounter;
-		baseTypes.emplace(name, obj);
+	ObjectType AddType(const std::string& name, const UserDefined& obj) {
+		if (auto it = baseTypes.find(name); it == baseTypes.end()) {
+			auto res = baseTypes.emplace(name, obj);
+			return res.first->second.type = (ObjectType)++typeCounter;
+		}
+		return ObjectType::UserDefined;
 	}
 
 	ankerl::unordered_dense::map<std::string, UserDefined> baseTypes;

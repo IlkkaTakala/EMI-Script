@@ -22,7 +22,7 @@ struct TokenData
 	Association Associativity = Association::None;
 };
 
-struct Node;
+class Node;
 struct TokenHolder
 {
 	Token token = None;

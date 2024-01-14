@@ -38,25 +38,12 @@ ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
 	{"and", Token::And},
 };
 
-Lexer::Lexer(const std::string& file)
+Lexer::Lexer(const char* data, size_t size)
 {
-	Valid = false;
-	std::fstream data(file, std::ios::in);
-
-	if (data.is_open()) {
-		Valid = true;
-
-		data.seekg(0, std::ios::end);
-		size_t size = data.tellg();
-		FileData.resize(size + 1);
-		data.seekg(0);
-		data.read(&FileData[0], size);
-
-		Reset();
-	}
-	else {
-		gLogger() << LogLevel::Warning << MakePath(file) << ": Cannot open file\n";
-	}
+	Valid = data && size > 0;
+	FileData = data;
+	Size = size;
+	Reset();
 }
 
 Lexer::~Lexer()
@@ -93,8 +80,8 @@ inline bool ValidID(unsigned char c) {
 
 void Lexer::Reset()
 {
-	Current.Ptr = FileData.c_str();
-	Current.Last = FileData.c_str() + FileData.size();
+	Current.Ptr = FileData;
+	Current.Last = FileData + Size;
 	Current.Column = 1;
 	Current.Row = 1;
 	Current.Valid = true;

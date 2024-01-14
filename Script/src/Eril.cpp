@@ -21,6 +21,11 @@ ScriptHandle Eril::VMHandle::CompileScript(const char* file, const Options& opti
 	return vm->Compile(file, options);
 }
 
+void Eril::VMHandle::CompileTemporary(const char* data)
+{
+	((VM*)Vm)->CompileTemporary(data);
+}
+
 FunctionHandle Eril::VMHandle::GetFunctionHandle(const char* name)
 {
 	auto id = ((VM*)Vm)->GetFunctionID(name);

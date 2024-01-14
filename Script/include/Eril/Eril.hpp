@@ -68,6 +68,7 @@ namespace Eril
 		VMHandle(unsigned int, void*);
 
 		ScriptHandle CompileScript(const char* file, const Options& options = {});
+		void CompileTemporary(const char* data);
 
 		FunctionHandle GetFunctionHandle(const char* name);
 

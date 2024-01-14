@@ -58,6 +58,19 @@ ScriptHandle VM::Compile(const char* path, const Options& options)
 	return handle;
 }
 
+void VM::CompileTemporary(const char* data)
+{
+	CompileOptions fulloptions{};
+	fulloptions.Handle = 0;
+	fulloptions.Data = data;
+	fulloptions.UserOptions.Simplify = true;
+	{
+		std::lock_guard lock(CompileMutex);
+		CompileQueue.push(fulloptions);
+	}
+	QueueNotify.notify_one();
+}
+
 size_t VM::GetFunctionID(const std::string& name)
 {
 	if (auto it = NameToFunctionMap.find(name); it != NameToFunctionMap.end()) {
@@ -69,9 +82,9 @@ size_t VM::GetFunctionID(const std::string& name)
 size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 {
 	auto it = FunctionMap.find((uint16)handle);
-	if (it == FunctionMap.end()) return {0};
+	if (it == FunctionMap.end()) return (size_t)-1;
 
-	CallObject* call = new CallObject(&it->second);
+	CallObject* call = new CallObject(it->second);
 
 	call->Arguments.reserve(args.size());
 	for (auto& v : args) {
@@ -82,11 +95,11 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 	size_t idx = 0;
 	if (ReturnFreeList.empty()) {
 		ReturnValues.push_back(call->Return.get_future());
-		idx = ReturnValues.size();
+		idx = ReturnValues.size() - 1;
 	}
 	else {
-		idx = ReturnFreeList.top();
-		ReturnFreeList.pop();
+		idx = ReturnFreeList.back();
+		ReturnFreeList.pop_back();
 		ReturnValues[idx] = call->Return.get_future();
 	}
 
@@ -99,15 +112,40 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 
 Variable VM::GetReturnValue(size_t index)
 {
-	if (ReturnValues.size() <= index) return {};
+	if (ReturnValues.size() <= index || ReturnFreeList.end() != std::find(ReturnFreeList.begin(), ReturnFreeList.end(), index)) return {};
 	Variable var = ReturnValues[index].get();
+	ReturnFreeList.push_back(index);
 	moveOwnershipToHost(var);
 	return var;
 }
 
-std::vector<void(*)(const uint8*& ptr, const uint8* end)> OpCodeTable = {
-	IntAdd
-};
+void VM::AddNamespace(ankerl::unordered_dense::map<std::string, Namespace>& space)
+{
+	std::unique_lock lk(MergeMutex);
+	for (auto& [name, s] : space) {
+		for (auto& [oname, obj] : s.objects) {
+			auto type = Manager.AddType(oname, obj);
+			s.objectTypes[oname] = type;
+		}
+		s.objects.clear();
+		for (auto& [fname, func] : s.functions) {
+			auto full = name + '.' + fname;
+			if (auto it = NameToFunctionMap.find(full); it != NameToFunctionMap.end()) {
+				gWarn() << "Multiple definitions for function " << full << '\n';
+			}
+			auto idx = ++FunctionHandleCounter;
+			NameToFunctionMap[full] = idx;
+			FunctionMap[idx] = func;
+		}
+
+		if (auto it = Namespaces.find(name); it != Namespaces.end()) {
+			it->second.merge(s);
+		}
+		else {
+			Namespaces[name] = s;
+		}
+	}
+}
 
 Runner::Runner(VM* vm) : Owner(vm)
 {
@@ -120,6 +158,8 @@ Runner::~Runner()
 }
 
 #define TARGET(Op) case OpCodes::Op
+#define Read16() *(uint16*)current->Ptr
+#define Read8() *(uint8*)current->Ptr
 
 void Runner::operator()()
 {
@@ -136,23 +176,57 @@ void Runner::operator()()
 		}
 		CallStack.emplace(f);
 
-		//auto& target = CallStack.top();
 		bool interrupt = true;
-		const uint8* bytecodePtr = f->FunctionPtr->Bytecode.data();
-		const uint8* codeEnd = bytecodePtr + f->FunctionPtr->Bytecode.size();
+		CallObject* current = CallStack.top();
+		current->Ptr = current->FunctionPtr->Bytecode.data();
+		current->End = current->Ptr + current->FunctionPtr->Bytecode.size();
 
-		while (interrupt && bytecodePtr < codeEnd && Owner->IsRunning()) {
-			switch ((OpCodes)*bytecodePtr)
+		auto nums = &f->FunctionPtr->numberTable.values();
+
+
+		while (interrupt && current->Ptr < current->End && Owner->IsRunning()) {
+			switch ((OpCodes)*current->Ptr++)
 			{
 				TARGET(JumpForward) : {
-					bytecodePtr += 0;
+					current->Ptr += Read16();
 				} break;
 
+				TARGET(JumpBackward) : {
+					current->Ptr -= Read16();
+				} break;
 
+				TARGET(LoadNumber) : {
+					Stack.push((*nums)[Read16()]);
+					current->Ptr += 2;
+				} break;
 
+				TARGET(Return) : {
+					auto val = Stack.pop();
+					if (current->StackOffset == 0) {
+						current->Return.set_value(val);
+						Stack.to(0);
+					}
+					else {
+						Stack.to(current->StackOffset);
+						Stack.push(val);
+					}
+					CallStack.pop();
+					if (!CallStack.empty()) {
+						current = CallStack.top();
+					}
+					else {
+						current = nullptr;
+						interrupt = false;
+					}
+				} break;
+
+				TARGET(PushUndefined) : {
+					Variable var;
+					var.setUndefined();
+					Stack.push(var);
+				}
 
 			default:
-				OpCodeTable[*bytecodePtr](++bytecodePtr, codeEnd);
 				break;
 			}
 		}
@@ -164,5 +238,6 @@ CallObject::CallObject(Function* function)
 	FunctionPtr = function;
 	StackOffset = 0;
 	Location = 0;
-	
+	Ptr = nullptr;
+	End = nullptr;
 }

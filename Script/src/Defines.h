@@ -36,13 +36,22 @@ typedef unsigned long ScriptHandle;
 
 enum class OpCodes : uint8
 {
-	LoadConst,
+	Noop,
+	LoadNumber,
+	LoadString,
 	LoadSymbol,
 	Pop,
 	CallSymbol,
+	PushUndefined,
 
 	JumpBackward,
 	JumpForward,
 	Return,
 	ReturnValue,
+
+
+	NumAdd,
+	NumSub,
+	NumMul,
+	NumDiv,
 };

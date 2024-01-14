@@ -43,7 +43,7 @@ struct Context
 class Lexer
 {
 public:
-	Lexer(const std::string& file);
+	Lexer(const char* data, size_t size);
 	~Lexer();
 
 	void Reset();
@@ -55,7 +55,8 @@ private:
 
 	Token Analyse(std::string_view& Data);
 
-	std::string FileData;
+	const char* FileData;
+	size_t Size;
 	Context Current;
 	bool Valid;
 };

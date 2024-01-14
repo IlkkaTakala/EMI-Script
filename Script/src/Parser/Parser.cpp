@@ -117,17 +117,25 @@ void Parser::ThreadedParse(VM* vm)
 			options = vm->CompileQueue.front();
 			vm->CompileQueue.pop();
 		}
-		if (options.Path != "")
+		if (options.Path != "" || options.Handle == 0)
 			Parse(vm, options);
 	}
 }
 
-void Parser::Parse(VM* vm, const CompileOptions& options)
+void Parser::Parse(VM* vm, CompileOptions& options)
 {
-	gDebug() << "Parsing file " << MakePath(options.Path) << '\n';
-	if (!std::filesystem::exists(options.Path)) {
-		gLogger() << LogLevel::Warning << MakePath(options.Path) << ": File not found\n";
-		return;
+	if (options.Handle != 0) {
+		gDebug() << "Parsing file " << MakePath(options.Path) << '\n';
+		if (!std::filesystem::exists(options.Path)) {
+			gLogger() << LogLevel::Warning << MakePath(options.Path) << ": File not found\n";
+			return;
+		}
+	}
+	else {
+		if (Data.size() == 00) {
+			gError() << "No data given\n";
+			return;
+		}
 	}
 
 	gDebug() << "Constructing AST\n";
@@ -142,12 +150,31 @@ void Parser::Parse(VM* vm, const CompileOptions& options)
 	ASTWalker ast(vm, root);
 	ast.Run();
 
-	vm;
+	vm->AddNamespace(ast.namespaces);
+
+	delete root;
 }
 
-Node* Parser::ConstructAST(const CompileOptions& options)
+Node* Parser::ConstructAST(CompileOptions& options)
 {
-	Lexer lex(options.Path);
+	if (options.Handle != 0) {
+		std::fstream data(options.Path, std::ios::in);
+
+		if (data.is_open()) {
+
+			data.seekg(0, std::ios::end);
+			size_t size = data.tellg();
+			options.Data.resize(size + 1);
+			data.seekg(0);
+			data.read(&options.Data[0], size);
+
+		}
+		else {
+			gLogger() << LogLevel::Warning << MakePath(options.Path) << ": Cannot open file\n";
+		}
+	}
+
+	Lexer lex(options.Data.c_str(), options.Data.size());
 
 	if (!lex.IsValid()) return nullptr;
 
@@ -207,6 +234,7 @@ Node* Parser::ConstructAST(const CompileOptions& options)
 				auto& old = symbolStack.top();
 				if (useSimplify) {
 					if (data.mergeToken == old.token) {
+						if (next.ptr) delete next.ptr;
 						next.ptr = old.ptr;
 						if (data.nodeType != None) next.ptr->type = data.nodeType;
 					}

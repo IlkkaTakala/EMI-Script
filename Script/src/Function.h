@@ -44,4 +44,12 @@ struct Function
 	uint8 ArgCount;
 
 	std::vector<uint8> Bytecode;
+
+	Function() {
+		scope = nullptr;
+		ArgCount = 0;
+	}
+	~Function() {
+		delete scope;
+	}
 };
