@@ -119,13 +119,14 @@ Variable VM::GetReturnValue(size_t index)
 	return var;
 }
 
-void VM::AddNamespace(ankerl::unordered_dense::map<std::string, Namespace>& space)
+void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std::string, Namespace>& space)
 {
 	std::unique_lock lk(MergeMutex);
 	for (auto& [name, s] : space) {
 		for (auto& [oname, obj] : s.objects) {
 			auto type = Manager.AddType(oname, obj);
 			s.objectTypes[oname] = type;
+			Units[path].objects.push_back({ name, oname });
 		}
 		s.objects.clear();
 		for (auto& [fname, func] : s.functions) {
@@ -136,6 +137,7 @@ void VM::AddNamespace(ankerl::unordered_dense::map<std::string, Namespace>& spac
 			auto idx = ++FunctionHandleCounter;
 			NameToFunctionMap[full] = idx;
 			FunctionMap[idx] = func;
+			Units[path].functions.push_back({ name, fname });
 		}
 
 		if (auto it = Namespaces.find(name); it != Namespaces.end()) {
@@ -144,6 +146,35 @@ void VM::AddNamespace(ankerl::unordered_dense::map<std::string, Namespace>& spac
 		else {
 			Namespaces[name] = s;
 		}
+	}
+}
+
+void VM::RemoveUnit(const std::string& unit)
+{
+	std::unique_lock lk(MergeMutex);
+	if (auto it = Units.find(unit); it != Units.end()) {
+		auto& u = it->second;
+		for (auto& [name, function] : u.functions) {
+			Namespace& n = Namespaces[name];
+
+			n.symbols.erase(name);
+			delete n.functions[function.c_str()];
+			n.functions.erase(function.c_str());
+			auto full = name + '.' + function;
+			if (auto named = NameToFunctionMap.find(full); named != NameToFunctionMap.end()) {
+				FunctionMap.erase(named->second);
+				NameToFunctionMap.erase(full);
+			}
+		}
+		for (auto& [name, obj] : u.objects) {
+			Manager.RemoveType(name);
+			Namespace& n = Namespaces[name];
+			n.objects.erase(name);
+			n.objectTypes.erase(name);
+			n.symbols.erase(name);
+		}
+		
+		Units.erase(unit);
 	}
 }
 
@@ -158,8 +189,6 @@ Runner::~Runner()
 }
 
 #define TARGET(Op) case OpCodes::Op
-#define Read16() *(uint16*)current->Ptr
-#define Read8() *(uint8*)current->Ptr
 
 void Runner::operator()()
 {
@@ -181,34 +210,42 @@ void Runner::operator()()
 		current->Ptr = current->FunctionPtr->Bytecode.data();
 		current->End = current->Ptr + current->FunctionPtr->Bytecode.size();
 
-		auto nums = &f->FunctionPtr->numberTable.values();
+		Registers.reserve(current->FunctionPtr->RegisterCount);
+
+		auto& nums = f->FunctionPtr->numberTable.values();
 
 
 		while (interrupt && current->Ptr < current->End && Owner->IsRunning()) {
-			switch ((OpCodes)*current->Ptr++)
+			const Instruction& byte = *(Instruction*)current->Ptr++;
+			switch (byte.code)
 			{
 				TARGET(JumpForward) : {
-					current->Ptr += Read16();
+					current->Ptr += byte.param;
 				} break;
 
 				TARGET(JumpBackward) : {
-					current->Ptr -= Read16();
+					current->Ptr -= byte.param;
+				} break;
+
+				TARGET(Jump) : {
+					current->Ptr = &current->FunctionPtr->Bytecode.data()[byte.param];
 				} break;
 
 				TARGET(LoadNumber) : {
-					Stack.push((*nums)[Read16()]);
-					current->Ptr += 2;
+					Registers[byte.target] = nums[byte.param];
 				} break;
 
 				TARGET(Return) : {
-					auto val = Stack.pop();
-					if (current->StackOffset == 0) {
-						current->Return.set_value(val);
-						Stack.to(0);
-					}
-					else {
-						Stack.to(current->StackOffset);
-						Stack.push(val);
+					if (byte.target == 1) {
+						auto& val = Registers[byte.in1];
+						if (current->StackOffset == 0) {
+							current->Return.set_value(val);
+							Registers.to(0);
+						}
+						else {
+							Registers.to(current->StackOffset);
+							// @todo: return value
+						}
 					}
 					CallStack.pop();
 					if (!CallStack.empty()) {
@@ -221,10 +258,27 @@ void Runner::operator()()
 				} break;
 
 				TARGET(PushUndefined) : {
-					Variable var;
-					var.setUndefined();
-					Stack.push(var);
+					Registers[byte.target].setUndefined();
 				}
+				TARGET(PushBoolean) : {
+					Registers[byte.target] = byte.in1 == 1 ? true : false;
+				}
+
+				TARGET(NumAdd) : {
+					Registers[byte.target] = Registers[byte.in1].as<double>() + Registers[byte.in2].as<double>();
+				} break;
+
+				TARGET(NumSub) : {
+					Registers[byte.target] = Registers[byte.in1].as<double>() - Registers[byte.in2].as<double>();
+				} break;
+
+				TARGET(NumDiv) : {
+					Registers[byte.target] = Registers[byte.in1].as<double>() / Registers[byte.in2].as<double>();
+				} break;
+
+				TARGET(NumMul) : {
+					Registers[byte.target] = Registers[byte.in1].as<double>() * Registers[byte.in2].as<double>();
+				} break;
 
 			default:
 				break;

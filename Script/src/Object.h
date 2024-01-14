@@ -84,6 +84,10 @@ public:
 		return ObjectType::UserDefined;
 	}
 
+	void RemoveType(const std::string& name) {
+		baseTypes.erase(name);
+	}
+
 	ankerl::unordered_dense::map<std::string, UserDefined> baseTypes;
 
 private:

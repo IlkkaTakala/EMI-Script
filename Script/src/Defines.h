@@ -29,7 +29,7 @@ inline Logger& gError()
 typedef unsigned int uint;
 typedef unsigned char uint8;
 typedef unsigned __int16 uint16;
-typedef unsigned __int16 uint32;
+typedef unsigned __int32 uint32;
 typedef __int16 int16;
 typedef __int64 int64;
 typedef unsigned long ScriptHandle;
@@ -43,15 +43,17 @@ enum class OpCodes : uint8
 	Pop,
 	CallSymbol,
 	PushUndefined,
+	PushBoolean,
 
 	JumpBackward,
 	JumpForward,
+	Jump,
 	Return,
-	ReturnValue,
-
 
 	NumAdd,
 	NumSub,
 	NumMul,
 	NumDiv,
+
+	StrAdd,
 };

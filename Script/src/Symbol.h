@@ -31,10 +31,13 @@ struct Symbol
 	SymbolFlags flags = SymbolFlags::None;
 	VariableType varType = VariableType::Undefined;
 	bool resolved = false;
-	int startLife;
-	int endLife;
+	size_t startLife;
+	size_t endLife;
+	uint8 reg;
 
 	void setType(SymbolType t);
 
-	inline bool isAssignable() const { return SymbolFlags::Assignable == (flags & SymbolFlags::Assignable); }
 };
+
+inline bool isAssignable(const SymbolFlags& s) { return SymbolFlags::Assignable == (s & SymbolFlags::Assignable); }
+inline bool isTyped(const SymbolFlags& s) { return SymbolFlags::Typed == (s & SymbolFlags::Typed); }

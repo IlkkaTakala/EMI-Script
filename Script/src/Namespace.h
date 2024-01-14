@@ -27,6 +27,21 @@ struct Namespace
 		rhs.symbols.clear();
 	}
 
+	inline void remove(Namespace& rhs) {
+		for (auto& [name, func] : rhs.functions) {
+			functions.erase(name);
+		}
+		for (auto& [name, func] : rhs.objects) {
+			objects.erase(name);
+		}
+		for (auto& [name, func] : rhs.objectTypes) {
+			objectTypes.erase(name);
+		}
+		for (auto& [name, func] : rhs.symbols) {
+			symbols.erase(name);
+		}
+	}
+
 	~Namespace() {
 		for (auto& [name, f] : functions) {
 			delete f;
@@ -48,3 +63,8 @@ struct Namespace
 	}
 };
 
+struct CompileUnit
+{
+	std::vector<std::pair<std::string, std::string>> functions;
+	std::vector<std::pair<std::string, std::string>> objects;
+};

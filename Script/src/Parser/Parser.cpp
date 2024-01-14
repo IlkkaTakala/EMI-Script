@@ -124,12 +124,14 @@ void Parser::ThreadedParse(VM* vm)
 
 void Parser::Parse(VM* vm, CompileOptions& options)
 {
+	auto fullPath = MakePath(options.Path);
 	if (options.Handle != 0) {
-		gDebug() << "Parsing file " << MakePath(options.Path) << '\n';
+		gDebug() << "Parsing file " << fullPath << '\n';
 		if (!std::filesystem::exists(options.Path)) {
-			gLogger() << LogLevel::Warning << MakePath(options.Path) << ": File not found\n";
+			gLogger() << LogLevel::Warning << fullPath << ": File not found\n";
 			return;
 		}
+		vm->RemoveUnit(fullPath);
 	}
 	else {
 		if (Data.size() == 00) {
@@ -141,7 +143,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	gDebug() << "Constructing AST\n";
 	auto root = ConstructAST(options);
 	if (!root) {
-		gLogger() << LogLevel::Error << MakePath(options.Path) << ": Parse failed\n";
+		gLogger() << LogLevel::Error << fullPath << ": Parse failed\n";
 		return;
 	}
 
@@ -150,9 +152,10 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	ASTWalker ast(vm, root);
 	ast.Run();
 
-	vm->AddNamespace(ast.namespaces);
+	if (!ast.HasError) {
+		vm->AddNamespace(fullPath, ast.namespaces);
+	}
 
-	delete root;
 }
 
 Node* Parser::ConstructAST(CompileOptions& options)
@@ -217,15 +220,18 @@ Node* Parser::ConstructAST(CompileOptions& options)
 
 			TokenHolder next;
 			next.token = rule.nonTerminal;
-			if (data.mergeToken == None && useSimplify) {
-				next.ptr = new Node();
-				next.ptr->type = data.nodeType == None ? next.token : data.nodeType;
+			if (useSimplify) {
+				if (data.mergeToken == None) {
+					next.ptr = new Node();
+					next.ptr->type = data.nodeType == None ? next.token : data.nodeType;
+				}
+				else {
+					next.ptr = new Node();
+					next.ptr->type = next.token;
+				}
+				next.ptr->depth = 0;
+				next.ptr->line = lex.GetContext().Row;
 			}
-			else {
-				next.ptr = new Node();
-				next.ptr->type = next.token;
-			}
-			next.ptr->depth = 0;
 
 			for (int i = 0; i < rule.development.size(); ++i) {
 				if (rule.development[i] == None) break;
@@ -253,7 +259,6 @@ Node* Parser::ConstructAST(CompileOptions& options)
 				stateStack.pop();
 			}
 			if (next.ptr) {
-				next.ptr->line = lex.GetContext().Row;
 				Optimize(next.ptr);
 			}
 

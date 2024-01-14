@@ -6,7 +6,14 @@
 class Node
 {
 public:
-	Node() : line(0), depth(0), parent(nullptr) {}
+	Node() :
+		line(0),
+		depth(0),
+		regTarget(0),
+		symFlags(SymbolFlags::None),
+		varType(VariableType::Undefined),
+		instruction(0)
+	{}
 	~Node() {
 		for (auto& c : children) {
 			delete c;
@@ -16,32 +23,28 @@ public:
 	size_t line;
 	size_t depth;
 	std::variant<std::string, double, bool> data;
+	std::list<Node*> children;
+	VariableType varType;
+	SymbolFlags symFlags;
+	uint8 regTarget;
+	size_t instruction;
 
 	Variable toVariable() const;
 
-	Node* parent;
-	std::list<Node*> children;
 
 	void print(const std::string& prefix, bool isLast = false);
 
-};
-
-struct Instruction
-{
-	OpCodes code;
-	uint8 target;
-	uint8 in1;
-	uint8 in2;
 };
 
 class VM;
 struct ASTWalker
 {
 	ASTWalker(VM*, Node*);
+	~ASTWalker();
 	void Run();
 	void Walk(Node*);
 
-	bool findSymbol(const std::string & name);
+	Symbol* findSymbol(const std::string & name);
 
 	void handleFunction(Node* n, Function* f, Symbol& s);
 
@@ -49,11 +52,37 @@ struct ASTWalker
 	Namespace* currentNamespace;
 	ankerl::unordered_dense::map<std::string, Namespace> namespaces;
 
+	bool HasError;
+
 	// Function parsing
 	Scoped* currentScope;
 	Function* currentFunction;
 	std::vector<Instruction> instructionList;
-	std::vector<bool> registers;
+	std::array<bool, 256> registers;
+	uint8 maxRegister;
+
+	void initRegs() {
+		for (auto& r : registers) r = false;
+		maxRegister = 0;
+	}
+
+	uint8 getFirstFree() {
+		for (uint8 i = 0; i < registers.size(); i++) {
+			if (!registers[i]) {
+				registers[i] = true;
+				if (maxRegister < i) maxRegister = i;
+				return i;
+			}
+		}
+		gError() << "No free registers, this shouldn't happen\n";
+		HasError = true;
+		return 0;
+	}
+
+	void freeReg(uint8 reg) {
+		registers[reg] = false;
+	}
+
 };
 
 void TypeConverter(Node* n, const TokenHolder& h);

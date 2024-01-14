@@ -28,8 +28,8 @@ struct CompileOptions
 struct CallObject 
 {
 	const Function* FunctionPtr;
-	const uint8* Ptr;
-	const uint8* End;
+	const uint32* Ptr;
+	const uint32* End;
 	size_t Location;
 	uint16 StackOffset;
 	std::vector<Variable> Arguments;
@@ -41,40 +41,28 @@ struct CallObject
 };
 
 template <typename T>
-class stack
+class RegisterStack
 {
 public:
-	T pop() {
-		if (top == 0) return T();
-		top--;
-		return _stack[top];
+	void to(size_t location) {
+		top = location;
+		fast = &_stack[top];
 	}
 
-	T& peek() {
-		return _stack[top - 1];
+	void reserve(uint8 count) {
+		_stack.resize(top + count);
+		fast = &_stack[top];
 	}
 
-	void push(const T& v) {
-		top++;
-		if (_stack.size() <= top) _stack.push_back(v);
-		else _stack[top - 1] = v;
-	}
-
-	void pop(size_t count) {
-		if (top < count)
-			top -= count;
-		else
-			top = 0;
-	}
-
-	void to(size_t i) {
-		top = i;
+	T& operator[](size_t location) {
+		return fast[location];
 	}
 
 private:
 
 	size_t top;
 	std::vector<T> _stack;
+	T* fast;
 };
 
 class Runner
@@ -88,7 +76,7 @@ public:
 private:
 	VM* Owner;
 	std::stack<CallObject*> CallStack;
-	stack<Variable> Stack;
+	RegisterStack<Variable> Registers;
 };
 
 class VM
@@ -106,10 +94,12 @@ public:
 	size_t CallFunction(FunctionHandle handle, const std::span<Variable>& args);
 	Variable GetReturnValue(size_t index);
 
-	void AddNamespace(ankerl::unordered_dense::map<std::string, Namespace>& space);
+	void AddNamespace(const std::string& path, ankerl::unordered_dense::map<std::string, Namespace>& space);
 
 	inline bool IsRunning() const { return VMRunning; }
 	//void Step();
+
+	void RemoveUnit(const std::string& unit);
 
 private:
 	friend class Parser;
@@ -137,6 +127,7 @@ private:
 	std::vector<size_t> ReturnFreeList;
 	bool VMRunning;
 
+	ankerl::unordered_dense::map<std::string, CompileUnit> Units;
 	ankerl::unordered_dense::map<uint32, Function*> FunctionMap;
 	ankerl::unordered_dense::map<std::string, uint32> NameToFunctionMap;
 	ankerl::unordered_dense::map<std::string, Namespace> Namespaces;

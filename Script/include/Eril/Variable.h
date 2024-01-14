@@ -31,6 +31,8 @@ enum class VariableType
 	Number,
 	Boolean,
 	External,
+	String,
+	Array,
 	Object
 };
 
