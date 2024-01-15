@@ -97,12 +97,12 @@ Control Break
 Flow IfFlow
 Flow ForFlow
 Flow WhileFlow
-Flow ElseFlow
 
-IfFlow If Lparenthesis Expr Rparenthesis FlowBlock
-ForFlow For Lparenthesis Expr Semi Expr Semi Expr Rparenthesis FlowBlock
-WhileFlow While Lparenthesis Expr Rparenthesis FlowBlock
+IfFlow If Lparenthesis Expr Rparenthesis FlowBlock ElseFlow
+ForFlow For Lparenthesis Expr Semi Expr Semi Expr Rparenthesis FlowBlock ElseFlow
+WhileFlow While Lparenthesis Expr Rparenthesis FlowBlock ElseFlow
 ElseFlow Else FlowBlock
+ElseFlow None
 
 FlowBlock Stmt
 FlowBlock Scope
@@ -220,12 +220,12 @@ None Break
 None None IfFlow
 None None ForFlow
 None None WhileFlow
-None None ElseFlow
 
 None If
 None For
 None While
 None Else
+.
 
 None None Stmt 
 None None Scope 
