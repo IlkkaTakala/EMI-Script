@@ -440,6 +440,8 @@ void ASTWalker::Run()
 #define _SetOut(n) n->regTarget = instructionList[n->instruction].target
 #define _First() n->children.front()
 #define _Last() n->children.back()
+#define _Error(text) gError() << "Line " << n->line << ": " << text << "\n"; HasError = true;
+#define _Warn(text) gWarn() << "Line " << n->line << ": " << text << "\n";
 
 #define _Operator(varTy, op) \
 case VariableType::varTy: {\
@@ -456,7 +458,26 @@ void ASTWalker::Walk(Node* n)
 	Function* f = currentFunction;
 	switch (n->type) {
 		_N(Scope,
+			auto& next = currentScope->children.emplace_back();
+			next.parent = currentScope;
+			currentScope = &next;
+			auto regs = registers;
 			_Walk;
+			currentScope = currentScope->parent;
+			registers = regs;
+		);
+
+		_N(TypeNumber,
+			_Type = VariableType::Number;
+		);
+		_N(TypeString,
+			_Type = VariableType::String;
+		);
+		_N(AnyType,
+			_Type = VariableType::Undefined;
+		);
+		_N(Typename,
+			_Type = VariableType::Object;
 		);
 
 		_N(Number, {
@@ -489,7 +510,7 @@ void ASTWalker::Walk(Node* n)
 			_Operator(Number, NumAdd)
 			_Operator(String, StrAdd)
 			default:
-				gError() << "Line " << n->line << ": No correct operator + found for type\n"; 
+				_Error("No correct operator + found for type"); 
 				HasError = true; 
 				break; 
 			}
@@ -500,7 +521,7 @@ void ASTWalker::Walk(Node* n)
 			{
 				_Operator(Number, NumSub);
 			default:
-				gError() << "Line " << n->line << ": No correct operator - found for type\n";
+				_Error("No correct operator - found for type");
 				HasError = true;
 				break;
 			}
@@ -511,7 +532,7 @@ void ASTWalker::Walk(Node* n)
 			{
 				_Operator(Number, NumDiv);
 			default:
-				gError() << "Line " << n->line << ": No correct operator / found for type\n";
+				_Error("No correct operator / found for type");
 				HasError = true;
 				break;
 			}
@@ -522,7 +543,7 @@ void ASTWalker::Walk(Node* n)
 			{
 				_Operator(Number, NumMul);
 			default:
-				gError() << "Line " << n->line << ": No correct operator * found for type\n";
+				_Error("No correct operator * found for type");
 				HasError = true;
 				break;
 			}
@@ -537,7 +558,7 @@ void ASTWalker::Walk(Node* n)
 				n->symFlags = symbol->flags;
 			}
 			else {
-				gError() << "Symbol not defined: " << std::get<std::string>(n->data) << '\n';
+				_Error("Symbol not defined: " << std::get<std::string>(n->data));
 				HasError = true;
 			}
 		);
@@ -548,12 +569,12 @@ void ASTWalker::Walk(Node* n)
 			auto& lhs = _First();
 			auto& rhs = _Last();
 			if (!isAssignable(lhs->symFlags)) {
-				gError() << "Line " << n->line << ": Trying to assign to unassignable type\n";
+				_Error("Trying to assign to unassignable type");
 				HasError = true;
 			}
 			if (lhs->varType != rhs->varType) {
 				if (isTyped(lhs->symFlags) || lhs->data.index() != 0) {
-					gError() << "Line " << n->line << ": Trying to assign unrelated types\n";
+					_Error("Trying to assign unrelated types");
 					HasError = true;
 				}
 				else { // @todo: something else here, lhs might not be symbol
@@ -571,15 +592,24 @@ void ASTWalker::Walk(Node* n)
 			sym->endLife = instructionList.size();
 			sym->setType(SymbolType::Variable);
 			sym->resolved = true;
-			if (n->children.size() == 1) {
+			if (n->children.size() > 0) {
 				_Walk;
-				sym->reg = n->regTarget = _First()->regTarget;
-				sym->varType = _Type = _First()->varType;
+				sym->varType = _Type = _First()->varType; // @todo: types for user defined objects;
+				if (sym->varType != VariableType::Undefined) {
+					sym->flags = sym->flags | SymbolFlags::Typed;
+				}
+				if (n->children.size() == 2) {
+					if (_Last()->varType == _Type || _Type == VariableType::Undefined) {
+						sym->varType = _Type = _Last()->varType;
+						sym->reg = n->regTarget = _Last()->regTarget;
+						break;
+					}
+					_Error("Cannot assign unrelated types");
+				}
 			}
-			else {
-				_Op(PushUndefined);
-				_Out;
-			}
+			_Op(PushTypeDefault);
+			_In16 = (uint16)sym->varType;
+			sym->reg = _Out;
 		);
 
 		_N(Return,
@@ -591,8 +621,24 @@ void ASTWalker::Walk(Node* n)
 			}
 		);
 
+		_N(If,
+			auto& next = currentScope->children.emplace_back();
+			next.parent = currentScope;
+			currentScope = &next;
+			auto regs = registers;
+			Walk(_First());
+			_Op(JumpEq);
+			n->regTarget = instruction.target = _First()->regTarget;
+			for (auto& c : _Last()->children) Walk(c);
+			auto res = f->jumpTable.emplace(instructionList.size());
+			uint16 idx = (uint16)std::distance(f->jumpTable.begin(), res.first);
+			_In16 = idx;
+			currentScope = currentScope->parent;
+			registers = regs;
+			);
+
 	default:
-		gError() << "Line " << n->line << ": Unexpected token found" << "\n";
+		_Error("Unexpected token found");
 		break;
 	}
 }

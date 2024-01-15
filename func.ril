@@ -8,8 +8,13 @@ object Test
 }
 
 def func() {
-	var test = true;
-	test = 5;
+	var test : number = 5;
+	var other : Test;
+	if (var auto = 23) {
+		test = 15;
+	}else{
+		test = 10;
+	}
 	test = test + 4 / test * 65 - test;
 	return test / 3;
 }

@@ -39,3 +39,27 @@ void moveOwnershipToHost(Variable& var)
 	}
 	return;
 }
+
+Variable GetTypeDefault(VariableType type)
+{
+	switch (type)
+	{
+	case VariableType::Undefined:
+		return Variable();
+	case VariableType::Number:
+		return Variable(0.0);
+	case VariableType::Boolean:
+		return Variable(false);
+	case VariableType::External:
+		return Variable();
+	case VariableType::String:
+		return Variable();
+	case VariableType::Array:
+		return Variable();
+	case VariableType::Object:
+		return Variable();
+	default:
+		// @todo: find proper defaults
+		return Variable();
+	}
+}

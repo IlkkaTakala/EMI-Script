@@ -44,11 +44,21 @@ enum class OpCodes : uint8
 	CallSymbol,
 	PushUndefined,
 	PushBoolean,
+	PushTypeDefault,
 
 	JumpBackward,
 	JumpForward,
 	Jump,
+	JumpEq,
+	JumpNeg,
 	Return,
+
+	Equal,
+	NotEqual,
+	Less,
+	Greater,
+	LessEqual,
+	GreaterEqual,
 
 	NumAdd,
 	NumSub,

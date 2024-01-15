@@ -221,7 +221,7 @@ void Runner::operator()()
 			{
 				TARGET(JumpForward) : {
 					current->Ptr += byte.param;
-				} break;
+				} break;	
 
 				TARGET(JumpBackward) : {
 					current->Ptr -= byte.param;
@@ -262,6 +262,9 @@ void Runner::operator()()
 				}
 				TARGET(PushBoolean) : {
 					Registers[byte.target] = byte.in1 == 1 ? true : false;
+				}
+				TARGET(PushTypeDefault) : {
+					Registers[byte.target] = GetTypeDefault((VariableType)byte.param);
 				}
 
 				TARGET(NumAdd) : {

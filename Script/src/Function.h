@@ -69,6 +69,7 @@ struct Function
 
 	ankerl::unordered_dense::set<std::string> stringTable;
 	ankerl::unordered_dense::set<double> numberTable;
+	ankerl::unordered_dense::set<size_t> jumpTable;
 
 	Scoped* scope;
 

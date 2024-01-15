@@ -13,6 +13,7 @@ RProgram Stmt
 
 Typename TypeString
 Typename TypeNumber
+Typename Id
 
 ObjectDef Object Id Lcurly MObjectVar Rcurly
 MObjectVar ObjectVar MObjectVar
@@ -109,9 +110,9 @@ FlowBlock Scope
 Indexer Expr Lbracket Expr Rbracket
 Indexer Expr Lbracket Rbracket
 
-VarDeclare Var Id OVarDeclare
-VarDeclare Static Id OVarDeclare
-VarDeclare Const Id OVarDeclare
+VarDeclare Var Id OTypename OVarDeclare
+VarDeclare Static Id OTypename OVarDeclare
+VarDeclare Const Id OTypename OVarDeclare
 OVarDeclare Assign Expr
 OVarDeclare None
 
@@ -135,6 +136,7 @@ None None Stmt
 
 None TypeString 
 None TypeNumber
+Id Typename
 
 Id None MObjectVar
 None None MObjectVar
