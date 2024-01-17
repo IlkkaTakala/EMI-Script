@@ -40,7 +40,6 @@ enum class OpCodes : uint8
 	LoadNumber,
 	LoadString,
 	LoadSymbol,
-	Pop,
 	CallSymbol,
 	PushUndefined,
 	PushBoolean,
@@ -60,6 +59,7 @@ enum class OpCodes : uint8
 	LessEqual,
 	GreaterEqual,
 
+	Not,
 	NumAdd,
 	NumSub,
 	NumMul,

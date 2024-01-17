@@ -13,6 +13,7 @@
 #endif
 
 #include <vector>
+#include <functional>
 #include "Eril/Variable.h"
 
 namespace Eril
@@ -62,6 +63,29 @@ namespace Eril
 		bool Simplify = false;
 	};
 
+
+	typedef std::function<Variable(size_t, Variable*)> __internal_function_;
+	typedef std::vector<__internal_function_> __internal_function_lut_;
+	inline __internal_function_lut_& __getFunctionTable() {
+		static __internal_function_lut_ functions;
+		return functions;
+	}
+
+	template <typename Ret, typename ...T> requires std::is_convertible_v<Ret, Variable> && ((std::is_convertible_v<T, Variable>) && ...)
+	bool RegisterFunction(std::function<Ret(T...)> func) {
+		constexpr size_t size = sizeof...(T);
+		 [fs = size] <typename Ret, typename ...V, size_t... S> (const std::function<Ret(V...)>& func, const std::index_sequence<S...>) {
+			__getFunctionTable().push_back([func, fs](size_t s, Variable* var) -> Variable {
+				if (s != fs) return {};
+				return func((var[S].as<V>())...);
+				}); 
+		} (func, std::make_index_sequence<size>());
+		printf("Register called on %s\n", func.target_type().name());
+		return true;
+	}
+
+#define REGISTER_NOVA(Namespace, func) static inline bool __nova_reg_##Namespace##_##function = Eril::RegisterFunction(std::function<decltype(func)>{func});
+
 	class CORE_API VMHandle
 	{
 	public:
@@ -104,6 +128,7 @@ namespace Eril
 		VariableHandle FunctionHandle::operator()(Args... args) {
 		return vm->CallFunction(*this, args...);
 	}
+
 }
 
 #endif // !_ERIL_INC_GUARD_HPP

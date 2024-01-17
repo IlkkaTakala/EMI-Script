@@ -10,13 +10,34 @@ object Test
 def func() {
 	var test : number = 5;
 	var other : Test;
-	if (var auto = 23) {
-		test = 15;
-	}else{
-		test = 10;
+	test = -100;
+	if (false) {
+	
+	} else if (true) {
+	
+	} else {
+	
+	}if (true) {
+	
+	} else {
+	
+	}if (true) {
+	
+	} else {
+	
+	}if (true) {
+	
+	} else {
+	
+	}if (true) {
+	
+	} else {
+	
 	}
-	test = test + 4 / test * 65 - test;
-	return test / 3;
+	/*for (var i = 0; i < 10; i++) {
+		test = test + 1;
+	}*/
+	return -test;
 }
 
 public def funct(value, vel, ) {

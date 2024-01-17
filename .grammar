@@ -50,7 +50,6 @@ Expr Expr Mult Expr
 
 Expr Expr And Expr
 Expr Expr Or Expr
-Expr Not Expr 
 Expr Expr Equal Expr
 Expr Expr Less Expr
 Expr Expr Larger Expr
@@ -63,8 +62,12 @@ Conditional Expr Opt Expr Colon Expr
 Expr Priority
 Priority Lparenthesis Expr Rparenthesis
 
-Expr Value
+Expr Unary
 Expr ValueId
+Unary Value
+Unary Add Expr
+Unary Sub Expr
+Unary Not Expr
 Value True
 Value False
 Value String
@@ -173,7 +176,6 @@ None Mult
 
 None And 
 None Or 
-None Not 
 None Equal 
 None Less 
 None Larger 
@@ -186,8 +188,12 @@ None None Conditional
 None None Priority
 None None Expr
 
-None None Value 
+None None Unary 
 ValueId ValueId
+None None Value
+None None Expr
+None Negate
+None Not
 True True
 False False 
 String String 
@@ -225,7 +231,7 @@ None If
 None For
 None While
 None Else
-.
+None Else
 
 None None Stmt 
 None None Scope 

@@ -83,7 +83,7 @@ public:
 		return ((value) & (QNAN | SIGN_BIT)) == (QNAN | SIGN_BIT) && !(value & TAG_NIL);
 	}
 
-	VariableType getType() {
+	VariableType getType() const {
 		if (isNumber()) return VariableType::Number;
 		if (isUndefined()) return VariableType::Undefined;
 		if (isObject()) return VariableType::Object;
@@ -115,7 +115,7 @@ public:
 		return ((T)(uintptr_t)((value) & ~(SIGN_BIT | QNAN | TAG_NIL)));
 	}
 
-	bool operator==(const Variable& rhs) {
+	bool operator==(const Variable& rhs) const {
 		return value == rhs.value;
 	}
 };

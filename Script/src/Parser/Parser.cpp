@@ -23,7 +23,7 @@ void Parser::InitializeParser()
 	TokenParseData[Div] = { 60, Association::Left };
 	TokenParseData[Assign] = { 5, Association::Right };
 	TokenParseData[Equal] = { 19, Association::Left };
-	TokenParseData[Not] = { 20, Association::Left };
+	TokenParseData[Not] = { 50, Association::Left };
 	TokenParseData[And] = { 18, Association::Left };
 	TokenParseData[Or] = { 17, Association::Left };
 
@@ -221,16 +221,19 @@ Node* Parser::ConstructAST(CompileOptions& options)
 			TokenHolder next;
 			next.token = rule.nonTerminal;
 			if (useSimplify) {
+				next.ptr = new Node();
 				if (data.mergeToken == None) {
-					next.ptr = new Node();
 					next.ptr->type = data.nodeType == None ? next.token : data.nodeType;
 				}
 				else {
-					next.ptr = new Node();
 					next.ptr->type = next.token;
 				}
 				next.ptr->depth = 0;
 				next.ptr->line = lex.GetContext().Row;
+			}
+			else {
+				next.ptr = new Node();
+				next.ptr->type = next.token;
 			}
 
 			for (int i = 0; i < rule.development.size(); ++i) {

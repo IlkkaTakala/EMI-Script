@@ -5,3 +5,5 @@ void moveOwnershipToVM(Variable& var);
 void moveOwnershipToHost(Variable& var);
 
 Variable GetTypeDefault(VariableType type);
+
+bool isTruthy(const Variable& var);

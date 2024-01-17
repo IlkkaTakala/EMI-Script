@@ -23,6 +23,14 @@ std::vector<std::string> split(const std::string& s, char delim) {
 	return elems;
 }
 
+int print(int number) {
+	std::cout << number;
+
+	return 100;
+}
+
+REGISTER_NOVA(Global, print);
+
 int main()
 {
 	std::unordered_map<std::string, std::function<int(Eril::VMHandle&, const std::vector<std::string>&)>> commandTable = {

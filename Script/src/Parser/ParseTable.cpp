@@ -368,13 +368,11 @@ void CreateParseTable(Grammar& g) {
 					case REDUCE:
 						if (state[k].reduce > item.rule)
 							state[k].reduce = item.rule;
-						gDebug() << "reduce error: rule " << item.rule << "\n";
 						break;
 
 					case SHIFT:
 						state[k].type = DECIDE;
 						state[k].reduce = item.rule;
-						gDebug() << "shift error" << item.rule << "\n";
 						break;
 					case ACCEPT:
 					case ERROR:

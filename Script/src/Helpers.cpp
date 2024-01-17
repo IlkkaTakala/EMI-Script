@@ -63,3 +63,27 @@ Variable GetTypeDefault(VariableType type)
 		return Variable();
 	}
 }
+
+bool isTruthy(const Variable& var)
+{
+	switch (var.getType())
+	{
+	case VariableType::Undefined:
+		return false;
+	case VariableType::Number:
+		return var.as<int>() != 0;
+	case VariableType::Boolean:
+		return var.as<bool>();
+	case VariableType::External:
+		return var.as<void*>() != nullptr;
+	case VariableType::String:
+		return false; // @todo: string check
+	case VariableType::Array:
+		return true;
+	case VariableType::Object:
+		return true;
+	default:
+		// @todo: find proper truths
+		return false;
+	}
+}

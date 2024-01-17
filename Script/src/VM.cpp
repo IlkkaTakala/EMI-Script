@@ -82,8 +82,10 @@ size_t VM::GetFunctionID(const std::string& name)
 size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 {
 	auto it = FunctionMap.find((uint16)handle);
-	if (it == FunctionMap.end()) return (size_t)-1;
-
+	if (it == FunctionMap.end()) {
+		gWarn() << "Invalid function handle\n";
+		return (size_t)-1;
+	}
 	CallObject* call = new CallObject(it->second);
 
 	call->Arguments.reserve(args.size());
@@ -213,6 +215,7 @@ void Runner::operator()()
 		Registers.reserve(current->FunctionPtr->RegisterCount);
 
 		auto& nums = f->FunctionPtr->numberTable.values();
+		auto& jumps = f->FunctionPtr->jumpTable.values();
 
 
 		while (interrupt && current->Ptr < current->End && Owner->IsRunning()) {
@@ -228,7 +231,7 @@ void Runner::operator()()
 				} break;
 
 				TARGET(Jump) : {
-					current->Ptr = &current->FunctionPtr->Bytecode.data()[byte.param];
+					current->Ptr = &current->FunctionPtr->Bytecode.data()[jumps[byte.param]];
 				} break;
 
 				TARGET(LoadNumber) : {
@@ -282,8 +285,29 @@ void Runner::operator()()
 				TARGET(NumMul) : {
 					Registers[byte.target] = Registers[byte.in1].as<double>() * Registers[byte.in2].as<double>();
 				} break;
+				
+				TARGET(Equal) : {
+					Registers[byte.target] = Registers[byte.in1] == Registers[byte.in2]; // @todo: fix this
+				} break;
+
+				TARGET(Not) : {
+					Registers[byte.target] = !isTruthy(Registers[byte.in1]); // @todo: fix this
+				} break;
+
+				TARGET(JumpEq) : {
+					if (isTruthy(Registers[byte.target])) {
+						current->Ptr += byte.param;
+					}
+				} break;
+
+				TARGET(JumpNeg) : {
+					if (!isTruthy(Registers[byte.target])) {
+						current->Ptr += byte.param;
+					}
+				} break;
 
 			default:
+				gError() << "Unknown bytecode detected\n";
 				break;
 			}
 		}

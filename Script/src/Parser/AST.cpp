@@ -106,6 +106,7 @@ void OpAdd(Node* n, Node* l, Node* r) {
 	case False: 
 	case True: {
 		n->data = VariantToBool(l) || VariantToBool(r);
+		n->type = std::get<bool>(n->data) ? True : False;
 	} break;
 	default:
 		break;
@@ -117,7 +118,7 @@ void OpSub(Node* n, Node* l, Node* r) {
 	switch (l->type)
 	{
 	case String: {
-		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
+		n->data = VariantToStr(l);// -VariantToStr(r); // @todo: Remove substrings?
 	} break;
 	case Number: {
 		n->data = VariantToFloat(l) - VariantToFloat(r);
@@ -125,10 +126,45 @@ void OpSub(Node* n, Node* l, Node* r) {
 	case False: 
 	case True: {
 		n->data = VariantToBool(l) && VariantToBool(r);
+		n->type = std::get<bool>(n->data) ? True : False;
 	} break;
 	default:
 		break;
 	}
+}
+
+void OpNeg(Node* n, Node* l) {
+	n->type = l->type;
+	switch (l->type)
+	{
+	case Number: {
+		n->data = -VariantToFloat(l);
+	} break;
+	case False: 
+	case True: {
+		n->data = !VariantToBool(l);
+		n->type = std::get<bool>(n->data) ? True : False;
+	} break;
+	default:
+		break;
+	}
+}
+
+void OpNot(Node* n, Node* l) {
+	n->type = l->type;
+	switch (l->type)
+	{
+	case Number: {
+		n->data = !VariantToBool(l);
+	} break;
+	case False: 
+	case True: {
+		n->data = !VariantToBool(l);
+	} break;
+	default:
+		break;
+	}
+	n->type = std::get<bool>(n->data) ? True : False;
 }
 
 void OpMult(Node* n, Node* l, Node* r) {
@@ -144,6 +180,7 @@ void OpMult(Node* n, Node* l, Node* r) {
 	case False: 
 	case True: {
 		n->data = VariantToBool(l) || VariantToBool(r);
+		n->type = std::get<bool>(n->data) ? True : False;
 	} break;
 	default:
 		break;
@@ -163,6 +200,7 @@ void OpDiv(Node* n, Node* l, Node* r) {
 	case False: 
 	case True: {
 		n->data = VariantToBool(l) || VariantToBool(r);
+		n->type = std::get<bool>(n->data) ? True : False;
 	} break;
 	default:
 		break;
@@ -181,11 +219,11 @@ void OpEqual(Node* n, Node* l, Node* r) {
 	case False: 
 	case True: {
 		n->data = VariantToBool(l) == VariantToBool(r);
+		n->type = std::get<bool>(n->data) ? True : False;
 	} break;
 	default:
 		break;
 	}
-	n->type = std::get<bool>(n->data) ? True : False;
 }
 
 bool Optimize(Node*& n)
@@ -267,6 +305,8 @@ bool Optimize(Node*& n)
 		if (allConstant) {
 			switch (n->type)
 			{
+			case Negate: OpNeg(n, l); break;
+			case Not: OpNot(n, l); break;
 			case Add: OpAdd(n, l, r); break;
 			case Sub: OpSub(n, l, r); break;
 			case Mult: OpMult(n, l, r); break;
@@ -403,7 +443,7 @@ void ASTWalker::Run()
 				currentNamespace->functions.emplace(function->Name.c_str(), function).first->second;
 				
 				handleFunction(c, function, symbol); 
-				gDebug() << "Generated function '" << data << "', used " << maxRegister + 1 << " registers\n";
+				gDebug() << "Generated function '" << data << "', used " << maxRegister + 1 << " registers and " << function->Bytecode.size() << " instructions\n";
 			}
 			else {
 				gError() << "Line " << c->line << ": Symbol '" << data << "' already defined\n";
@@ -563,6 +603,44 @@ void ASTWalker::Walk(Node* n)
 			}
 		);
 
+		_N(Negate, // @todo: Maybe own instruction
+			auto& var = _First()->varType;
+			if (var != VariableType::Number && var != VariableType::Undefined) {
+				_Error("Cannot negate non number types");
+			}
+			auto& load = instructionList.emplace_back(); 
+			load.code = OpCodes::LoadNumber;
+			auto res = f->numberTable.emplace(0.0);
+			uint16 idx = (uint16)std::distance(f->numberTable.begin(), res.first);
+			load.target = getFirstFree();
+			load.param = idx;
+
+			_Op(NumSub);
+			_Walk;
+			_In8 = load.target;
+			_In8_2 = _First()->regTarget;
+			_FreeChildren; // @todo: Can we do that??
+			_Out;
+			_Type = VariableType::Number;
+		);
+
+		_N(Not, // @todo: Maybe own instruction
+			_Op(Not);
+			_Walk;
+			_In8 = _First()->regTarget;
+			_FreeChildren; // @todo: Can we do that??
+			_Out;
+			_Type = VariableType::Boolean;
+		);
+
+		_N(Less,
+			;
+			_Walk;
+			_Op(Less);
+			_Out;
+			_Type = VariableType::Boolean;
+		);
+
 		_N(Assign,
 			if (n->children.size() != 2) break;
 			_Walk;
@@ -622,20 +700,110 @@ void ASTWalker::Walk(Node* n)
 		);
 
 		_N(If,
+			if (n->children.size() != 3) {
+				_Error("Incorrect if-block");
+			}
+
 			auto& next = currentScope->children.emplace_back();
 			next.parent = currentScope;
 			currentScope = &next;
 			auto regs = registers;
 			Walk(_First());
-			_Op(JumpEq);
+			_Op(JumpNeg);
 			n->regTarget = instruction.target = _First()->regTarget;
-			for (auto& c : _Last()->children) Walk(c);
-			auto res = f->jumpTable.emplace(instructionList.size());
-			uint16 idx = (uint16)std::distance(f->jumpTable.begin(), res.first);
-			_In16 = idx;
+			freeReg(instruction.target);
+
+			auto oldSize = instructionList.size();
+			auto it = ++n->children.begin();
+			Walk(*it);
+			freeReg((*it)->regTarget);
+
+			auto& elseinst = instructionList.emplace_back(); 
+			elseinst.code = OpCodes::JumpForward;
+			
+			_In16 = instructionList.size() - oldSize;
+			oldSize = instructionList.size();
+
+			Walk(_Last());
+			freeReg(_Last()->regTarget);
+
+			elseinst.param = instructionList.size() - oldSize;
+
 			currentScope = currentScope->parent;
 			registers = regs;
 			);
+
+		_N(For,
+			if (n->children.size() != 5) {
+				_Error("Incorrect for-block");
+			}
+
+			auto& next = currentScope->children.emplace_back();
+			next.parent = currentScope;
+			currentScope = &next;
+			auto regs = registers;
+			Walk(_First());
+
+			auto start = instructionList.size();
+			auto it = ++n->children.begin();
+			Walk(*it);
+			freeReg((*it)->regTarget);
+
+			_Op(JumpNeg);
+			n->regTarget = instruction.target = (*it)->regTarget;
+			auto jumpStart = instructionList.size();
+
+			it++;
+			Walk(*it);
+			freeReg((*it)->regTarget);
+
+			it++;
+			Walk(*it);
+			freeReg((*it)->regTarget);
+
+			auto& elseinst = instructionList.emplace_back();
+			elseinst.code = OpCodes::JumpBackward;
+			elseinst.param = instructionList.size() - start;
+
+			_In16 = instructionList.size() - jumpStart;
+
+			currentScope = currentScope->parent;
+			registers = regs;
+			);
+
+		_N(While,
+			if (n->children.size() != 3) {
+				_Error("Incorrect while-block");
+			}
+
+			auto& next = currentScope->children.emplace_back();
+			next.parent = currentScope;
+			currentScope = &next;
+			auto regs = registers;
+
+			auto start = instructionList.size();
+			Walk(_First());
+			_Op(JumpNeg);
+			auto jumpStart = instructionList.size();
+			n->regTarget = instruction.target = _First()->regTarget;
+
+			auto it = ++n->children.begin();
+			Walk(*it);
+			freeReg((*it)->regTarget);
+
+			auto& elseinst = instructionList.emplace_back();
+			elseinst.code = OpCodes::JumpBackward;
+			elseinst.param = instructionList.size() - start;
+			
+			_In16 = instructionList.size() - jumpStart;
+
+			currentScope = currentScope->parent;
+			registers = regs;
+			);
+
+		_N(Else,
+			_Walk;
+		);
 
 	default:
 		_Error("Unexpected token found");
@@ -671,9 +839,17 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol& s)
 
 		case Scope: {
 
+			instructionList.reserve(c->children.size() * n->depth);
 			currentScope = f->scope;
-			for (auto& stmt : c->children)
-				Walk(stmt);
+			for (auto& stmt : c->children) {
+				try {
+					Walk(stmt);
+					if (IsConstant(stmt->type) || IsOperator(stmt->type)) freeReg(stmt->regTarget);
+				}
+				catch (...) {
+					gError() << "Internal error occured!\n";
+				}
+			}
 
 		} break;
 
