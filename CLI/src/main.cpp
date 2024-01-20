@@ -29,7 +29,7 @@ int print(int number) {
 	return 100;
 }
 
-REGISTER_NOVA(Global, print);
+REGISTER_NOVA(Global, print, print);
 
 int main()
 {

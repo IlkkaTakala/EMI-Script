@@ -86,12 +86,19 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 		gWarn() << "Invalid function handle\n";
 		return (size_t)-1;
 	}
+	if (!it->second->IsPublic) {
+		gWarn() << "Function is private\n";
+		return (size_t)-1;
+	}
+
 	CallObject* call = new CallObject(it->second);
 
 	call->Arguments.reserve(args.size());
-	for (auto& v : args) {
-		moveOwnershipToVM(v);
-		call->Arguments.push_back(v);
+	for (int i = 0; i < call->FunctionPtr->ArgCount && i < args.size(); i++) {
+		if (call->FunctionPtr->Types[i + 1] == args[i].getType()) {
+			moveOwnershipToVM(args[i]);
+			call->Arguments.push_back(args[i]);
+		}
 	}
 
 	size_t idx = 0;
@@ -211,12 +218,17 @@ void Runner::operator()()
 		CallObject* current = CallStack.top();
 		current->Ptr = current->FunctionPtr->Bytecode.data();
 		current->End = current->Ptr + current->FunctionPtr->Bytecode.size();
+		current->StackOffset = 0;
 
 		Registers.reserve(current->FunctionPtr->RegisterCount);
+		Registers.to(0);
 
-		auto& nums = f->FunctionPtr->numberTable.values();
-		auto& jumps = f->FunctionPtr->jumpTable.values();
+		for (int i = 0; i < current->FunctionPtr->ArgCount && i < f->Arguments.size(); i++) {
+			Registers[i] = f->Arguments[i];
+		}
 
+#define NUMS current->FunctionPtr->numberTable.values()
+#define JUMPS current->FunctionPtr->jumpTable.values()
 
 		while (interrupt && current->Ptr < current->End && Owner->IsRunning()) {
 			const Instruction& byte = *(Instruction*)current->Ptr++;
@@ -231,16 +243,17 @@ void Runner::operator()()
 				} break;
 
 				TARGET(Jump) : {
-					current->Ptr = &current->FunctionPtr->Bytecode.data()[jumps[byte.param]];
+					current->Ptr = &current->FunctionPtr->Bytecode.data()[JUMPS[byte.param]];
 				} break;
 
 				TARGET(LoadNumber) : {
-					Registers[byte.target] = nums[byte.param];
+					Registers[byte.target] = NUMS[byte.param];
 				} break;
 
 				TARGET(Return) : {
-					if (byte.target == 1) {
-						auto& val = Registers[byte.in1];
+					Variable val;
+					if (byte.in1 == 1) {
+						val = Registers[byte.target];
 						if (current->StackOffset == 0) {
 							current->Return.set_value(val);
 							Registers.to(0);
@@ -253,6 +266,9 @@ void Runner::operator()()
 					CallStack.pop();
 					if (!CallStack.empty()) {
 						current = CallStack.top();
+						Registers.to(current->StackOffset);
+						const Instruction& oldByte = *(Instruction*)(current->Ptr - 1);
+						Registers[oldByte.target] = val;
 					}
 					else {
 						current = nullptr;
@@ -260,15 +276,76 @@ void Runner::operator()()
 					}
 				} break;
 
+				TARGET(CallFunction) : {
+
+					auto& fn = current->FunctionPtr->functionTable[byte.in1];
+					if (fn == nullptr) {
+						auto& name = current->FunctionPtr->functionTableSymbols[byte.in1];
+						if (auto idx = Owner->NameToFunctionMap.find(name); idx != Owner->NameToFunctionMap.end()) {
+							if (auto it = Owner->FunctionMap.find(idx->second); it != Owner->FunctionMap.end()) {
+								fn = it->second;
+							}
+						}
+						else {
+							name = current->FunctionPtr->Namespace + "." + name;
+							if (idx = Owner->NameToFunctionMap.find(name); idx != Owner->NameToFunctionMap.end()) {
+								if (auto it = Owner->FunctionMap.find(idx->second); it != Owner->FunctionMap.end()) {
+									fn = it->second;
+								}
+							}
+							else {
+								gWarn() << "Function does not exist: " << name << "\n";
+								break;
+							}
+						}
+					}
+					if (!fn->IsPublic && current->FunctionPtr->NamespaceHash != fn->NamespaceHash) {
+						gWarn() << "Cannot call private function " << fn->Name << "\n";
+						break;
+					}
+					
+					CallObject* call = new CallObject(fn); // @todo: do this better, too slow
+					call->StackOffset = current->StackOffset + byte.in2;
+					Registers.to(call->StackOffset);
+					Registers.reserve(fn->RegisterCount);
+
+					CallStack.push(call);
+					current = call;
+				} break;
+
 				TARGET(PushUndefined) : {
 					Registers[byte.target].setUndefined();
-				}
+				} break;
 				TARGET(PushBoolean) : {
 					Registers[byte.target] = byte.in1 == 1 ? true : false;
-				}
+				} break;
 				TARGET(PushTypeDefault) : {
 					Registers[byte.target] = GetTypeDefault((VariableType)byte.param);
-				}
+				} break;
+
+				TARGET(Copy) : {
+					Registers[byte.target] = Registers[byte.in1];
+				} break;
+
+				TARGET(PreMod) : {
+					if (byte.in2 == 0) {
+						Registers[byte.target] = Registers[byte.target].as<double>() + 1.0;
+					}
+					else {
+						Registers[byte.target] = Registers[byte.target].as<double>() - 1.0;
+					}
+				} break;
+				
+				TARGET(PostMod) : {
+					if (byte.in2 == 0) {
+						Registers[byte.in1] = Registers[byte.in1].as<double>() + 1.0;
+						Registers[byte.target] = Registers[byte.in1];
+					}
+					else {
+						Registers[byte.in1] = Registers[byte.in1].as<double>() - 1.0;
+						Registers[byte.target] = Registers[byte.in1];
+					}
+				} break;
 
 				TARGET(NumAdd) : {
 					Registers[byte.target] = Registers[byte.in1].as<double>() + Registers[byte.in2].as<double>();
@@ -306,6 +383,10 @@ void Runner::operator()()
 					}
 				} break;
 
+				TARGET(Less) : {
+					Registers[byte.target] = Registers[byte.in1].as<double>() < Registers[byte.in2].as<double>();
+				} break;
+
 			default:
 				gError() << "Unknown bytecode detected\n";
 				break;
@@ -318,7 +399,6 @@ CallObject::CallObject(Function* function)
 {
 	FunctionPtr = function;
 	StackOffset = 0;
-	Location = 0;
-	Ptr = nullptr;
-	End = nullptr;
+	Ptr = function->Bytecode.data();
+	End = function->Bytecode.data() + function->Bytecode.size();
 }

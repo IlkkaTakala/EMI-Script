@@ -10,7 +10,7 @@ public:
 		line(0),
 		depth(0),
 		regTarget(0),
-		symFlags(SymbolFlags::None),
+		sym(),
 		varType(VariableType::Undefined),
 		instruction(0)
 	{}
@@ -24,8 +24,8 @@ public:
 	size_t depth;
 	std::variant<std::string, double, bool> data;
 	std::list<Node*> children;
+	Symbol* sym;
 	VariableType varType;
-	SymbolFlags symFlags;
 	uint8 regTarget;
 	size_t instruction;
 
@@ -46,19 +46,20 @@ struct ASTWalker
 
 	Symbol* findSymbol(const std::string & name);
 
-	void handleFunction(Node* n, Function* f, Symbol& s);
+	void handleFunction(Node* n, Function* f, Symbol* s);
 
 	Node* root;
 	Namespace* currentNamespace;
 	ankerl::unordered_dense::map<std::string, Namespace> namespaces;
 
 	bool HasError;
+	bool HasDebug;
 
 	// Function parsing
 	Scoped* currentScope;
 	Function* currentFunction;
 	std::vector<Instruction> instructionList;
-	std::array<bool, 256> registers;
+	std::array<bool, 255> registers;
 	uint8 maxRegister;
 
 	void initRegs() {
@@ -67,7 +68,7 @@ struct ASTWalker
 	}
 
 	uint8 getFirstFree() {
-		for (uint8 i = 0; i < registers.size(); i++) {
+		for (uint8 i = 0; i < 255; i++) {
 			if (!registers[i]) {
 				registers[i] = true;
 				if (maxRegister < i) maxRegister = i;
@@ -77,6 +78,19 @@ struct ASTWalker
 		gError() << "No free registers, this shouldn't happen\n";
 		HasError = true;
 		return 0;
+	}
+
+	uint8 getLastFree() {
+		uint8 idx = 0;
+		for (uint8 i = 0; i < 255; i++) {
+			if (registers[i]) {
+				idx = i;
+			}
+		}
+		idx++;
+		registers[idx] = true;
+		maxRegister = idx;
+		return idx;
 	}
 
 	void freeReg(uint8 reg) {

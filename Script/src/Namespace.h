@@ -7,14 +7,14 @@
 struct Namespace
 {
 	std::string Name;
-	ankerl::unordered_dense::map<const char*, Function*> functions;
+	ankerl::unordered_dense::map<std::string, Function*> functions;
 	ankerl::unordered_dense::map<std::string, UserDefined> objects;
 	ankerl::unordered_dense::map<std::string, ObjectType> objectTypes;
-	ankerl::unordered_dense::map<std::string, Symbol> symbols;
+	ankerl::unordered_dense::map<std::string, Symbol*> symbols;
 
 	Symbol* findSymbol(const std::string& name) {
 		if (auto it = symbols.find(name); it == symbols.end()) return nullptr;
-		else return &it->second;
+		else return it->second;
 	}
 
 	inline void merge(Namespace& rhs) {
@@ -44,6 +44,9 @@ struct Namespace
 
 	~Namespace() {
 		for (auto& [name, f] : functions) {
+			delete f;
+		}
+		for (auto& [name, f] : symbols) {
 			delete f;
 		}
 	}

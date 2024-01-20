@@ -155,7 +155,6 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	if (!ast.HasError) {
 		vm->AddNamespace(fullPath, ast.namespaces);
 	}
-
 }
 
 Node* Parser::ConstructAST(CompileOptions& options)

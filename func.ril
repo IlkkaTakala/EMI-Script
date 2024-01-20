@@ -7,41 +7,22 @@ object Test
     any = "anyval";
 }
 
-def func() {
+public def func(value : number) {
 	var test : number = 5;
 	var other : Test;
 	test = -100;
-	if (false) {
-	
-	} else if (true) {
-	
-	} else {
-	
-	}if (true) {
-	
-	} else {
-	
-	}if (true) {
-	
-	} else {
-	
-	}if (true) {
-	
-	} else {
-	
-	}if (true) {
-	
-	} else {
-	
+	if (true) {
+		test += value;
 	}
-	/*for (var i = 0; i < 10; i++) {
-		test = test + 1;
-	}*/
+	for (var i = 0; i < 10; i++) {
+		++test;
+	}
+	test = funct(100, test);
 	return -test;
 }
 
-public def funct(value, vel, ) {
-    
+def funct(value, vel) : number {
+    return value + vel;
 }
 
 # compile ../../ScriptTest.ril -s

@@ -40,10 +40,16 @@ enum class OpCodes : uint8
 	LoadNumber,
 	LoadString,
 	LoadSymbol,
+	
 	CallSymbol,
+	CallInternal,
+	CallFunction,
+
 	PushUndefined,
 	PushBoolean,
 	PushTypeDefault,
+
+	Copy,
 
 	JumpBackward,
 	JumpForward,
@@ -64,6 +70,9 @@ enum class OpCodes : uint8
 	NumSub,
 	NumMul,
 	NumDiv,
+
+	PreMod,
+	PostMod,
 
 	StrAdd,
 };

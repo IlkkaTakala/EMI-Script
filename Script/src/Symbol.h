@@ -31,12 +31,12 @@ struct Symbol
 	SymbolFlags flags = SymbolFlags::None;
 	VariableType varType = VariableType::Undefined;
 	bool resolved = false;
-	size_t startLife;
-	size_t endLife;
-	uint8 reg;
+	size_t startLife = 0;
+	size_t endLife = 0;
+	uint8 reg = 0;
+	bool needsLoading = false;
 
 	void setType(SymbolType t);
-
 };
 
 inline bool isAssignable(const SymbolFlags& s) { return SymbolFlags::Assignable == (s & SymbolFlags::Assignable); }

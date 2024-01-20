@@ -24,7 +24,7 @@ OTypename None
 OExpr Assign Expr
 OExpr None
 
-FunctionDef Definition Id Lparenthesis MFunctionVar Rparenthesis Scope
+FunctionDef Definition Id Lparenthesis MFunctionVar Rparenthesis OTypename Scope
 PublicFunctionDef Public FunctionDef
 NamespaceDef Extend Id Colon
 MFunctionVar FunctionVar Comma MFunctionVar
@@ -65,7 +65,9 @@ Priority Lparenthesis Expr Rparenthesis
 Expr Unary
 Expr ValueId
 Unary Value
+Unary Add Add Expr
 Unary Add Expr
+Unary Sub Sub Expr
 Unary Sub Expr
 Unary Not Expr
 Value True
@@ -84,6 +86,10 @@ Pipe Router FunctionCall
 Pipe If Lparenthesis Expr Rparenthesis Pipe
 
 Expr Expr Assign Expr
+Expr Expr Add Assign Expr
+Expr Expr Sub Assign Expr
+Expr Expr Div Assign Expr
+Expr Expr Mult Assign Expr
 Expr VarDeclare
 Expr FunctionCall
 Expr Indexer
@@ -102,8 +108,8 @@ Flow ForFlow
 Flow WhileFlow
 
 IfFlow If Lparenthesis Expr Rparenthesis FlowBlock ElseFlow
-ForFlow For Lparenthesis Expr Semi Expr Semi Expr Rparenthesis FlowBlock ElseFlow
-WhileFlow While Lparenthesis Expr Rparenthesis FlowBlock ElseFlow
+ForFlow For Lparenthesis Expr Semi Expr Semi Expr Rparenthesis FlowBlock
+WhileFlow While Lparenthesis Expr Rparenthesis FlowBlock
 ElseFlow Else FlowBlock
 ElseFlow None
 
@@ -166,8 +172,8 @@ None None Expr
 None None Flow
 None None Setter
 
-None Increment Expr
-None Decrement Expr
+None Increment
+None Decrement 
 
 None Add 
 None Sub 
@@ -191,7 +197,9 @@ None None Expr
 None None Unary 
 ValueId ValueId
 None None Value
+None PreIncrement
 None None Expr
+None PreDecrement
 None Negate
 None Not
 True True
@@ -210,6 +218,10 @@ None None FunctionCall
 None If
 
 Assign Assign
+Assign Add
+Assign Sub
+Assign Div
+Assign Mult
 None None VarDeclare
 None None FunctionCall
 None None Indexer

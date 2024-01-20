@@ -33,6 +33,7 @@ enum class VariableType
 	External,
 	String,
 	Array,
+	Function,
 	Object
 };
 
@@ -119,5 +120,26 @@ public:
 		return value == rhs.value;
 	}
 };
+
+template <typename T>
+inline VariableType type() {
+	return VariableType::Undefined;
+}
+template<>
+inline VariableType type<bool>() {
+	return VariableType::Boolean;
+}
+template <typename T> requires (std::is_convertible_v<T, double>)
+inline VariableType type() {
+	return VariableType::Number;
+}
+template <> 
+inline VariableType type<const char*>() {
+	return VariableType::String;
+}
+template<typename T> requires std::is_pointer_v<T>
+inline VariableType type() {
+	return VariableType::External;
+}
 
 #endif //_VARIABLE_INC_GUARD_H_

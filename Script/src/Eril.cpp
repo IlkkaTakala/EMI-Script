@@ -4,6 +4,41 @@
 
 using namespace Eril;
 
+bool Eril::__internal_register(__internal_function* func)
+{
+	if (ValidHostFunctions().find((uint64_t)func) != ValidHostFunctions().end()) return false;
+	auto& space = HostFunctions()[func->space];
+	if (space.find(func->name) != space.end()) return false;
+	space[func->name] = func;
+	ValidHostFunctions().emplace((uint64_t)func);
+	gDebug() << (*HostFunctions()["Global"]["print"])(1, std::vector<Variable>{10}.data()).as<int>();
+	return true;
+}
+
+bool Eril::__internal_unregister(const char* space, const char* name)
+{
+	auto& f = HostFunctions();
+	if (auto it = f.find(space); it != f.end()) {
+		if (auto fun = it->second.find(name); fun != it->second.end()) {
+			ValidHostFunctions().erase((uint64_t)fun->second);
+			delete fun->second;
+			it->second.erase(fun);
+		}
+	}
+	return false;
+}
+
+CORE_API void Eril::UnregisterAllExternals()
+{
+	ValidHostFunctions().clear();
+	for (auto& space : HostFunctions()) {
+		for (auto& f : space.second) {
+			delete f.second;
+		}
+	}
+	HostFunctions().clear();
+}
+
 VMHandle Eril::CreateEnvironment()
 {
 	uint idx = CreateVM();

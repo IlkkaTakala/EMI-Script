@@ -27,11 +27,10 @@ struct CompileOptions
 
 struct CallObject 
 {
-	const Function* FunctionPtr;
+	Function* FunctionPtr;
 	const uint32* Ptr;
 	const uint32* End;
-	size_t Location;
-	uint16 StackOffset;
+	size_t StackOffset;
 	std::vector<Variable> Arguments;
 	std::promise<Variable> Return;
 
@@ -78,6 +77,16 @@ private:
 	std::stack<CallObject*> CallStack;
 	RegisterStack<Variable> Registers;
 };
+
+inline auto& HostFunctions() {
+	static ankerl::unordered_dense::map<std::string, ankerl::unordered_dense::map<std::string, __internal_function*>> f;
+	return f;
+};
+
+inline auto& ValidHostFunctions() {
+	static ankerl::unordered_dense::set<uint64_t> f;
+	return f;
+}
 
 class VM
 {
