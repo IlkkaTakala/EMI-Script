@@ -90,7 +90,7 @@ inline bool IsConstant(Token t) {
 }
 
 inline bool IsOperator(Token t) {
-	return t >= Equal && t <= Div;
+	return t >= Equal && t <= Div || t == FunctionCall;
 }
 
 void OpAdd(Node* n, Node* l, Node* r) {
@@ -208,6 +208,7 @@ void OpDiv(Node* n, Node* l, Node* r) {
 }
 
 void OpEqual(Node* n, Node* l, Node* r) {
+	n->type = l->type;
 	switch (l->type)
 	{
 	case String: {
@@ -219,11 +220,30 @@ void OpEqual(Node* n, Node* l, Node* r) {
 	case False: 
 	case True: {
 		n->data = VariantToBool(l) == VariantToBool(r);
-		n->type = std::get<bool>(n->data) ? True : False;
 	} break;
 	default:
 		break;
 	}
+	n->type = std::get<bool>(n->data) ? True : False;
+}
+
+void OpNotEqual(Node* n, Node* l, Node* r) {
+	switch (l->type)
+	{
+	case String: {
+		n->data = VariantToStr(l) != VariantToStr(r); // TODO Remove substrings?
+	} break;
+	case Number: {
+		n->data = VariantToFloat(l) != VariantToFloat(r);
+	} break;
+	case False: 
+	case True: {
+		n->data = VariantToBool(l) != VariantToBool(r);
+	} break;
+	default:
+		break;
+	}
+	n->type = std::get<bool>(n->data) ? True : False;
 }
 
 bool Optimize(Node*& n)
@@ -312,6 +332,7 @@ bool Optimize(Node*& n)
 			case Mult: OpMult(n, l, r); break;
 			case Div: OpDiv(n, l, r); break;
 			case Equal: OpEqual(n, l, r); break;
+			case NotEqual: OpNotEqual(n, l, r); break;
 			default:
 				break;
 			}
@@ -327,6 +348,32 @@ bool Optimize(Node*& n)
 	}
 
 	return true;
+}
+
+void Desugar(Node*& n)
+{
+	for (auto& c : n->children) {
+		Desugar(c);
+	}
+
+	switch (n->type)
+	{
+	case Pipe: {
+		Node* previous = nullptr;
+		for (auto& node : n->children) {
+			if (node->type == FunctionCall && previous) {
+				node->children.back()->children.emplace_front(previous);
+			}
+			previous = node;
+		}
+		n->children.clear();
+		delete n;
+		n = previous;
+	} break;
+
+	default:
+		break;
+	}
 }
 
 void TypeConverter(Node* n, const TokenHolder& h)
@@ -560,6 +607,18 @@ if (n->data.index() == 0 && *std::get<std::string>(n->data).c_str() == '=') {\
 }\
 else _Out;
 
+#define _Compare(op) \
+_Walk;\
+if (_First()->varType != _Last()->varType && _First()->varType != VariableType::Undefined && _Last()->varType != VariableType::Undefined) {\
+	_Error("Can only compare number types");\
+}\
+_Type = VariableType::Boolean;\
+_Op(op);\
+_In8 = _First()->regTarget;\
+_In8_2 = _Last()->regTarget;\
+_FreeChildren;\
+_Out;\
+
 void ASTWalker::Walk(Node* n)
 {
 	Function* f = currentFunction;
@@ -616,7 +675,7 @@ void ASTWalker::Walk(Node* n)
 			_Op(NumAdd);
 			switch (_First()->varType)
 			{
-			_Operator(Undefined, NumAdd)
+			_Operator(Undefined, Add)
 			_Operator(Number, NumAdd)
 			_Operator(String, StrAdd)
 			default:
@@ -720,16 +779,27 @@ void ASTWalker::Walk(Node* n)
 		);
 
 		_N(Less,
-			_Walk;
-			if (_First()->varType != _Last()->varType && _First()->varType != VariableType::Undefined && _Last()->varType != VariableType::Undefined) {
-				_Error("Can only compare number types");
-			}
-			_Type = VariableType::Boolean;
-			_Op(Less);
-			_In8 = _First()->regTarget;
-			_In8_2 = _Last()->regTarget;
-			_FreeChildren;
-			_Out;
+			_Compare(Less)
+		);
+
+		_N(LessEqual,
+			_Compare(LessEqual)
+		);
+
+		_N(Larger,
+			_Compare(Greater)
+		);
+
+		_N(LargerEqual,
+			_Compare(GreaterEqual)
+		);
+
+		_N(Equal,
+			_Compare(Equal)
+		);
+
+		_N(NotEqual,
+			_Compare(NotEqual)
 		);
 
 		case Decrement:
@@ -925,6 +995,7 @@ void ASTWalker::Walk(Node* n)
 			if (!_First()->sym || _First()->sym->type != SymbolType::Function) {
 				_Error("Variable functions not supported yet"); // @todo: Add support
 			}
+			auto name = getFullId(_First());
 
 			auto& params = _Last();
 			for (auto& c : params->children) {
@@ -937,6 +1008,7 @@ void ASTWalker::Walk(Node* n)
 					_Op(Copy);
 					instruction.target = getLastFree();
 					_In8 = c->regTarget;
+					c->regTarget = instruction.target;
 				}
 			}
 
@@ -944,7 +1016,6 @@ void ASTWalker::Walk(Node* n)
 				freeReg(c->regTarget);
 			}
 
-			auto name = getFullId(_First());
 			auto it = std::find(currentFunction->functionTableSymbols.begin(), currentFunction->functionTableSymbols.end(), name);
 			size_t index = 0;
 

@@ -43,17 +43,17 @@ namespace Eril
 
 	class FunctionHandle
 	{
-		size_t id = 0;
+		void* id = 0;
 		VMHandle* vm = nullptr;
 
 	public:
 		template<typename ...Args> requires (std::is_convertible_v<Args, Variable> && ...)
 		VariableHandle operator()(Args... args);
 
-		operator size_t() {
+		operator void*() {
 			return id;
 		}
-		explicit FunctionHandle(size_t in, VMHandle* handle) {
+		explicit FunctionHandle(void* in, VMHandle* handle) {
 			id = in;
 			vm = handle;
 		}

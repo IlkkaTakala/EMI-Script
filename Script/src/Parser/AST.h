@@ -101,4 +101,4 @@ struct ASTWalker
 
 void TypeConverter(Node* n, const TokenHolder& h);
 bool Optimize(Node*&);
-void Desugar(Node*);
+void Desugar(Node*&);

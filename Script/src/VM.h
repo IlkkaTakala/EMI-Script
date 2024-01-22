@@ -48,8 +48,8 @@ public:
 		fast = &_stack[top];
 	}
 
-	void reserve(uint8 count) {
-		_stack.resize(top + count);
+	void reserve(size_t count) {
+		_stack.resize(count);
 		fast = &_stack[top];
 	}
 
@@ -98,7 +98,7 @@ public:
 	ScriptHandle Compile(const char* path, const Options& options);
 	void CompileTemporary(const char* data);
 
-	size_t GetFunctionID(const std::string& name);
+	void* GetFunctionID(const std::string& name);
 
 	size_t CallFunction(FunctionHandle handle, const std::span<Variable>& args);
 	Variable GetReturnValue(size_t index);
@@ -137,12 +137,9 @@ private:
 	bool VMRunning;
 
 	ankerl::unordered_dense::map<std::string, CompileUnit> Units;
-	ankerl::unordered_dense::map<uint32, Function*> FunctionMap;
-	ankerl::unordered_dense::map<std::string, uint32> NameToFunctionMap;
+	ankerl::unordered_dense::set<Function*> ValidFunctions;
+	ankerl::unordered_dense::map<std::string, Function*> NameToFunctionMap;
 	ankerl::unordered_dense::map<std::string, Namespace> Namespaces;
-	std::stack<uint32> FunctionFreeList;
-	uint32 FunctionHandleCounter = 0;
-
 
 	ObjectManager Manager;
 	std::vector<Variable> GlobalVariables;

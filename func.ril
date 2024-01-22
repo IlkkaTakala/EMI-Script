@@ -11,17 +11,19 @@ public def func(value : number) {
 	var test : number = 5;
 	var other : Test;
 	test = -100;
-	if (true) {
-		test += value;
-	}
-	for (var i = 0; i < 10; i++) {
-		++test;
-	}
-	test = funct(100, test);
-	return -test;
+	
+	test = test 
+	|> Test.add(100)
+	|> Test.add(101)
+	|> Test.add(102)
+	|> Test.add(103);
+	
+	return test != 100;
 }
 
-def funct(value, vel) : number {
+extend Test:
+
+public def add(value, vel) : number {
     return value + vel;
 }
 

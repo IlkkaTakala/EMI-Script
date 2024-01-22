@@ -71,7 +71,7 @@ void VM::CompileTemporary(const char* data)
 	QueueNotify.notify_one();
 }
 
-size_t VM::GetFunctionID(const std::string& name)
+void* VM::GetFunctionID(const std::string& name)
 {
 	if (auto it = NameToFunctionMap.find(name); it != NameToFunctionMap.end()) {
 		return it->second;
@@ -81,17 +81,19 @@ size_t VM::GetFunctionID(const std::string& name)
 
 size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 {
-	auto it = FunctionMap.find((uint16)handle);
-	if (it == FunctionMap.end()) {
+	Function* fn = (Function*)(void*)handle;
+	auto it = ValidFunctions.find(fn);
+	if (it == ValidFunctions.end()) {
 		gWarn() << "Invalid function handle\n";
 		return (size_t)-1;
 	}
-	if (!it->second->IsPublic) {
+
+	if (!fn->IsPublic) {
 		gWarn() << "Function is private\n";
 		return (size_t)-1;
 	}
 
-	CallObject* call = new CallObject(it->second);
+	CallObject* call = new CallObject(fn);
 
 	call->Arguments.reserve(args.size());
 	for (int i = 0; i < call->FunctionPtr->ArgCount && i < args.size(); i++) {
@@ -143,9 +145,8 @@ void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std:
 			if (auto it = NameToFunctionMap.find(full); it != NameToFunctionMap.end()) {
 				gWarn() << "Multiple definitions for function " << full << '\n';
 			}
-			auto idx = ++FunctionHandleCounter;
-			NameToFunctionMap[full] = idx;
-			FunctionMap[idx] = func;
+			NameToFunctionMap[full] = func;
+			ValidFunctions.emplace(func);
 			Units[path].functions.push_back({ name, fname });
 		}
 
@@ -167,13 +168,12 @@ void VM::RemoveUnit(const std::string& unit)
 			Namespace& n = Namespaces[name];
 
 			n.symbols.erase(name);
-			delete n.functions[function.c_str()];
+			auto ptr = n.functions[function.c_str()];
+			ValidFunctions.erase(ptr);
+			delete ptr;
 			n.functions.erase(function.c_str());
 			auto full = name + '.' + function;
-			if (auto named = NameToFunctionMap.find(full); named != NameToFunctionMap.end()) {
-				FunctionMap.erase(named->second);
-				NameToFunctionMap.erase(full);
-			}
+			NameToFunctionMap.erase(full);
 		}
 		for (auto& [name, obj] : u.objects) {
 			Manager.RemoveType(name);
@@ -282,32 +282,41 @@ void Runner::operator()()
 					if (fn == nullptr) {
 						auto& name = current->FunctionPtr->functionTableSymbols[byte.in1];
 						if (auto idx = Owner->NameToFunctionMap.find(name); idx != Owner->NameToFunctionMap.end()) {
-							if (auto it = Owner->FunctionMap.find(idx->second); it != Owner->FunctionMap.end()) {
-								fn = it->second;
-							}
+							fn = idx->second;
 						}
 						else {
-							name = current->FunctionPtr->Namespace + "." + name;
-							if (idx = Owner->NameToFunctionMap.find(name); idx != Owner->NameToFunctionMap.end()) {
-								if (auto it = Owner->FunctionMap.find(idx->second); it != Owner->FunctionMap.end()) {
-									fn = it->second;
-								}
+							std::string fnname = current->FunctionPtr->Namespace + "." + name;
+							if (idx = Owner->NameToFunctionMap.find(fnname); idx != Owner->NameToFunctionMap.end()) {
+								fn = idx->second;
 							}
 							else {
-								gWarn() << "Function does not exist: " << name << "\n";
+								gWarn() << "Function does not exist: " << fnname << "\n";
 								break;
 							}
 						}
 					}
+					else if (Owner->ValidFunctions.find(fn) == Owner->ValidFunctions.end()) {
+						current->FunctionPtr->functionTable[byte.in1] = nullptr;
+						gWarn() << "Cannot call deleted function\n";
+						break;
+					}
+
 					if (!fn->IsPublic && current->FunctionPtr->NamespaceHash != fn->NamespaceHash) {
 						gWarn() << "Cannot call private function " << fn->Name << "\n";
 						break;
 					}
+
+					for (int i = 1; i < fn->Types.size(); i++) {
+						if (fn->Types[i] != VariableType::Undefined && fn->Types[i] != Registers[byte.in2].getType()) {
+							gWarn() << "Invalid argument types\n";
+							break;
+						}
+					}
 					
 					CallObject* call = new CallObject(fn); // @todo: do this better, too slow
 					call->StackOffset = current->StackOffset + byte.in2;
+					Registers.reserve(call->StackOffset + fn->RegisterCount);
 					Registers.to(call->StackOffset);
-					Registers.reserve(fn->RegisterCount);
 
 					CallStack.push(call);
 					current = call;
@@ -348,23 +357,48 @@ void Runner::operator()()
 				} break;
 
 				TARGET(NumAdd) : {
-					Registers[byte.target] = Registers[byte.in1].as<double>() + Registers[byte.in2].as<double>();
+					Registers[byte.target] = Registers[byte.in1].as<double>() + toNumber(Registers[byte.in2]);
+				} break;
+
+				TARGET(StrAdd) : {
+					//Registers[byte.target] = Registers[byte.in1].as<String*>() + Registers[byte.in2].as<String*>();
 				} break;
 
 				TARGET(NumSub) : {
-					Registers[byte.target] = Registers[byte.in1].as<double>() - Registers[byte.in2].as<double>();
+					Registers[byte.target] = Registers[byte.in1].as<double>() - toNumber(Registers[byte.in2]);
 				} break;
 
 				TARGET(NumDiv) : {
-					Registers[byte.target] = Registers[byte.in1].as<double>() / Registers[byte.in2].as<double>();
+					Registers[byte.target] = Registers[byte.in1].as<double>() / toNumber(Registers[byte.in2]);
 				} break;
 
 				TARGET(NumMul) : {
-					Registers[byte.target] = Registers[byte.in1].as<double>() * Registers[byte.in2].as<double>();
+					Registers[byte.target] = Registers[byte.in1].as<double>() * toNumber(Registers[byte.in2]);
+				} break;
+
+				// @todo: these could be optimized if the arguments are always the same type
+				TARGET(Add) : {
+					 add(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
+				} break;
+
+				TARGET(Sub) : {
+					sub(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
+				} break;
+
+				TARGET(Div) : {
+					div(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
+				} break;
+
+				TARGET(Mul) : {
+					mul(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
 				} break;
 				
 				TARGET(Equal) : {
-					Registers[byte.target] = Registers[byte.in1] == Registers[byte.in2]; // @todo: fix this
+					Registers[byte.target] = equal(Registers[byte.in1], Registers[byte.in2]); // @todo: fix this
+				} break;
+
+				TARGET(NotEqual) : {
+					Registers[byte.target] = !equal(Registers[byte.in1], Registers[byte.in2]); // @todo: fix this
 				} break;
 
 				TARGET(Not) : {
@@ -384,7 +418,19 @@ void Runner::operator()()
 				} break;
 
 				TARGET(Less) : {
-					Registers[byte.target] = Registers[byte.in1].as<double>() < Registers[byte.in2].as<double>();
+					Registers[byte.target] = toNumber(Registers[byte.in1]) < toNumber(Registers[byte.in2]);
+				} break;
+
+				TARGET(LessEqual) : {
+					Registers[byte.target] = toNumber(Registers[byte.in1]) <= toNumber(Registers[byte.in2]);
+				} break;
+
+				TARGET(Greater) : {
+					Registers[byte.target] = toNumber(Registers[byte.in1]) > toNumber(Registers[byte.in2]);
+				} break;
+
+				TARGET(GreaterEqual) : {
+					Registers[byte.target] = toNumber(Registers[byte.in1]) >= toNumber(Registers[byte.in2]);
 				} break;
 
 			default:

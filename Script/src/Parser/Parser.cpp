@@ -147,6 +147,8 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 		return;
 	}
 
+	Desugar(root);
+
 	root->print("");
 	gDebug() << "Walking AST\n";
 	ASTWalker ast(vm, root);

@@ -50,6 +50,7 @@ Expr Expr Mult Expr
 
 Expr Expr And Expr
 Expr Expr Or Expr
+Expr Expr NotEqual Expr
 Expr Expr Equal Expr
 Expr Expr Less Expr
 Expr Expr Larger Expr
@@ -83,7 +84,6 @@ Array Lbracket CallParams Rbracket
 MPipe Pipe MPipe
 MPipe Pipe
 Pipe Router FunctionCall
-Pipe If Lparenthesis Expr Rparenthesis Pipe
 
 Expr Expr Assign Expr
 Expr Expr Add Assign Expr
@@ -182,6 +182,7 @@ None Mult
 
 None And 
 None Or 
+None NotEqual 
 None Equal 
 None Less 
 None Larger 
@@ -215,7 +216,6 @@ None Array CallParams
 None None MPipe
 None Pipe 
 None None FunctionCall
-None If
 
 Assign Assign
 Assign Add

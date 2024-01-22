@@ -87,3 +87,76 @@ bool isTruthy(const Variable& var)
 		return false;
 	}
 }
+
+bool equal(const Variable& lhs, const Variable& rhs)
+{
+	if (lhs.getType() != rhs.getType()) return false;
+	switch (lhs.getType())
+	{
+	case VariableType::String: return false;
+	default:
+		return lhs.operator==(rhs);
+		break;
+	}
+}
+
+void add(Variable& out, const Variable& lhs, const Variable& rhs)
+{
+	switch (lhs.getType())
+	{
+	case VariableType::Number: out = lhs.as<double>() + toNumber(rhs.as<double>()); return;
+
+	default:
+		return;
+	}
+}
+
+void sub(Variable& out, const Variable& lhs, const Variable& rhs)
+{
+	if (lhs.getType() != rhs.getType()) return;
+	switch (lhs.getType())
+	{
+	case VariableType::Number: out = lhs.as<double>() - rhs.as<double>(); return;
+
+	default:
+		return;
+	}
+}
+
+void mul(Variable& out, const Variable& lhs, const Variable& rhs)
+{
+	if (lhs.getType() != rhs.getType()) return;
+	switch (lhs.getType())
+	{
+	case VariableType::Number: out = lhs.as<double>() * rhs.as<double>(); return;
+
+	default:
+		return;
+	}
+}
+
+void div(Variable& out, const Variable& lhs, const Variable& rhs)
+{
+	if (lhs.getType() != rhs.getType()) return;
+	switch (lhs.getType())
+	{
+	case VariableType::Number: out = lhs.as<double>() / rhs.as<double>(); return;
+
+	default:
+		return;
+	}
+}
+
+double toNumber(const Variable& in)
+{
+	switch (in.getType())
+	{
+	case VariableType::Number: return in.as<double>();
+	case VariableType::Boolean: return in.as<bool>() ? 1.0 : 0.0;
+
+
+
+	default:
+		return 0.0;
+	}
+}

@@ -71,6 +71,11 @@ enum class OpCodes : uint8
 	NumMul,
 	NumDiv,
 
+	Add,
+	Sub,
+	Mul,
+	Div,
+
 	PreMod,
 	PostMod,
 

@@ -93,7 +93,7 @@ int main()
 
 				Eril::FunctionHandle h = vm.GetFunctionHandle(input.c_str());
 				auto handle = h(10, 5423.453, "Test", true, &input, 34.f);
-				std::cout << handle.get<double>() << '\n';
+				std::cout << handle.get<bool>() << '\n';
 			}
 			printf("Exiting script stage\n\n");
 		} break;

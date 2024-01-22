@@ -149,7 +149,6 @@ Token Lexer::Analyse(std::string_view& Data)
 			CASE('}', TOKEN(Rcurly);)
 			CASE('[', TOKEN(Lbracket);)
 			CASE(']', TOKEN(Rbracket);)
-			CASE('!', TOKEN(Not);)
 			CASE('<', TOKEN(Less);)
 			CASE('>', TOKEN(Larger);)
 			CASE(',', TOKEN(Comma);)
@@ -182,12 +181,21 @@ Token Lexer::Analyse(std::string_view& Data)
 				TOKEN(String);
 				start++; endOffset = 1;
 				)
-							CASE('=',
-								if (*(ptr + 1) == '=') {
-									TOKEN(Equal);
-									Current.Advance();
-								}
-								else TOKEN(Assign);
+
+			CASE('=',
+				if (*(ptr + 1) == '=') {
+					TOKEN(Equal);
+					Current.Advance();
+				}
+				else TOKEN(Assign);
+				)
+					
+			CASE('!',
+				if (*(ptr + 1) == '=') {
+					TOKEN(NotEqual);
+					Current.Advance();
+				}
+				else TOKEN(Not);
 				)
 
 			CASE('|',
