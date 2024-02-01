@@ -34,50 +34,9 @@ typedef __int16 int16;
 typedef __int64 int64;
 typedef unsigned long ScriptHandle;
 
+#define X(x) x,
 enum class OpCodes : uint8
 {
-	Noop,
-	LoadNumber,
-	LoadString,
-	LoadSymbol,
-	
-	CallSymbol,
-	CallInternal,
-	CallFunction,
-
-	PushUndefined,
-	PushBoolean,
-	PushTypeDefault,
-
-	Copy,
-
-	JumpBackward,
-	JumpForward,
-	Jump,
-	JumpEq,
-	JumpNeg,
-	Return,
-
-	Equal,
-	NotEqual,
-	Less,
-	Greater,
-	LessEqual,
-	GreaterEqual,
-
-	Not,
-	NumAdd,
-	NumSub,
-	NumMul,
-	NumDiv,
-
-	Add,
-	Sub,
-	Mul,
-	Div,
-
-	PreMod,
-	PostMod,
-
-	StrAdd,
+#include "Opcodes.h"
 };
+#undef X

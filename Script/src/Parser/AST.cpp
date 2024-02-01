@@ -1092,6 +1092,9 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 					gError() << "Internal error occured!\n";
 				}
 			}
+			Instruction op;
+			op.code = OpCodes::Break;
+			instructionList.emplace_back(op);
 
 		} break;
 

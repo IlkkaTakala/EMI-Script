@@ -201,7 +201,7 @@ Runner::~Runner()
 
 }
 
-#define TARGET(Op) case OpCodes::Op
+#define TARGET(Op) Op: 
 
 void Runner::operator()()
 {
@@ -231,28 +231,49 @@ void Runner::operator()()
 
 #define NUMS current->FunctionPtr->numberTable.values()
 #define JUMPS current->FunctionPtr->jumpTable.values()
+		out:
+		while (interrupt && Owner->IsRunning()) {
 
-		while (interrupt && current->Ptr < current->End && Owner->IsRunning()) {
+		start: // @todo: maybe something better so we can exit whenever?
 			const Instruction& byte = *(Instruction*)current->Ptr++;
+
+#define X(x) case OpCodes::x: goto x;
 			switch (byte.code)
 			{
-				TARGET(JumpForward) : {
+			default: __assume(0);
+#include "Opcodes.h"
+			}
+#undef X
+				TARGET(Noop) goto start;
+				TARGET(Break) {
+					interrupt = false;
+				} goto out;
+
+				TARGET(JumpForward) {
 					current->Ptr += byte.param;
-				} break;	
+				} goto start;	
 
-				TARGET(JumpBackward) : {
+				TARGET(JumpBackward) {
 					current->Ptr -= byte.param;
-				} break;
+				} goto start;
 
-				TARGET(Jump) : {
+				TARGET(Jump) {
 					current->Ptr = &current->FunctionPtr->Bytecode.data()[JUMPS[byte.param]];
-				} break;
+				} goto start;
 
-				TARGET(LoadNumber) : {
+				TARGET(LoadNumber) {
 					Registers[byte.target] = NUMS[byte.param];
-				} break;
+				} goto start;
 
-				TARGET(Return) : {
+				TARGET(LoadString) {
+					
+				} goto start;
+
+				TARGET(LoadSymbol) {
+					
+				} goto start;
+
+				TARGET(Return) {
 					Variable val;
 					if (byte.in1 == 1) {
 						val = Registers[byte.target];
@@ -275,10 +296,11 @@ void Runner::operator()()
 					else {
 						current = nullptr;
 						interrupt = false;
+						goto out;
 					}
-				} break;
+				} goto start;
 
-				TARGET(CallFunction) : {
+				TARGET(CallFunction) {
 
 					auto& fn = current->FunctionPtr->functionTable[byte.in1];
 					if (fn == nullptr) {
@@ -293,25 +315,25 @@ void Runner::operator()()
 							}
 							else {
 								gWarn() << "Function does not exist: " << fnname << "\n";
-								break;
+								goto start;
 							}
 						}
 					}
 					//else if (Owner->ValidFunctions.find(fn) == Owner->ValidFunctions.end()) { // @todo: check is maybe required but very slow
 					//	current->FunctionPtr->functionTable[byte.in1] = nullptr;
 					//	gWarn() << "Cannot call deleted function\n";
-					//	break;
+					//	goto start;
 					//}
 
 					if (!fn->IsPublic && current->FunctionPtr->NamespaceHash != fn->NamespaceHash) {
 						gWarn() << "Cannot call private function " << fn->Name << "\n";
-						break;
+						goto start;
 					}
 
 					for (int i = 1; i < fn->Types.size(); i++) {
 						if (fn->Types[i] != VariableType::Undefined && fn->Types[i] != Registers[byte.in2].getType()) {
 							gWarn() << "Invalid argument types\n";
-							break;
+							goto start;
 						}
 					}
 					
@@ -322,32 +344,40 @@ void Runner::operator()()
 					Registers.to(call.StackOffset);
 					current = &call;
 
-				} break;
+				} goto start;
 
-				TARGET(PushUndefined) : {
+				TARGET(CallSymbol) {
+
+				} goto start;
+
+				TARGET(CallInternal) {
+
+				} goto start;
+
+				TARGET(PushUndefined) {
 					Registers[byte.target].setUndefined();
-				} break;
-				TARGET(PushBoolean) : {
+				} goto start;
+				TARGET(PushBoolean) {
 					Registers[byte.target] = byte.in1 == 1 ? true : false;
-				} break;
-				TARGET(PushTypeDefault) : {
+				} goto start;
+				TARGET(PushTypeDefault) {
 					Registers[byte.target] = GetTypeDefault((VariableType)byte.param);
-				} break;
+				} goto start;
 
-				TARGET(Copy) : {
+				TARGET(Copy) {
 					Registers[byte.target] = Registers[byte.in1];
-				} break;
+				} goto start;
 
-				TARGET(PreMod) : {
+				TARGET(PreMod) {
 					if (byte.in2 == 0) {
 						Registers[byte.target] = Registers[byte.target].as<double>() + 1.0;
 					}
 					else {
 						Registers[byte.target] = Registers[byte.target].as<double>() - 1.0;
 					}
-				} break;
+				} goto start;
 				
-				TARGET(PostMod) : {
+				TARGET(PostMod) {
 					if (byte.in2 == 0) {
 						Registers[byte.in1] = Registers[byte.in1].as<double>() + 1.0;
 						Registers[byte.target] = Registers[byte.in1];
@@ -356,89 +386,85 @@ void Runner::operator()()
 						Registers[byte.in1] = Registers[byte.in1].as<double>() - 1.0;
 						Registers[byte.target] = Registers[byte.in1];
 					}
-				} break;
+				} goto start;
 
-				TARGET(NumAdd) : {
+				TARGET(NumAdd) {
 					Registers[byte.target] = Registers[byte.in1].as<double>() + toNumber(Registers[byte.in2]);
-				} break;
+				} goto start;
 
-				TARGET(StrAdd) : {
+				TARGET(StrAdd) {
 					//Registers[byte.target] = Registers[byte.in1].as<String*>() + Registers[byte.in2].as<String*>();
-				} break;
+				} goto start;
 
-				TARGET(NumSub) : {
+				TARGET(NumSub) {
 					Registers[byte.target] = Registers[byte.in1].as<double>() - toNumber(Registers[byte.in2]);
-				} break;
+				} goto start;
 
-				TARGET(NumDiv) : {
+				TARGET(NumDiv) {
 					Registers[byte.target] = Registers[byte.in1].as<double>() / toNumber(Registers[byte.in2]);
-				} break;
+				} goto start;
 
-				TARGET(NumMul) : {
+				TARGET(NumMul) {
 					Registers[byte.target] = Registers[byte.in1].as<double>() * toNumber(Registers[byte.in2]);
-				} break;
+				} goto start;
 
 				// @todo: these could be optimized if the arguments are always the same type
-				TARGET(Add) : {
+				TARGET(Add) {
 					 add(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
-				} break;
+				} goto start;
 
-				TARGET(Sub) : {
+				TARGET(Sub) {
 					sub(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
-				} break;
+				} goto start;
 
-				TARGET(Div) : {
+				TARGET(Div) {
 					div(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
-				} break;
+				} goto start;
 
-				TARGET(Mul) : {
+				TARGET(Mul) {
 					mul(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
-				} break;
+				} goto start;
 				
-				TARGET(Equal) : {
+				TARGET(Equal) {
 					Registers[byte.target] = equal(Registers[byte.in1], Registers[byte.in2]); // @todo: fix this
-				} break;
+				} goto start;
 
-				TARGET(NotEqual) : {
+				TARGET(NotEqual) {
 					Registers[byte.target] = !equal(Registers[byte.in1], Registers[byte.in2]); // @todo: fix this
-				} break;
+				} goto start;
 
-				TARGET(Not) : {
+				TARGET(Not) {
 					Registers[byte.target] = !isTruthy(Registers[byte.in1]); // @todo: fix this
-				} break;
+				} goto start;
 
-				TARGET(JumpEq) : {
+				TARGET(JumpEq) {
 					if (isTruthy(Registers[byte.target])) {
 						current->Ptr += byte.param;
 					}
-				} break;
+				} goto start;
 
-				TARGET(JumpNeg) : {
+				TARGET(JumpNeg) {
 					if (!isTruthy(Registers[byte.target])) {
 						current->Ptr += byte.param;
 					}
-				} break;
+				} goto start;
 
-				TARGET(Less) : {
+				TARGET(Less) {
 					Registers[byte.target] = toNumber(Registers[byte.in1]) < toNumber(Registers[byte.in2]);
-				} break;
+				} goto start;
 
-				TARGET(LessEqual) : {
+				TARGET(LessEqual) {
 					Registers[byte.target] = toNumber(Registers[byte.in1]) <= toNumber(Registers[byte.in2]);
-				} break;
+				} goto start;
 
-				TARGET(Greater) : {
+				TARGET(Greater) {
 					Registers[byte.target] = toNumber(Registers[byte.in1]) > toNumber(Registers[byte.in2]);
-				} break;
+				} goto start;
 
-				TARGET(GreaterEqual) : {
+				TARGET(GreaterEqual) {
 					Registers[byte.target] = toNumber(Registers[byte.in1]) >= toNumber(Registers[byte.in2]);
-				} break;
+				} goto start;
 
-			default:
-				gError() << "Unknown bytecode detected\n";
-				break;
-			}
 		}
 	}
 }
