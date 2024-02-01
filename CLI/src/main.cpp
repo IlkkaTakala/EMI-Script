@@ -90,10 +90,12 @@ int main()
 					runScriptMode = false;
 					break;
 				}
-
-				Eril::FunctionHandle h = vm.GetFunctionHandle(input.c_str());
-				auto handle = h(10, 5423.453, "Test", true, &input, 34.f);
-				std::cout << handle.get<bool>() << '\n';
+				auto res = split(input, ' ');
+				if (res.size() > 0) {
+					Eril::FunctionHandle h = vm.GetFunctionHandle(res[0].c_str());
+					auto handle = h(res.size() > 1 ? stoi(res[1]) : 10);
+					std::cout << handle.get<size_t>() << '\n';
+				}
 			}
 			printf("Exiting script stage\n\n");
 		} break;

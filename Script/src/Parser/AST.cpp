@@ -846,7 +846,14 @@ void ASTWalker::Walk(Node* n)
 				}
 			}
 			_FreeConstant(rhs);
-			n->regTarget = _SetOut(rhs) = lhs->regTarget;
+			if (IsConstant(rhs->type) || IsOperator(rhs->type)) {
+				n->regTarget = _SetOut(rhs) = lhs->regTarget;
+			}
+			else {
+				_Op(Copy);
+				_In8 = rhs->regTarget;
+				n->regTarget = instruction.target = lhs->regTarget;
+			}
 		);
 
 		_N(VarDeclare,
@@ -864,7 +871,15 @@ void ASTWalker::Walk(Node* n)
 				if (n->children.size() == 2) {
 					if (_Last()->varType == _Type || _Type == VariableType::Undefined) {
 						sym->varType = _Type = _Last()->varType;
-						sym->reg = n->regTarget = _Last()->regTarget;
+						auto type = _Last()->type;
+						if (IsConstant(type) ||IsOperator(type)) {
+							sym->reg = n->regTarget = _Last()->regTarget;
+						}
+						else {
+							_Op(Copy);
+							_In8 = _Last()->regTarget;
+							sym->reg = _Out;
+						}
 						break;
 					}
 					_Error("Cannot assign unrelated types");

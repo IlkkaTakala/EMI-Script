@@ -1,30 +1,25 @@
 extend Script:
 
-object Test
-{
-    test : string = "value";
-    time : number;
-    any = "anyval";
-}
 
 public def func(value : number) {
-	var test : number = 5;
-	var other : Test;
-	test = -100;
 	
-	test = test 
-	|> Test.add(100)
-	|> Test.add(101)
-	|> Test.add(102)
-	|> Test.add(103);
+	if (value < 2) {
+		return value;
+	}
 	
-	return test != 100;
+	return func(value - 1) + func(value - 2);
 }
 
-extend Test:
 
-public def add(value, vel) : number {
-    return value + vel;
-}
+
+
+
+
+
+
+
+
+
+
 
 # compile ../../ScriptTest.ril -s

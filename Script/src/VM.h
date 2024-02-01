@@ -31,12 +31,10 @@ struct CallObject
 	const uint32* Ptr;
 	const uint32* End;
 	size_t StackOffset;
+	size_t PromiseIndex;
 	std::vector<Variable> Arguments;
-	std::promise<Variable> Return;
 
 	CallObject(Function* function);
-	CallObject(const CallObject& obj) = delete;
-	CallObject operator=(const CallObject& obj) = delete;
 };
 
 template <typename T>
@@ -59,9 +57,9 @@ public:
 
 private:
 
-	size_t top;
+	size_t top = 0;
 	std::vector<T> _stack;
-	T* fast;
+	T* fast = nullptr;
 };
 
 class Runner
@@ -74,7 +72,7 @@ public:
 
 private:
 	VM* Owner;
-	std::stack<CallObject*> CallStack;
+	std::vector<CallObject> CallStack;
 	RegisterStack<Variable> Registers;
 };
 
@@ -130,9 +128,10 @@ private:
 	bool CompileRunning;
 
 	std::condition_variable CallQueueNotify;
-	std::queue<CallObject*> CallQueue;
+	std::queue<CallObject> CallQueue;
 	std::vector<std::thread> RunnerPool;
 	std::vector<std::future<Variable>> ReturnValues;
+	std::vector<std::promise<Variable>> ReturnPromiseValues;
 	std::vector<size_t> ReturnFreeList;
 	bool VMRunning;
 

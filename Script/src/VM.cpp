@@ -93,29 +93,32 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 		return (size_t)-1;
 	}
 
-	CallObject* call = new CallObject(fn);
+	CallObject& call = CallQueue.emplace(fn);
 
-	call->Arguments.reserve(args.size());
-	for (int i = 0; i < call->FunctionPtr->ArgCount && i < args.size(); i++) {
-		if (call->FunctionPtr->Types[i + 1] == args[i].getType()) {
+	call.Arguments.reserve(args.size());
+	for (int i = 0; i < call.FunctionPtr->ArgCount && i < args.size(); i++) {
+		if (call.FunctionPtr->Types[i + 1] == args[i].getType()) {
 			moveOwnershipToVM(args[i]);
-			call->Arguments.push_back(args[i]);
+			call.Arguments.push_back(args[i]);
 		}
 	}
 
 	size_t idx = 0;
 	if (ReturnFreeList.empty()) {
-		ReturnValues.push_back(call->Return.get_future());
+		auto& promise = ReturnPromiseValues.emplace_back();
+		ReturnValues.push_back(promise.get_future());
 		idx = ReturnValues.size() - 1;
+		call.PromiseIndex = idx;
 	}
 	else {
 		idx = ReturnFreeList.back();
 		ReturnFreeList.pop_back();
-		ReturnValues[idx] = call->Return.get_future();
+		call.PromiseIndex = idx;
+		ReturnPromiseValues[idx] = std::promise<Variable>();
+		ReturnValues[idx] = ReturnPromiseValues[idx].get_future();
 	}
 
 	std::unique_lock lk(CallMutex);
-	CallQueue.push(call);
 	CallQueueNotify.notify_one();
 
 	return idx;
@@ -189,7 +192,8 @@ void VM::RemoveUnit(const std::string& unit)
 
 Runner::Runner(VM* vm) : Owner(vm)
 {
-
+	Registers.reserve(64);
+	CallStack.reserve(128);
 }
 
 Runner::~Runner()
@@ -203,19 +207,17 @@ void Runner::operator()()
 {
 	while (Owner->IsRunning()) {
 
-		CallObject * f;
 		{
 			std::unique_lock lk(Owner->CallMutex);
 			Owner->CallQueueNotify.wait(lk, [&]() {return !Owner->CallQueue.empty() || !Owner->IsRunning(); });
 			if (!Owner->IsRunning()) return;
 
-			f = Owner->CallQueue.front();
+			CallStack.push_back(Owner->CallQueue.front());
 			Owner->CallQueue.pop();
 		}
-		CallStack.emplace(f);
 
 		bool interrupt = true;
-		CallObject* current = CallStack.top();
+		CallObject* current = &CallStack.back();
 		current->Ptr = current->FunctionPtr->Bytecode.data();
 		current->End = current->Ptr + current->FunctionPtr->Bytecode.size();
 		current->StackOffset = 0;
@@ -223,8 +225,8 @@ void Runner::operator()()
 		Registers.reserve(current->FunctionPtr->RegisterCount);
 		Registers.to(0);
 
-		for (int i = 0; i < current->FunctionPtr->ArgCount && i < f->Arguments.size(); i++) {
-			Registers[i] = f->Arguments[i];
+		for (int i = 0; i < current->FunctionPtr->ArgCount && i < current->Arguments.size(); i++) {
+			Registers[i] = current->Arguments[i];
 		}
 
 #define NUMS current->FunctionPtr->numberTable.values()
@@ -255,7 +257,7 @@ void Runner::operator()()
 					if (byte.in1 == 1) {
 						val = Registers[byte.target];
 						if (current->StackOffset == 0) {
-							current->Return.set_value(val);
+							Owner->ReturnPromiseValues[current->PromiseIndex].set_value(val);
 							Registers.to(0);
 						}
 						else {
@@ -263,9 +265,9 @@ void Runner::operator()()
 							// @todo: return value
 						}
 					}
-					CallStack.pop();
+					CallStack.pop_back();
 					if (!CallStack.empty()) {
-						current = CallStack.top();
+						current = &CallStack.back();
 						Registers.to(current->StackOffset);
 						const Instruction& oldByte = *(Instruction*)(current->Ptr - 1);
 						Registers[oldByte.target] = val;
@@ -295,11 +297,11 @@ void Runner::operator()()
 							}
 						}
 					}
-					else if (Owner->ValidFunctions.find(fn) == Owner->ValidFunctions.end()) {
-						current->FunctionPtr->functionTable[byte.in1] = nullptr;
-						gWarn() << "Cannot call deleted function\n";
-						break;
-					}
+					//else if (Owner->ValidFunctions.find(fn) == Owner->ValidFunctions.end()) { // @todo: check is maybe required but very slow
+					//	current->FunctionPtr->functionTable[byte.in1] = nullptr;
+					//	gWarn() << "Cannot call deleted function\n";
+					//	break;
+					//}
 
 					if (!fn->IsPublic && current->FunctionPtr->NamespaceHash != fn->NamespaceHash) {
 						gWarn() << "Cannot call private function " << fn->Name << "\n";
@@ -313,13 +315,13 @@ void Runner::operator()()
 						}
 					}
 					
-					CallObject* call = new CallObject(fn); // @todo: do this better, too slow
-					call->StackOffset = current->StackOffset + byte.in2;
-					Registers.reserve(call->StackOffset + fn->RegisterCount);
-					Registers.to(call->StackOffset);
+					auto offset = current->StackOffset + byte.in2;
+					auto& call = CallStack.emplace_back(fn); // @todo: do this better, too slow
+					call.StackOffset = offset;
+					Registers.reserve(call.StackOffset + fn->RegisterCount);
+					Registers.to(call.StackOffset);
+					current = &call;
 
-					CallStack.push(call);
-					current = call;
 				} break;
 
 				TARGET(PushUndefined) : {

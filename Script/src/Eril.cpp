@@ -11,7 +11,6 @@ bool Eril::__internal_register(__internal_function* func)
 	if (space.find(func->name) != space.end()) return false;
 	space[func->name] = func;
 	ValidHostFunctions().emplace((uint64_t)func);
-	gDebug() << (*HostFunctions()["Global"]["print"])(1, std::vector<Variable>{10}.data()).as<int>();
 	return true;
 }
 
