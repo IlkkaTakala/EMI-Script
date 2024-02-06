@@ -10,10 +10,12 @@ VM::VM()
 	CompileRunning = true;
 
 	VMRunning = true;
-	for (uint i = 0; i < counter; i++) {
+	for (uint i = 0; i < counter / 2; i++) {
 		ParserPool.emplace_back(Parser::ThreadedParse, this);
 		RunnerPool.emplace_back(Runner(this));
 	}
+
+	GarbageCollector = new std::thread(&VM::GarbageCollect, this);
 }
 
 VM::~VM()
@@ -28,6 +30,8 @@ VM::~VM()
 	for (auto& t : RunnerPool) {
 		t.join();
 	}
+	GarbageCollector->join();
+	delete GarbageCollector;
 	Parser::ReleaseParser();
 }
 
@@ -73,13 +77,19 @@ void VM::CompileTemporary(const char* data)
 
 void* VM::GetFunctionID(const std::string& name)
 {
+	if (name.find('.') == std::string::npos) {
+		if (auto it = NameToFunctionMap.find("Global." + name); it != NameToFunctionMap.end()) {
+			return it->second;
+		}
+		return 0;
+	}
 	if (auto it = NameToFunctionMap.find(name); it != NameToFunctionMap.end()) {
 		return it->second;
 	}
 	return 0;
 }
 
-size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
+size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& args)
 {
 	Function* fn = (Function*)(void*)handle;
 	auto it = ValidFunctions.find(fn);
@@ -97,9 +107,9 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 
 	call.Arguments.reserve(args.size());
 	for (int i = 0; i < call.FunctionPtr->ArgCount && i < args.size(); i++) {
-		if (call.FunctionPtr->Types[i + 1] == args[i].getType()) {
-			moveOwnershipToVM(args[i]);
-			call.Arguments.push_back(args[i]);
+		auto val = moveOwnershipToVM(args[i]);
+		if (call.FunctionPtr->Types[i + 1] == val.getType()) {
+			call.Arguments.push_back(val);
 		}
 	}
 
@@ -124,13 +134,30 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<Variable>& args)
 	return idx;
 }
 
-Variable VM::GetReturnValue(size_t index)
+InternalValue VM::GetReturnValue(size_t index)
 {
 	if (ReturnValues.size() <= index || ReturnFreeList.end() != std::find(ReturnFreeList.begin(), ReturnFreeList.end(), index)) return {};
 	Variable var = ReturnValues[index].get();
 	ReturnFreeList.push_back(index);
-	moveOwnershipToHost(var);
-	return var;
+	auto val = moveOwnershipToHost(var);
+	return val;
+}
+
+Symbol* VM::FindSymbol(const std::string& name, const std::string& space, bool& isNamespace)
+{
+	if (Namespaces.find(name) != Namespaces.end()) {
+		isNamespace = true;
+		return nullptr;
+	}
+	isNamespace = false;
+	if (auto it = Namespaces.find(space); it != Namespaces.end()) {
+		auto res = it->second.findSymbol(name);
+		if (res) return res;
+	}
+	auto res = Namespaces["Global"].findSymbol(name);
+	if (res) return res;
+
+	return nullptr;
 }
 
 void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std::string, Namespace>& space)
@@ -138,7 +165,7 @@ void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std:
 	std::unique_lock lk(MergeMutex);
 	for (auto& [name, s] : space) {
 		for (auto& [oname, obj] : s.objects) {
-			auto type = Manager.AddType(oname, obj);
+			auto type = Manager.AddType(name + '.' + oname, obj);
 			s.objectTypes[oname] = type;
 			Units[path].objects.push_back({ name, oname });
 		}
@@ -151,6 +178,10 @@ void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std:
 			NameToFunctionMap[full] = func;
 			ValidFunctions.emplace(func);
 			Units[path].functions.push_back({ name, fname });
+		}
+		for (auto& [vname, var] : s.variables) {
+			Units[path].variables.push_back({ name, vname });
+			GlobalVariables.emplace(vname, var);
 		}
 
 		if (auto it = Namespaces.find(name); it != Namespaces.end()) {
@@ -170,7 +201,7 @@ void VM::RemoveUnit(const std::string& unit)
 		for (auto& [name, function] : u.functions) {
 			Namespace& n = Namespaces[name];
 
-			n.symbols.erase(name);
+			n.symbols.erase(function);
 			auto ptr = n.functions[function.c_str()];
 			ValidFunctions.erase(ptr);
 			delete ptr;
@@ -179,14 +210,29 @@ void VM::RemoveUnit(const std::string& unit)
 			NameToFunctionMap.erase(full);
 		}
 		for (auto& [name, obj] : u.objects) {
-			Manager.RemoveType(name);
+			Manager.RemoveType(name + '.' + obj);
 			Namespace& n = Namespaces[name];
-			n.objects.erase(name);
-			n.objectTypes.erase(name);
-			n.symbols.erase(name);
+			n.objects.erase(obj);
+			n.objectTypes.erase(obj);
+			n.symbols.erase(obj);
+		}
+		for (auto& [name, var] : u.variables) {
+			Namespace& n = Namespaces[name];
+			n.variables.erase(var);
+			n.symbols.erase(var);
 		}
 		
 		Units.erase(unit);
+	}
+}
+
+void VM::GarbageCollect()
+{
+	while (VMRunning) {
+
+		String::GetAllocator()->MakeFree();
+
+		std::this_thread::sleep_for(std::chrono::seconds(1));
 	}
 }
 
@@ -230,6 +276,7 @@ void Runner::operator()()
 		}
 
 #define NUMS current->FunctionPtr->numberTable.values()
+#define STRS current->FunctionPtr->stringTable
 #define JUMPS current->FunctionPtr->jumpTable.values()
 		out:
 		while (interrupt && Owner->IsRunning()) {
@@ -266,34 +313,46 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(LoadString) {
-					
+					Registers[byte.target] = STRS[byte.param];
 				} goto start;
 
 				TARGET(LoadSymbol) {
-					
+					auto& var = current->FunctionPtr->globalTable[byte.param];
+					if (var == nullptr) {
+						auto& name = current->FunctionPtr->globalTableSymbols[byte.param];
+						if (auto idx = Owner->GlobalVariables.find(name); idx != Owner->GlobalVariables.end()) {
+							var = &idx->second;
+						}
+						else {
+							std::string varname = current->FunctionPtr->Namespace + "." + name;
+							if (idx = Owner->GlobalVariables.find(varname); idx != Owner->GlobalVariables.end()) {
+								var = &idx->second;
+							}
+							else {
+								gWarn() << "Variable does not exist: " << varname << "\n";
+								goto start;
+							}
+						}
+					}
+
+					Registers[byte.target] = *var;
+
 				} goto start;
 
 				TARGET(Return) {
 					Variable val;
 					if (byte.in1 == 1) {
 						val = Registers[byte.target];
-						if (current->StackOffset == 0) {
-							Owner->ReturnPromiseValues[current->PromiseIndex].set_value(val);
-							Registers.to(0);
-						}
-						else {
-							Registers.to(current->StackOffset);
-							// @todo: return value
-						}
 					}
+					Registers.to(current->StackOffset);
 					CallStack.pop_back();
 					if (!CallStack.empty()) {
 						current = &CallStack.back();
-						Registers.to(current->StackOffset);
 						const Instruction& oldByte = *(Instruction*)(current->Ptr - 1);
 						Registers[oldByte.target] = val;
 					}
 					else {
+						Owner->ReturnPromiseValues[current->PromiseIndex].set_value(val);
 						current = nullptr;
 						interrupt = false;
 						goto out;
@@ -331,7 +390,10 @@ void Runner::operator()()
 					}
 
 					for (int i = 1; i < fn->Types.size(); i++) {
-						if (fn->Types[i] != VariableType::Undefined && fn->Types[i] != Registers[byte.in2].getType()) {
+						if ((fn->Types[i] != VariableType::Undefined 
+							&& fn->Types[i] != Registers[byte.in2].getType())
+							&& Registers[byte.in2].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
+
 							gWarn() << "Invalid argument types\n";
 							goto start;
 						}
@@ -393,7 +455,7 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(StrAdd) {
-					//Registers[byte.target] = Registers[byte.in1].as<String*>() + Registers[byte.in2].as<String*>();
+					stradd(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
 				} goto start;
 
 				TARGET(NumSub) {

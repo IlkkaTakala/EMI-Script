@@ -97,6 +97,7 @@ void Parser::InitializeGrammar(const char* grammar)
 
 	ReleaseGrammar(G);
 	CreateParser(G, Rules);
+	Rules.clear();
 	gLogger()<< LogLevel::Debug << "Grammar compiled\n";
 }
 

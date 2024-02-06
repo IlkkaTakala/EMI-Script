@@ -15,17 +15,18 @@
 #include <vector>
 #include <string>
 #include <functional>
-#include "Eril/Variable.h"
+#include "Value.h"
 
 namespace Eril
 {
 	class VMHandle;
 	typedef unsigned long ScriptHandle; // @todo: fix type
 	
-	class VariableHandle
+	class ValueHandle
 	{
 		size_t id = 0;
 		VMHandle* vm = nullptr;
+		InternalValue cached;
 
 	public:
 		operator size_t() {
@@ -35,7 +36,7 @@ namespace Eril
 		template<typename T>
 		T get();
 
-		explicit VariableHandle(size_t in, VMHandle* handle) {
+		explicit ValueHandle(size_t in, VMHandle* handle) {
 			id = in;
 			vm = handle;
 		}
@@ -47,8 +48,8 @@ namespace Eril
 		VMHandle* vm = nullptr;
 
 	public:
-		template<typename ...Args> requires (std::is_convertible_v<Args, Variable> && ...)
-		VariableHandle operator()(Args... args);
+		template<typename ...Args> requires (std::is_convertible_v<Args, InternalValue> && ...)
+		ValueHandle operator()(Args... args);
 
 		operator void*() {
 			return id;
@@ -67,12 +68,12 @@ namespace Eril
 	// https://stackoverflow.com/a/65382619
 	struct __internal_function {
 		void* state = 0;
-		Variable(*operate)(void*, size_t, Variable*) = 0;
+		InternalValue(*operate)(void*, size_t, InternalValue*) = 0;
 		void(*cleanup)(void*) = 0;
 		size_t arg_count = 0;
 		const char* name = nullptr;
 		const char* space = nullptr;
-		VariableType* arg_types = nullptr;
+		ValueType* arg_types = nullptr;
 
 		void clear() { 
 			if (cleanup) { cleanup(state); } 
@@ -104,7 +105,7 @@ namespace Eril
 
 		__internal_function() {}
 		~__internal_function() { clear(); }
-		Variable operator()(size_t s, Variable* args)const { 
+		InternalValue operator()(size_t s, InternalValue* args)const { 
 			if ((!args && s != 0) || s != arg_count) return {};
 			return operate(state, s, args); 
 		}
@@ -115,17 +116,17 @@ namespace Eril
 
 	template<class V, class F, typename ...Args, size_t... S> 
 	constexpr auto __make_caller(std::index_sequence<S...>) {
-		return +[](void* ptr, size_t s, Variable* args)->Variable {
+		return +[](void* ptr, size_t s, InternalValue* args)->InternalValue {
 			return (*(F*)(ptr))((args[S].as<Args>())...); };
 	}
 
 	template<class V, class F, typename ...Args, size_t... S> requires std::is_void_v<V>
 	constexpr auto __make_caller(std::index_sequence<S...>) {
-		return +[](void* ptr, size_t s, Variable* args)->Variable {
+		return +[](void* ptr, size_t s, InternalValue* args)->InternalValue {
 			(*(F*)(ptr))((args[S].as<Args>())...); return {}; };
 	}
 
-	template<class F, class...Args> requires (std::is_convertible_v<F, Variable> || std::is_void_v<F>) && ((std::is_convertible_v<Args, Variable>) && ...)
+	template<class F, class...Args> requires (std::is_convertible_v<F, InternalValue> || std::is_void_v<F>) && ((std::is_convertible_v<Args, InternalValue>) && ...)
 	bool RegisterFunction(const std::string& space, const std::string& name, std::function<F(Args...)>&& f) {
 		auto retval = new __internal_function();
 		constexpr size_t size = sizeof...(Args);
@@ -136,7 +137,7 @@ namespace Eril
 		c = new char[space.length() + 1];
 		strcpy_s(c, space.length() + 1, space.c_str());
 		retval->space = c;
-		retval->arg_types = new VariableType[size]{type<Args>()...};
+		retval->arg_types = new ValueType[size]{type<Args>()...};
 		retval->arg_count = size;
 		retval->state = new std::decay_t<std::function<F(Args...)>>(std::forward<std::function<F(Args...)>>(f));
 		retval->operate = __make_caller<F, std::decay_t<std::function<F(Args...)>>, Args...>(std::make_index_sequence<size>());
@@ -162,15 +163,15 @@ namespace Eril
 
 		FunctionHandle GetFunctionHandle(const char* name);
 
-		VariableHandle _internal_call(FunctionHandle handle, size_t count, Variable* args);
+		ValueHandle _internal_call(FunctionHandle handle, size_t count, InternalValue* args);
 
-		template<typename ...Args> requires (std::is_convertible_v<Args, Variable> && ...)
-		VariableHandle CallFunction(FunctionHandle handle, Args... args) {
-			std::vector<Variable> params = { Variable(args)... };
+		template<typename ...Args> requires (std::is_convertible_v<Args, InternalValue> && ...)
+		ValueHandle CallFunction(FunctionHandle handle, Args... args) {
+			std::vector<InternalValue> params = { InternalValue(args)... };
 			return _internal_call(handle, params.size(), params.data());
 		}
 
-		Variable GetReturn(VariableHandle handle);
+		InternalValue GetReturn(ValueHandle handle);
 
 		void ReleaseVM();
 
@@ -185,11 +186,16 @@ namespace Eril
 	void ReleaseEnvironment(VMHandle handle);
 
 	template<typename T>
-	T VariableHandle::get() {
-		return vm->GetReturn(*this).as<T>();
+	T ValueHandle::get() {
+		if (vm) {
+			cached = vm->GetReturn(*this);
+			vm = nullptr;
+			return cached.as<T>();
+		}
+		return cached.as<T>();
 	}
-	template<typename ...Args> requires (std::is_convertible_v<Args, Variable> && ...)
-		VariableHandle FunctionHandle::operator()(Args... args) {
+	template<typename ...Args> requires (std::is_convertible_v<Args, InternalValue> && ...)
+		ValueHandle FunctionHandle::operator()(Args... args) {
 		return vm->CallFunction(*this, args...);
 	}
 

@@ -6,6 +6,7 @@
 
 #include "Symbol.h"
 #include "Object.h"
+#include "StringObject.h"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -76,7 +77,7 @@ struct Function
 	size_t NamespaceHash;
 	bool IsPublic;
 
-	ankerl::unordered_dense::set<std::string> stringTable;
+	std::vector<Variable> stringTable;
 	ankerl::unordered_dense::set<double> numberTable;
 	ankerl::unordered_dense::set<size_t> jumpTable;
 

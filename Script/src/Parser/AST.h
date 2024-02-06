@@ -10,7 +10,7 @@ public:
 		line(0),
 		depth(0),
 		regTarget(0),
-		sym(),
+		sym(nullptr),
 		varType(VariableType::Undefined),
 		instruction(0)
 	{}
@@ -44,10 +44,11 @@ struct ASTWalker
 	void Run();
 	void Walk(Node*);
 
-	Symbol* findSymbol(const std::string & name);
+	Symbol* findSymbol(const std::string& name, const std::string& space, bool& isNamespace);
 
 	void handleFunction(Node* n, Function* f, Symbol* s);
 
+	VM* vm;
 	Node* root;
 	Namespace* currentNamespace;
 	ankerl::unordered_dense::map<std::string, Namespace> namespaces;
@@ -58,6 +59,7 @@ struct ASTWalker
 	// Function parsing
 	Scoped* currentScope;
 	Function* currentFunction;
+	ankerl::unordered_dense::set<std::string> stringList;
 	std::vector<Instruction> instructionList;
 	std::array<bool, 255> registers;
 	uint8 maxRegister;

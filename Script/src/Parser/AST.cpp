@@ -1,6 +1,8 @@
 #include "AST.h"
 #include "NativeFuncs.h"
 #include "Helpers.h"
+#include "StringObject.h"
+#include "VM.h"
 #include <iostream>
 
 constexpr unsigned char print_first[] = { 195, 196, 196 };
@@ -57,7 +59,7 @@ bool VariantToBool(Node* n) {
 
 Variable Node::toVariable() const
 {
-	Variable v;
+	InternalValue v;
 	switch (data.index())
 	{
 	case 0: v = std::get<0>(data).c_str(); break;
@@ -66,8 +68,8 @@ Variable Node::toVariable() const
 	default:
 		break;
 	}
-	moveOwnershipToVM(v);
-	return v;
+	auto var = moveOwnershipToVM(v);
+	return var;
 }
 
 void Node::print(const std::string& prefix, bool isLast)
@@ -86,7 +88,7 @@ inline bool IsControl(Token t) {
 }
 
 inline bool IsConstant(Token t) {
-	return t >= String && t <= False;
+	return t >= Literal && t <= False;
 }
 
 inline bool IsOperator(Token t) {
@@ -97,7 +99,7 @@ void OpAdd(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case String: {
+	case Literal: {
 		n->data = VariantToStr(l) + VariantToStr(r);
 	} break;
 	case Number: {
@@ -117,7 +119,7 @@ void OpSub(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case String: {
+	case Literal: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // @todo: Remove substrings?
 	} break;
 	case Number: {
@@ -171,7 +173,7 @@ void OpMult(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case String: {
+	case Literal: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
 	} break;
 	case Number: {
@@ -191,7 +193,7 @@ void OpDiv(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case String: {
+	case Literal: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
 	} break;
 	case Number: {
@@ -211,7 +213,7 @@ void OpEqual(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case String: {
+	case Literal: {
 		n->data = VariantToStr(l) == VariantToStr(r); // TODO Remove substrings?
 	} break;
 	case Number: {
@@ -230,7 +232,7 @@ void OpEqual(Node* n, Node* l, Node* r) {
 void OpNotEqual(Node* n, Node* l, Node* r) {
 	switch (l->type)
 	{
-	case String: {
+	case Literal: {
 		n->data = VariantToStr(l) != VariantToStr(r); // TODO Remove substrings?
 	} break;
 	case Number: {
@@ -396,8 +398,9 @@ void TypeConverter(Node* n, const TokenHolder& h)
 	}
 }
 
-ASTWalker::ASTWalker(VM*, Node* n)
+ASTWalker::ASTWalker(VM* in_vm, Node* n)
 {
+	vm = in_vm;
 	root = n;
 	auto it = namespaces.emplace("Global", Namespace{});
 	currentNamespace = &it.first->second;
@@ -429,8 +432,9 @@ void ASTWalker::Run()
 		case ObjectDef:
 		{
 			auto& data = std::get<0>(c->data);
-			auto s = findSymbol(data);
-			if (!s) {
+			bool isNameSpace;
+			auto s = findSymbol(data, "", isNameSpace);
+			if (!s && !isNameSpace) {
 				auto it = currentNamespace->symbols.emplace(data, new Symbol{});
 				auto& symbol = it.first->second;
 				symbol->setType(SymbolType::Object);
@@ -484,8 +488,9 @@ void ASTWalker::Run()
 		case FunctionDef:
 		{
 			auto& data = std::get<0>(c->data);
-			auto s = findSymbol(data);
-			if (!s) {
+			bool isNameSpace;
+			auto s = findSymbol(data, "", isNameSpace);
+			if (!s && !isNameSpace) {
 				auto it = currentNamespace->symbols.emplace(data, new Symbol{});
 				auto& symbol = it.first->second;
 				symbol->setType(SymbolType::Function);
@@ -509,7 +514,13 @@ void ASTWalker::Run()
 					case CallParams: {
 						function->ArgCount = (uint8)node->children.size();
 						for (auto& v : node->children) {
-							auto symParam = function->scope->addSymbol(std::get<0>(v->data));
+							auto symParam = findSymbol(std::get<0>(v->data), "", isNameSpace);
+							if (symParam || isNameSpace) {
+								gError() << "Line " << node->line << ": Symbol '" << std::get<0>(v->data) << "' already defined\n";
+								HasError = true;
+								break;
+							}
+							symParam = function->scope->addSymbol(std::get<0>(v->data));
 							Walk(v->children.front());
 							symParam->setType(SymbolType::Variable);
 							symParam->varType = v->children.front()->varType;
@@ -544,6 +555,36 @@ void ASTWalker::Run()
 
 		case VarDeclare:
 		{
+			auto& data = std::get<0>(c->data);
+			bool isNameSpace;
+			auto s = findSymbol(data, "", isNameSpace);
+			if (!s && !isNameSpace) {
+				auto it = currentNamespace->symbols.emplace(data, new Symbol{});
+				auto& symbol = it.first->second;
+				symbol->setType(SymbolType::Variable);
+				auto& variable = currentNamespace->variables.emplace(data, Variable{}).first->second;
+
+				symbol->startLife = (size_t)-1;
+				symbol->needsLoading = true;
+
+				switch (c->children.front()->type)
+				{
+				case TypeNumber:
+					symbol->varType = VariableType::Number; 
+					variable = VariantToFloat(c->children.back());
+					break;
+				case TypeString:
+					symbol->varType = VariableType::String;
+					variable = { String::GetAllocator()->MakeString(VariantToStr(c->children.back()).c_str()), VariableType::String };
+					break;
+				case Typename:
+					symbol->varType = VariableType::Object;
+					// @todo: make objects;
+					break;
+				case AnyType:
+					break;
+				}
+			}
 		} break;
 
 		default:
@@ -584,13 +625,15 @@ std::string getFullId(Node* n) {
 #define _Warn(text) gWarn() << "Line " << n->line << ": " << text << "\n";
 #define _FreeConstant(n) if (IsConstant(n->type) || IsOperator(n->type)) freeReg(n->regTarget);
 
-#define _Operator(varTy, op) \
+#define _Operator(varTy, op, op2) \
 case VariableType::varTy: {\
 	if (_Last()->varType != VariableType::Undefined && _Last()->varType != VariableType::varTy) {\
-		_Error("Cannot perform arithmetic on types");\
+		instruction.code = OpCodes::op2; \
 	}\
+	else { \
+		instruction.code = OpCodes::op; \
+	} \
 	_Type = VariableType::varTy;\
-	instruction.code = OpCodes::op; \
 	_In8 = _First()->regTarget;\
 	_In8_2 = _Last()->regTarget;\
 	_FreeChildren;\
@@ -657,6 +700,16 @@ void ASTWalker::Walk(Node* n)
 			}
 		);
 
+		_N(Literal, {
+			_Op(LoadString);
+			auto res = stringList.emplace(std::get<std::string>(n->data));
+			uint16 idx = (uint16)std::distance(stringList.begin(), res.first);
+			_In16 = idx;
+			_Out;
+			_Type = VariableType::String;
+			}
+		);
+
 		_N(True,
 			_Op(PushBoolean);
 			_Out;
@@ -675,13 +728,15 @@ void ASTWalker::Walk(Node* n)
 			_Op(NumAdd);
 			switch (_First()->varType)
 			{
-			_Operator(Undefined, Add)
-			_Operator(Number, NumAdd)
-			_Operator(String, StrAdd)
+			_Operator(Number, NumAdd, Add)
+			_Operator(String, StrAdd, Add)
 			default:
-				_Error("No correct operator + found for type"); 
-				HasError = true; 
-				break; 
+				_Type = VariableType::Undefined;
+				instruction.code = OpCodes::Add;
+				_In8 = _First()->regTarget;
+				_In8_2 = _Last()->regTarget;
+				_FreeChildren;
+				break;
 			}
 			_OperatorAssign;
 		);
@@ -690,10 +745,14 @@ void ASTWalker::Walk(Node* n)
 			_Op(NumAdd);
 			switch (_First()->varType)
 			{
-				_Operator(Number, NumSub);
+				_Operator(Number, NumSub, Sub);
 			default:
-				_Error("No correct operator - found for type");
-				HasError = true;
+				_Type = VariableType::Undefined;
+				instruction.code = OpCodes::Sub;
+				_In8 = _First()->regTarget;
+				_In8_2 = _Last()->regTarget;
+				_FreeChildren;
+				break;
 				break;
 			}
 			_OperatorAssign;
@@ -704,10 +763,14 @@ void ASTWalker::Walk(Node* n)
 			_Op(NumAdd);
 			switch (_First()->varType)
 			{
-				_Operator(Number, NumDiv);
+				_Operator(Number, NumDiv, Div);
 			default:
-				_Error("No correct operator / found for type");
-				HasError = true;
+				_Type = VariableType::Undefined;
+				instruction.code = OpCodes::Div;
+				_In8 = _First()->regTarget;
+				_In8_2 = _Last()->regTarget;
+				_FreeChildren;
+				break;
 				break;
 			}
 			_OperatorAssign;
@@ -718,10 +781,14 @@ void ASTWalker::Walk(Node* n)
 			_Op(NumAdd);
 			switch (_First()->varType)
 			{
-				_Operator(Number, NumMul);
+				_Operator(Number, NumMul, Mul);
 			default:
-				_Error("No correct operator * found for type");
-				HasError = true;
+				_Type = VariableType::Undefined;
+				instruction.code = OpCodes::Mul;
+				_In8 = _First()->regTarget;
+				_In8_2 = _Last()->regTarget;
+				_FreeChildren;
+				break;
 				break;
 			}
 			_OperatorAssign;
@@ -729,10 +796,34 @@ void ASTWalker::Walk(Node* n)
 		);
 
 		_N(Id,
-			auto symbol = findSymbol(std::get<std::string>(n->data));
+			_Walk;
+			bool isNameSpace;
+			Symbol* symbol = nullptr;
+			if (n->children.size() != 1) {
+				symbol = findSymbol(std::get<std::string>(n->data), "", isNameSpace);
+			}
+			else {
+				symbol = findSymbol(std::get<std::string>(n->data), std::get<std::string>(_First()->data), isNameSpace);
+			}
 			if (symbol) {
 				if (symbol->needsLoading) {
-					//_Op(LoadSymbol) // @todo: actual loading here
+					auto name = getFullId(n);
+					auto it = std::find(currentFunction->globalTableSymbols.begin(), currentFunction->globalTableSymbols.end(), name);
+					size_t index = 0;
+
+					if (it != currentFunction->globalTableSymbols.end()) {
+						index = it - currentFunction->globalTableSymbols.begin();
+					}
+					else {
+						currentFunction->globalTableSymbols.push_back(name);
+						currentFunction->globalTable.push_back(nullptr);
+					}
+
+					_Op(LoadSymbol);
+					_Type = symbol->varType;
+					_In16 = index;
+					_Out;
+					break;
 				}
 				else {
 					n->regTarget = symbol->reg;
@@ -740,6 +831,9 @@ void ASTWalker::Walk(Node* n)
 				}
 				_Type = symbol->varType;
 				n->sym = symbol;
+			}
+			else if (isNameSpace) {
+				
 			}
 			else { // @todo: fix this, symbols might be loaded later
 				_Error("Symbol not defined: " << std::get<std::string>(n->data));
@@ -1056,18 +1150,37 @@ void ASTWalker::Walk(Node* n)
 	}
 }
 
-Symbol* ASTWalker::findSymbol(const std::string& name)
+Symbol* ASTWalker::findSymbol(const std::string& name, const std::string& space, bool& isNamespace)
 {
-	if (namespaces.find(name) != namespaces.end()) return nullptr;
-	if (auto s = currentNamespace->findSymbol(name); s != nullptr) return s;
-	if (currentScope) if (auto s = currentScope->findSymbol(name); s != nullptr) return s;
-	return nullptr;
+	if (space.size() == 0) {
+		if (namespaces.find(name) != namespaces.end()) {
+			isNamespace = true;
+			return nullptr;
+		}
+		if (auto s = currentNamespace->findSymbol(name); s != nullptr) return s;
+		if (auto s = namespaces["Global"].findSymbol(name); s != nullptr) return s;
+		if (auto s = vm->FindSymbol(name, currentNamespace->Name, isNamespace); s != nullptr) return s;
+		if (currentScope) if (auto s = currentScope->findSymbol(name); s != nullptr) return s;
+		return nullptr;
+	}
+	else {
+		if (namespaces.find(name) != namespaces.end()) {
+			isNamespace = true;
+			return nullptr;
+		}
+		if (auto it = namespaces.find(space); it != namespaces.end()) {
+			if (auto s = it->second.findSymbol(name); s != nullptr) return s;
+			if (auto s = vm->FindSymbol(name, space, isNamespace); s != nullptr) return s;
+		}
+		return nullptr;
+	}
 }
 
 void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 {
 	initRegs();
 	currentFunction = f;
+	currentNamespace = &namespaces[f->Namespace];
 
 	for (auto& c : n->children) {
 		switch (c->type)
@@ -1075,7 +1188,7 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 		case CallParams: {
 			for (auto& v : c->children) {
 				auto symParam = f->scope->findSymbol(std::get<0>(v->data));
-				symParam->reg = getFirstFree();
+				if (symParam) symParam->reg = getFirstFree();
 			}
 		} break;
 
@@ -1107,6 +1220,13 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 	for (int i = 0; i < instructionList.size(); i++) {
 		f->Bytecode[i] = instructionList[i].data;
 	}
+
+	String::GetAllocator();
+	f->stringTable.reserve(stringList.size());
+	for (auto& str : stringList) {
+		f->stringTable.emplace_back(String::GetAllocator()->MakeString(str.c_str()), VariableType::String);
+	}
+	stringList.clear();
 
 	f->RegisterCount = maxRegister + 1;
 	s->resolved = true;

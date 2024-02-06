@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include "Lexer.h"
+#include "Defines.h"
 
 struct Grammar;
 struct ActionNode;
@@ -10,7 +11,7 @@ struct ItemHandle {
 	size_t id;
 };
 
-enum Action {
+enum Action : uint8 {
 	ACCEPT, SHIFT, REDUCE, DECIDE, ERROR, GOTO
 };
 
@@ -71,8 +72,8 @@ struct Kernel
 struct ActionNode
 {
 	Action type = ERROR;
-	int shift = -1;
-	int reduce = -1;
+	short shift = -1;
+	short reduce = -1;
 };
 
 struct Grammar

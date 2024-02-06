@@ -348,7 +348,7 @@ void CreateParseTable(Grammar& g) {
 		state.resize(Last);
 
 		for (const auto& key : kernel.keys) {
-			int nextState = kernel.gotos.at(key);
+			short nextState = (short)kernel.gotos.at(key);
 
 			if (state[key].type != ERROR && state[key].type != ACCEPT)
 				state[key].type = DECIDE;
@@ -367,17 +367,17 @@ void CreateParseTable(Grammar& g) {
 					{
 					case REDUCE:
 						if (state[k].reduce > item.rule)
-							state[k].reduce = item.rule;
+							state[k].reduce = (short)item.rule;
 						break;
 
 					case SHIFT:
 						state[k].type = DECIDE;
-						state[k].reduce = item.rule;
+						state[k].reduce = (short)item.rule;
 						break;
 					case ACCEPT:
 					case ERROR:
 						state[k].type = item.rule == 0 ? ACCEPT : REDUCE;
-						state[k].reduce = item.rule;
+						state[k].reduce = (short)item.rule;
 						break;
 					default:
 						break;
@@ -402,6 +402,7 @@ Grammar& CreateParser(Grammar& g, const RuleType& rules)
 	LastItem = 0;
 
 	g.ClosureKernels.clear();
+	g.ClosureKernels.shrink_to_fit();
 	g.Firsts.clear();
 	g.Follows.clear();
 

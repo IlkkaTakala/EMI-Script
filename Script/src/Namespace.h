@@ -11,6 +11,7 @@ struct Namespace
 	ankerl::unordered_dense::map<std::string, UserDefined> objects;
 	ankerl::unordered_dense::map<std::string, ObjectType> objectTypes;
 	ankerl::unordered_dense::map<std::string, Symbol*> symbols;
+	std::unordered_map<std::string, Variable> variables;
 
 	Symbol* findSymbol(const std::string& name) {
 		if (auto it = symbols.find(name); it == symbols.end()) return nullptr;
@@ -21,10 +22,12 @@ struct Namespace
 		functions.insert(rhs.functions.begin(), rhs.functions.end());
 		objectTypes.insert(rhs.objectTypes.begin(), rhs.objectTypes.end());
 		symbols.insert(rhs.symbols.begin(), rhs.symbols.end());
+		variables.insert(rhs.variables.begin(), rhs.variables.end());
 
 		rhs.functions.clear();
 		rhs.objects.clear();
 		rhs.symbols.clear();
+		rhs.variables.clear();
 	}
 
 	inline void remove(Namespace& rhs) {
@@ -39,6 +42,9 @@ struct Namespace
 		}
 		for (auto& [name, func] : rhs.symbols) {
 			symbols.erase(name);
+		}
+		for (auto& [name, func] : rhs.variables) {
+			variables.erase(name);
 		}
 	}
 
@@ -70,4 +76,5 @@ struct CompileUnit
 {
 	std::vector<std::pair<std::string, std::string>> functions;
 	std::vector<std::pair<std::string, std::string>> objects;
+	std::vector<std::pair<std::string, std::string>> variables;
 };

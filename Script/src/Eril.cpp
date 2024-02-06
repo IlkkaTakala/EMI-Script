@@ -66,14 +66,14 @@ FunctionHandle Eril::VMHandle::GetFunctionHandle(const char* name)
 	return FunctionHandle{id, this};
 }
 
-VariableHandle Eril::VMHandle::_internal_call(FunctionHandle handle, size_t count, Variable* args)
+ValueHandle Eril::VMHandle::_internal_call(FunctionHandle handle, size_t count, InternalValue* args)
 {
-	const std::span<Variable> s(args, count);
+	const std::span<InternalValue> s(args, count);
 	size_t out = ((VM*)Vm)->CallFunction(handle, s);
-	return VariableHandle{ out, this };
+	return ValueHandle{ out, this };
 }
 
-Variable Eril::VMHandle::GetReturn(VariableHandle handle)
+InternalValue Eril::VMHandle::GetReturn(ValueHandle handle)
 {
 	return ((VM*)Vm)->GetReturnValue(handle);
 }

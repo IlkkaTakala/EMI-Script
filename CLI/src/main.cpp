@@ -93,8 +93,9 @@ int main()
 				auto res = split(input, ' ');
 				if (res.size() > 0) {
 					Eril::FunctionHandle h = vm.GetFunctionHandle(res[0].c_str());
-					auto handle = h(res.size() > 1 ? stoi(res[1]) : 10);
-					std::cout << handle.get<size_t>() << '\n';
+					auto handle = h(res.size() > 1 ? res[1].c_str() : "10");
+					if (handle.get<const char*>()) 
+						std::cout << handle.get<const char*>() << '\n';
 				}
 			}
 			printf("Exiting script stage\n\n");

@@ -178,7 +178,7 @@ Token Lexer::Analyse(std::string_view& Data)
 			CASE('"',
 				Current.Advance();
 				while (*ptr != '"') Current.Advance();
-				TOKEN(String);
+				TOKEN(Literal);
 				start++; endOffset = 1;
 				)
 

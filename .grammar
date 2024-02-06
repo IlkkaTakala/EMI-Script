@@ -73,7 +73,7 @@ Unary Sub Expr
 Unary Not Expr
 Value True
 Value False
-Value String
+Value Literal
 Value Number
 Value Identifier
 Identifier Id
@@ -205,7 +205,7 @@ None Negate
 None Not
 True True
 False False 
-String String 
+Literal Literal 
 Number Number 
 None None Identifier 
 Id Id 

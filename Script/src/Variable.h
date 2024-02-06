@@ -3,13 +3,12 @@
 #pragma once
 #include <cstdint>
 #include <type_traits>
+#include <Defines.h>
 /**
  
 Using NaN boxing 
 
 https://craftinginterpreters.com/optimization.html#nan-boxing
-
-@todo: store small strings directly
 
 */
 
@@ -18,12 +17,12 @@ https://craftinginterpreters.com/optimization.html#nan-boxing
 #define TAG_NIL			1
 #define TAG_FALSE		2
 #define TAG_TRUE		3
-#define TAG_EXT			4
 #define NIL_VAL			(uint64_t)(QNAN | TAG_NIL)
 #define FALSE_VAL		(uint64_t)(QNAN | TAG_FALSE)
 #define TRUE_VAL		(uint64_t)(QNAN | TAG_TRUE)
 #define BOOL_VAL(b)		((b) ? TRUE_VAL : FALSE_VAL)
 #define OBJ_VAL(obj)	(SIGN_BIT | QNAN | (uint64_t)(uintptr_t)(obj))
+#define OBJ_TYPE(obj)	(obj & 0xffff)
 
 enum class VariableType
 {
@@ -43,6 +42,7 @@ class Variable
 
 public:
 	Variable() : value(NIL_VAL) {}
+	Variable(const Variable&);
 	Variable(int v) {
 		double val = static_cast<double>(v);
 		value = *(uint64_t*)&val;
@@ -50,21 +50,12 @@ public:
 	Variable(double v) {
 		value = *(uint64_t*)&v;
 	}
-	Variable(uint64_t v) {
-		if (v == 0) value = NIL_VAL;
-		else value = OBJ_VAL(v);
-	}
+	Variable(size_t v, VariableType type);
 	Variable(bool v) {
 		value = BOOL_VAL(v);
 	}
-	Variable(const char* v) {
-		if (v == nullptr) value = NIL_VAL;
-		else value = OBJ_VAL(v);
-	}
-	Variable(const void* v) {
-		if (v == nullptr) value = NIL_VAL;
-		else value = OBJ_VAL(v) | TAG_NIL;
-	}
+
+	~Variable();
 
 	void setUndefined() { value = NIL_VAL; }
 
@@ -77,9 +68,6 @@ public:
 	inline bool isBool() const {
 		return (value | 1) == TRUE_VAL;
 	}
-	inline bool isExternal() const {
-		return ((value) & (QNAN | SIGN_BIT | TAG_NIL)) == (QNAN | SIGN_BIT | TAG_NIL);
-	}
 	inline bool isObject() const {
 		return ((value) & (QNAN | SIGN_BIT)) == (QNAN | SIGN_BIT) && !(value & TAG_NIL);
 	}
@@ -87,16 +75,9 @@ public:
 	VariableType getType() const {
 		if (isNumber()) return VariableType::Number;
 		if (isUndefined()) return VariableType::Undefined;
-		if (isObject()) return VariableType::Object;
+		if (isObject()) return (VariableType)(OBJ_TYPE(value));
 		if (isBool()) return VariableType::Boolean;
-		if (isExternal()) return VariableType::External;
 		return VariableType::Undefined;
-	}
-
-	template<typename T>
-	T as() const {
-		static_assert("No conversion found, check types!");
-		return T();
 	}
 
 	template<typename T> requires (std::is_convertible_v<T, double>)
@@ -110,36 +91,15 @@ public:
 	bool as() const {
 		return value == TRUE_VAL;
 	}
-	
-	template<typename T> requires std::is_pointer_v<T>
-	T as() const {
-		return ((T)(uintptr_t)((value) & ~(SIGN_BIT | QNAN | TAG_NIL)));
+
+	template<typename T> requires std::is_class_v<T>
+	size_t as() const {
+		return ((uint64)((value) & ~(SIGN_BIT | QNAN))) >> 16;
 	}
 
 	bool operator==(const Variable& rhs) const {
 		return value == rhs.value;
 	}
 };
-
-template <typename T>
-inline VariableType type() {
-	return VariableType::Undefined;
-}
-template<>
-inline VariableType type<bool>() {
-	return VariableType::Boolean;
-}
-template <typename T> requires (std::is_convertible_v<T, double>)
-inline VariableType type() {
-	return VariableType::Number;
-}
-template <> 
-inline VariableType type<const char*>() {
-	return VariableType::String;
-}
-template<typename T> requires std::is_pointer_v<T>
-inline VariableType type() {
-	return VariableType::External;
-}
 
 #endif //_VARIABLE_INC_GUARD_H_

@@ -5,7 +5,7 @@ bool TypesMatch(Token lhs, Token rhs)
 	switch (lhs)
 	{
 	case TypeString:
-		return rhs == String;
+		return rhs == Literal;
 	case TypeNumber:
 		return rhs == Number;
 	case AnyType:

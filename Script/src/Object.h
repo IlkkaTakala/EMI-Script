@@ -1,6 +1,6 @@
 #pragma once
 #include "Defines.h"
-#include "Eril/Variable.h"
+#include "Variable.h"
 #include <vector>
 #include "ankerl/unordered_dense.h"
 #include "Symbol.h"
@@ -19,45 +19,22 @@ class ObjectManager;
 class Object
 {
 public:
-	ObjectType getType() const { return type; }
-	Object() : type(ObjectType::None), refCount(0) {};
+	ObjectType getType() const { return Type; }
+	Object() : Type(ObjectType::None), RefCount(0) {};
 	virtual ~Object() {
 
 	}
 
-protected:
-	ObjectType type;
-	int refCount;
-};
-
-class String : public Object
-{
 public:
-	String(const char* str) : String(str, strlen(str) + 1) {}
-
-	String(const char* str, size_t s) {
-		type = ObjectType::String;
-		_size = s;
-		_data = new char[s]();
-		memcpy(_data, str, s - 1);
-		_data[s - 1] = '\0';
-	}
-	~String() {
-		delete[] _data;
-	}
-	const char* data() const { return _data; }
-	size_t size() const { return _size; }
-
-private:
-	char* _data;
-	size_t _size;
+	ObjectType Type;
+	int RefCount;
 };
 
 class UserDefined : public Object
 {
 public:
 	UserDefined() {
-		type = ObjectType::UserDefined;
+		Type = ObjectType::UserDefined;
 	}
 	void AddField(const std::string& name, Variable var, Symbol flags) {
 		fields.push_back(var);
@@ -79,7 +56,7 @@ public:
 	ObjectType AddType(const std::string& name, const UserDefined& obj) {
 		if (auto it = baseTypes.find(name); it == baseTypes.end()) {
 			auto res = baseTypes.emplace(name, obj);
-			return res.first->second.type = (ObjectType)++typeCounter;
+			return res.first->second.Type = (ObjectType)++typeCounter;
 		}
 		return ObjectType::UserDefined;
 	}

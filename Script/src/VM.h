@@ -9,7 +9,7 @@
 #include "ankerl/unordered_dense.h"
 
 #include "Eril/Eril.hpp"
-#include "Eril/Variable.h"
+#include "Variable.h"
 #include "Function.h"
 #include "Object.h"
 #include "Namespace.h"
@@ -98,19 +98,21 @@ public:
 
 	void* GetFunctionID(const std::string& name);
 
-	size_t CallFunction(FunctionHandle handle, const std::span<Variable>& args);
-	Variable GetReturnValue(size_t index);
+	size_t CallFunction(FunctionHandle handle, const std::span<InternalValue>& args);
+	InternalValue GetReturnValue(size_t index);
 
+	Symbol* FindSymbol(const std::string& name, const std::string& space, bool& isNamespace);
 	void AddNamespace(const std::string& path, ankerl::unordered_dense::map<std::string, Namespace>& space);
 
 	inline bool IsRunning() const { return VMRunning; }
-	//void Step();
 
 	void RemoveUnit(const std::string& unit);
 
 private:
 	friend class Parser;
 	friend class Runner;
+
+	void GarbageCollect();
 
 	// When adding new compile targets
 	std::mutex CompileMutex;
@@ -126,6 +128,7 @@ private:
 	std::vector<std::thread> ParserPool;
 	size_t HandleCounter = 0;
 	bool CompileRunning;
+	std::thread* GarbageCollector;
 
 	std::condition_variable CallQueueNotify;
 	std::queue<CallObject> CallQueue;
@@ -141,6 +144,6 @@ private:
 	ankerl::unordered_dense::map<std::string, Namespace> Namespaces;
 
 	ObjectManager Manager;
-	std::vector<Variable> GlobalVariables;
+	std::unordered_map<std::string, Variable> GlobalVariables;
 	// Variable heap?
 };

@@ -1,16 +1,23 @@
-extend Script:
 
+var variable = "this is a test ";
 
-public def func(value : number) {
-	
-	if (value < 2) {
-		return value;
-	}
-	
-	return func(value - 1) + func(value - 2);
+public def call(va : string) {
+
+	return Script.func(va);
 }
 
+extend Script:
 
+public def func(value : string) {
+	
+	return String.addString(value);
+}
+
+extend String:
+
+public def addString(value : string) {
+	return variable + value;
+}
 
 
 

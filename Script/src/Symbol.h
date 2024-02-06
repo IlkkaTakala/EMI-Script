@@ -1,6 +1,6 @@
 #pragma once
 #include "Defines.h"
-#include "Eril/Variable.h"
+#include "Variable.h"
 
 enum class SymbolFlags
 {
