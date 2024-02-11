@@ -24,6 +24,13 @@ struct Rule
 	std::vector<Token> development;
 };
 
+struct RuleData
+{
+	Token dataToken = Token::None;
+	Token nodeType = Token::None;
+	Token mergeToken = Token::None;
+};
+
 struct Item
 {
 	Item() {
@@ -76,18 +83,17 @@ struct ActionNode
 	short reduce = -1;
 };
 
+typedef std::vector<std::vector<ActionNode>> ParseTable_t;
+typedef std::vector<Rule> RuleTable_t;
+
 struct Grammar
 {
-	Token Axiom = Start;
-	std::vector<Rule> RuleTable;
+	Token Axiom = Token::Start;
 	ankerl::unordered_dense::map<Token, std::vector<Token>> Firsts;
 	ankerl::unordered_dense::map<Token, std::vector<Token>> Follows;
-
 	std::vector<Kernel> ClosureKernels;
-	std::vector<std::vector<ActionNode>> ParseTable;
 
 	void GetSequenceFirsts(std::vector<Token>& result, const std::vector<Token>& sequence, int start) const;
 };
 
-Grammar& CreateParser(Grammar& g, const RuleType& rules);
-void ReleaseGrammar(Grammar& g);
+void CreateParser(ParseTable_t& ParseTable, RuleTable_t& RuleTable, std::vector<RuleData>& Data, const RuleType& rules);

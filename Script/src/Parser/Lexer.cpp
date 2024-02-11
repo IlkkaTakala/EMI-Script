@@ -3,11 +3,13 @@
 #include "Defines.h"
 #include <filesystem>
 
-#define X(name) {name, #name},
+#ifdef DEBUG
+#define X(name) {Token::name, #name},
 extern ankerl::unordered_dense::map<Token, const char*> TokensToName = {
 #include "Lexemes.h"
 };
 #undef X
+#endif // DEBUG
 
 ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
 	{"object", Token::Object },
@@ -28,6 +30,8 @@ ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
 
 	{"string", Token::TypeString},
 	{"number", Token::TypeNumber},
+	{"array", Token::TypeArray},
+	{"function", Token::TypeFunction},
 
 	{"true", Token::True},
 	{"false", Token::False},
@@ -89,10 +93,10 @@ void Lexer::Reset()
 
 Token Lexer::GetNext(std::string_view& Data)
 {
-	Token token = None;
+	Token token = Token::None;
 	do {
 		token = Analyse(Data);
-	} while (token == Skip);
+	} while (token == Token::Skip);
 
 	return token;
 }

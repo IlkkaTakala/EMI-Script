@@ -1,13 +1,15 @@
 #include "Helpers.h"
-#include "StringObject.h"
+#include "Objects/StringObject.h"
+#include "Objects/ArrayObject.h"
+#include <string>
 
 Variable moveOwnershipToVM(InternalValue& var)
 {
 	switch (var.getType())
 	{
 	case ValueType::String: {
-		auto idx = String::GetAllocator()->MakeString(var.as<const char*>());
-		return { idx, VariableType::String };
+		auto idx = String::GetAllocator()->Make(var.as<const char*>());
+		return idx;
 
 	} break;
 
@@ -28,7 +30,7 @@ InternalValue moveOwnershipToHost(Variable& var)
 	switch (var.getType())
 	{
 	case VariableType::String: {
-		auto str = String::GetAllocator()->GetString(var.as<String>());
+		auto str = var.as<String>();
 		char* out = new char[str->size()]();
 		strcpy_s(out, str->size(), str->data());
 		return out;
@@ -59,7 +61,7 @@ Variable GetTypeDefault(VariableType type)
 	case VariableType::External:
 		return Variable();
 	case VariableType::String:
-		return Variable((uint64_t)0, VariableType::String);
+		return String::GetAllocator()->GetDefault();
 	case VariableType::Array:
 		return Variable();
 	case VariableType::Object:
@@ -81,7 +83,7 @@ bool isTruthy(const Variable& var)
 	case VariableType::Boolean:
 		return var.as<bool>();
 	case VariableType::String:
-		return String::GetAllocator()->GetString(var.as<String>())->size() > 0; // @todo: string check
+		return var.as<String>()->size() > 0; // @todo: string check
 	case VariableType::Array:
 		return true;
 	case VariableType::Object:
@@ -97,7 +99,7 @@ bool equal(const Variable& lhs, const Variable& rhs)
 	if (lhs.getType() != rhs.getType()) return false;
 	switch (lhs.getType())
 	{
-	case VariableType::String: return strcmp(String::GetAllocator()->GetString(lhs.as<String>())->data(), toString(rhs)->data()) == 0;
+	case VariableType::String: return strcmp(lhs.as<String>()->data(), toString(rhs)->data()) == 0;
 	default:
 		return lhs.operator==(rhs);
 		break;
@@ -106,17 +108,16 @@ bool equal(const Variable& lhs, const Variable& rhs)
 
 void stradd(Variable& out, const Variable& lhs, const Variable& rhs)
 {
-	auto l = *toString(lhs);
-	auto r = *toString(rhs);
+	auto l = toString(lhs);
+	auto r = toString(rhs);
 
-	size_t len = l.size() + r.size() - 1;
-	auto idx = String::GetAllocator()->MakeString(len);
-	auto str = String::GetAllocator()->GetString(idx);
+	size_t len = l->size() + r->size() - 1;
+	auto str = String::GetAllocator()->Make(len);
 
-	memcpy(str->data(), l.data(), l.size());
-	memcpy(str->data() + l.size() - 1, r.data(), r.size());
+	memcpy(str->data(), l->data(), l->size());
+	memcpy(str->data() + l->size() - 1, r->data(), r->size());
 
-	out = { idx, VariableType::String };
+	out = str;
 }
 
 void add(Variable& out, const Variable& lhs, const Variable& rhs)
@@ -173,7 +174,7 @@ double toNumber(const Variable& in)
 	{
 	case VariableType::Number: return in.as<double>();
 	case VariableType::Boolean: return in.as<bool>() ? 1.0 : 0.0;
-	case VariableType::String: return atof(String::GetAllocator()->GetString(in.as<String>())->data());
+	case VariableType::String: return atof(in.as<String>()->data());
 
 	default:
 		return 0.0;
@@ -185,9 +186,15 @@ String* toString(const Variable& in)
 	auto alloc = String::GetAllocator();
 	switch (in.getType())
 	{
-	case VariableType::Number: return alloc->GetString(alloc->MakeString(std::to_string(in.as<double>()).c_str()));
-	case VariableType::Boolean: return alloc->GetString(alloc->MakeString(in.as<bool>() ? "true" : "false"));
-	case VariableType::String: return String::GetAllocator()->GetString(in.as<String>());
+	case VariableType::Number: {
+		double value = in.as<double>();
+		if (trunc(value) == value) {
+			return alloc->Make(std::to_string((size_t)value).c_str());
+		}
+		return alloc->Make(std::to_string(value).c_str());
+	}
+	case VariableType::Boolean: return alloc->Make(in.as<bool>() ? "true" : "false");
+	case VariableType::String: return in.as<String>();
 
 	default:
 		return alloc->GetDefault();

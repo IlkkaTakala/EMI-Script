@@ -53,6 +53,9 @@ file(
     "${_header_path}/*.h*"
 )
 
+include_directories(${CMAKE_BINARY_DIR})
+list (APPEND _source_list ${CMAKE_BINARY_DIR}/grammar.cpp)
+
 foreach(_source IN ITEMS ${_source_list})
     get_filename_component(_source_path "${_source}" PATH)
     file(RELATIVE_PATH _source_path_rel "${_src_root_path}" "${_source_path}")

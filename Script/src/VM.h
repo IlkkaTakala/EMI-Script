@@ -11,8 +11,8 @@
 #include "Eril/Eril.hpp"
 #include "Variable.h"
 #include "Function.h"
-#include "Object.h"
 #include "Namespace.h"
+#include "Objects/UserObject.h"
 
 using namespace Eril;
 
@@ -46,8 +46,14 @@ public:
 		fast = &_stack[top];
 	}
 
+	void destroy(size_t count) {
+		for (size_t i = 0; i < count; i++) {
+			fast[i].~T();
+		}
+	}
+
 	void reserve(size_t count) {
-		_stack.resize(count);
+		if (count > _stack.size()) _stack.resize(count);
 		fast = &_stack[top];
 	}
 

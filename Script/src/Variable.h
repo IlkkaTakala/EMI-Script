@@ -1,9 +1,7 @@
 #ifndef _VARIABLE_INC_GUARD_H_
 #define _VARIABLE_INC_GUARD_H_
 #pragma once
-#include <cstdint>
 #include <type_traits>
-#include <Defines.h>
 /**
  
 Using NaN boxing 
@@ -36,6 +34,8 @@ enum class VariableType
 	Object
 };
 
+class Object;
+
 class Variable
 {
 	uint64_t value;
@@ -43,6 +43,7 @@ class Variable
 public:
 	Variable() : value(NIL_VAL) {}
 	Variable(const Variable&);
+	Variable(Variable&&) noexcept;
 	Variable(int v) {
 		double val = static_cast<double>(v);
 		value = *(uint64_t*)&val;
@@ -50,14 +51,14 @@ public:
 	Variable(double v) {
 		value = *(uint64_t*)&v;
 	}
-	Variable(size_t v, VariableType type);
+	Variable(Object* ptr);
 	Variable(bool v) {
 		value = BOOL_VAL(v);
 	}
 
 	~Variable();
 
-	void setUndefined() { value = NIL_VAL; }
+	inline void setUndefined() { value = NIL_VAL; }
 
 	inline bool isNumber() const {
 		return (((value)&QNAN) != QNAN);
@@ -69,16 +70,10 @@ public:
 		return (value | 1) == TRUE_VAL;
 	}
 	inline bool isObject() const {
-		return ((value) & (QNAN | SIGN_BIT)) == (QNAN | SIGN_BIT) && !(value & TAG_NIL);
+		return ((value) & (QNAN | SIGN_BIT)) == (QNAN | SIGN_BIT);
 	}
 
-	VariableType getType() const {
-		if (isNumber()) return VariableType::Number;
-		if (isUndefined()) return VariableType::Undefined;
-		if (isObject()) return (VariableType)(OBJ_TYPE(value));
-		if (isBool()) return VariableType::Boolean;
-		return VariableType::Undefined;
-	}
+	VariableType getType() const;
 
 	template<typename T> requires (std::is_convertible_v<T, double>)
 	T as() const {
@@ -93,13 +88,16 @@ public:
 	}
 
 	template<typename T> requires std::is_class_v<T>
-	size_t as() const {
-		return ((uint64)((value) & ~(SIGN_BIT | QNAN))) >> 16;
+	T* as() const {
+		return ((T*)(uintptr_t)((value) & ~(SIGN_BIT | QNAN)));
 	}
 
 	bool operator==(const Variable& rhs) const {
 		return value == rhs.value;
 	}
+
+	Variable& operator=(const Variable& rhs);
+	Variable& operator=(Variable&& rhs) noexcept;
 };
 
 #endif //_VARIABLE_INC_GUARD_H_

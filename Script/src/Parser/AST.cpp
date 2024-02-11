@@ -1,12 +1,12 @@
 #include "AST.h"
 #include "NativeFuncs.h"
 #include "Helpers.h"
-#include "StringObject.h"
+#include "Objects/StringObject.h"
+#include "Objects/ArrayObject.h"
 #include "VM.h"
-#include <iostream>
 
-constexpr unsigned char print_first[] = { 195, 196, 196 };
-constexpr unsigned char print_last[] = { 192, 196, 196 };
+constexpr unsigned char print_first[] = { 195, 196, 196, 0 };
+constexpr unsigned char print_last[] = { 192, 196, 196, 0 };
 constexpr unsigned char print_add[] = { 179, 32, 32, 32, 0 };
 
 std::string VariantToStr(Node* n) {
@@ -71,44 +71,45 @@ Variable Node::toVariable() const
 	auto var = moveOwnershipToVM(v);
 	return var;
 }
-
+#ifdef DEBUG
 void Node::print(const std::string& prefix, bool isLast)
 {
-	std::cout << prefix;
-	std::cout.write(isLast ? (char*)print_last : (char*)print_first, 3);
-	std::cout << TokensToName[type] << ": " << VariantToStr(this) << '\n';
+	gLogger() << prefix;
+	gLogger() << (isLast ? (char*)print_last : (char*)print_first);
+	gLogger() << TokensToName[type] << ": " << VariantToStr(this) << '\n';
 
 	for (auto& node : children) {
 		node->print(prefix + (isLast ? "    " : (char*)print_add), node == children.back());
 	}
 }
+#endif
 
 inline bool IsControl(Token t) {
-	return t == Return || t == Break || t == Continue;
+	return t == Token::Return || t == Token::Break || t == Token::Continue;
 }
 
 inline bool IsConstant(Token t) {
-	return t >= Literal && t <= False;
+	return t >= Token::Literal && t <= Token::False;
 }
 
 inline bool IsOperator(Token t) {
-	return t >= Equal && t <= Div || t == FunctionCall;
+	return t >= Token::Equal && t <= Token::Div || t == Token::FunctionCall;
 }
 
 void OpAdd(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case Literal: {
+	case Token::Literal: {
 		n->data = VariantToStr(l) + VariantToStr(r);
 	} break;
-	case Number: {
+	case Token::Number: {
 		n->data = VariantToFloat(l) + VariantToFloat(r);
 	} break;
-	case False: 
-	case True: {
+	case Token::False:
+	case Token::True: {
 		n->data = VariantToBool(l) || VariantToBool(r);
-		n->type = std::get<bool>(n->data) ? True : False;
+		n->type = std::get<bool>(n->data) ? Token::True : Token::False;
 	} break;
 	default:
 		break;
@@ -119,16 +120,16 @@ void OpSub(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case Literal: {
+	case Token::Literal: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // @todo: Remove substrings?
 	} break;
-	case Number: {
+	case Token::Number: {
 		n->data = VariantToFloat(l) - VariantToFloat(r);
 	} break;
-	case False: 
-	case True: {
+	case Token::False:
+	case Token::True: {
 		n->data = VariantToBool(l) && VariantToBool(r);
-		n->type = std::get<bool>(n->data) ? True : False;
+		n->type = std::get<bool>(n->data) ? Token::True : Token::False;
 	} break;
 	default:
 		break;
@@ -139,13 +140,13 @@ void OpNeg(Node* n, Node* l) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case Number: {
+	case Token::Number: {
 		n->data = -VariantToFloat(l);
 	} break;
-	case False: 
-	case True: {
+	case Token::False: 
+	case Token::True: {
 		n->data = !VariantToBool(l);
-		n->type = std::get<bool>(n->data) ? True : False;
+		n->type = std::get<bool>(n->data) ? Token::True : Token::False;
 	} break;
 	default:
 		break;
@@ -156,33 +157,33 @@ void OpNot(Node* n, Node* l) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case Number: {
+	case Token::Number: {
 		n->data = !VariantToBool(l);
 	} break;
-	case False: 
-	case True: {
+	case Token::False: 
+	case Token::True: {
 		n->data = !VariantToBool(l);
 	} break;
 	default:
 		break;
 	}
-	n->type = std::get<bool>(n->data) ? True : False;
+	n->type = std::get<bool>(n->data) ? Token::True : Token::False;
 }
 
 void OpMult(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case Literal: {
+	case Token::Literal: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Number: {
+	case Token::Number: {
 		n->data = VariantToFloat(l) * VariantToFloat(r);
 	} break;
-	case False: 
-	case True: {
+	case Token::False: 
+	case Token::True: {
 		n->data = VariantToBool(l) || VariantToBool(r);
-		n->type = std::get<bool>(n->data) ? True : False;
+		n->type = std::get<bool>(n->data) ? Token::True : Token::False;
 	} break;
 	default:
 		break;
@@ -193,16 +194,16 @@ void OpDiv(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case Literal: {
+	case Token::Literal: {
 		n->data = VariantToStr(l);// -VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Number: {
+	case Token::Number: {
 		n->data = VariantToFloat(l) / VariantToFloat(r);
 	} break;
-	case False: 
-	case True: {
+	case Token::False: 
+	case Token::True: {
 		n->data = VariantToBool(l) || VariantToBool(r);
-		n->type = std::get<bool>(n->data) ? True : False;
+		n->type = std::get<bool>(n->data) ? Token::True : Token::False;
 	} break;
 	default:
 		break;
@@ -213,46 +214,46 @@ void OpEqual(Node* n, Node* l, Node* r) {
 	n->type = l->type;
 	switch (l->type)
 	{
-	case Literal: {
+	case Token::Literal: {
 		n->data = VariantToStr(l) == VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Number: {
+	case Token::Number: {
 		n->data = VariantToFloat(l) == VariantToFloat(r);
 	} break;
-	case False: 
-	case True: {
+	case Token::False: 
+	case Token::True: {
 		n->data = VariantToBool(l) == VariantToBool(r);
 	} break;
 	default:
 		break;
 	}
-	n->type = std::get<bool>(n->data) ? True : False;
+	n->type = std::get<bool>(n->data) ? Token::True : Token::False;
 }
 
 void OpNotEqual(Node* n, Node* l, Node* r) {
 	switch (l->type)
 	{
-	case Literal: {
+	case Token::Literal: {
 		n->data = VariantToStr(l) != VariantToStr(r); // TODO Remove substrings?
 	} break;
-	case Number: {
+	case Token::Number: {
 		n->data = VariantToFloat(l) != VariantToFloat(r);
 	} break;
-	case False: 
-	case True: {
+	case Token::False: 
+	case Token::True: {
 		n->data = VariantToBool(l) != VariantToBool(r);
 	} break;
 	default:
 		break;
 	}
-	n->type = std::get<bool>(n->data) ? True : False;
+	n->type = std::get<bool>(n->data) ? Token::True : Token::False;
 }
 
 bool Optimize(Node*& n)
 {
 	switch (n->type)
 	{
-	case Conditional: {
+	case Token::Conditional: {
 		if (n->children.size() == 3) {
 			if (IsConstant(n->children.front()->type)) {
 				auto old = n;
@@ -263,7 +264,7 @@ bool Optimize(Node*& n)
 		}
 	} break;
 
-	case Stmt: {
+	case Token::Stmt: {
 		if (n->children.empty()) break;
 		if (IsConstant(n->children.front()->type)) {
 			delete n;
@@ -272,7 +273,7 @@ bool Optimize(Node*& n)
 		}
 	} break;
 
-	case Scope: {
+	case Token::Scope: {
 		bool hasControl = false;
 		auto end = n->children.end();
 
@@ -302,7 +303,7 @@ bool Optimize(Node*& n)
 
 	} break;
 
-	case Static: {
+	case Token::Static: {
 		if (n->children.size() > 0) {
 			if (!IsConstant(n->children.front()->type)) {
 				delete n;
@@ -327,14 +328,14 @@ bool Optimize(Node*& n)
 		if (allConstant) {
 			switch (n->type)
 			{
-			case Negate: OpNeg(n, l); break;
-			case Not: OpNot(n, l); break;
-			case Add: OpAdd(n, l, r); break;
-			case Sub: OpSub(n, l, r); break;
-			case Mult: OpMult(n, l, r); break;
-			case Div: OpDiv(n, l, r); break;
-			case Equal: OpEqual(n, l, r); break;
-			case NotEqual: OpNotEqual(n, l, r); break;
+			case Token::Negate: OpNeg(n, l); break;
+			case Token::Not: OpNot(n, l); break;
+			case Token::Add: OpAdd(n, l, r); break;
+			case Token::Sub: OpSub(n, l, r); break;
+			case Token::Mult: OpMult(n, l, r); break;
+			case Token::Div: OpDiv(n, l, r); break;
+			case Token::Equal: OpEqual(n, l, r); break;
+			case Token::NotEqual: OpNotEqual(n, l, r); break;
 			default:
 				break;
 			}
@@ -360,10 +361,10 @@ void Desugar(Node*& n)
 
 	switch (n->type)
 	{
-	case Pipe: {
+	case Token::Pipe: {
 		Node* previous = nullptr;
 		for (auto& node : n->children) {
-			if (node->type == FunctionCall && previous) {
+			if (node->type == Token::FunctionCall && previous) {
 				node->children.back()->children.emplace_front(previous);
 			}
 			previous = node;
@@ -382,14 +383,14 @@ void TypeConverter(Node* n, const TokenHolder& h)
 {
 	switch (h.token)
 	{
-	case Number:
+	case Token::Number:
 		n->data = 0.f;
 		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<double>(n->data));
 		break;
-	case True:
+	case Token::True:
 		n->data = true;
 		break;
-	case False:
+	case Token::False:
 		n->data = false;
 		break;
 	default:
@@ -403,6 +404,7 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n)
 	vm = in_vm;
 	root = n;
 	auto it = namespaces.emplace("Global", Namespace{});
+	it.first->second.Name = "Global";
 	currentNamespace = &it.first->second;
 	currentFunction = nullptr;
 	currentScope = nullptr;
@@ -423,13 +425,13 @@ void ASTWalker::Run()
 	for (auto& c : root->children) {
 		switch (c->type)
 		{
-		case NamespaceDef:
+		case Token::NamespaceDef:
 		{
 			currentNamespace = &namespaces[std::get<0>(c->data)];
 			currentNamespace->Name = std::get<0>(c->data);
 		} break;
 		
-		case ObjectDef:
+		case Token::ObjectDef:
 		{
 			auto& data = std::get<0>(c->data);
 			bool isNameSpace;
@@ -446,7 +448,7 @@ void ASTWalker::Run()
 					Variable var;
 
 					if (field->children.size() == 2) {
-						if (field->children.front()->type != AnyType) {
+						if (field->children.front()->type != Token::AnyType) {
 							flags.flags = SymbolFlags::Typed;
 						}
 						if (IsConstant(field->children.back()->type)) {
@@ -457,10 +459,10 @@ void ASTWalker::Run()
 								gError() << "Trying to initialize with wrong type: In object " << data << ", field " << std::get<0>(field->data) << '\n';
 							}
 						}
-						else if (field->children.back()->type == OExpr) {
+						else if (field->children.back()->type == Token::OExpr) {
 							switch (field->children.front()->type)
 							{
-							case TypeNumber:
+							case Token::TypeNumber:
 								var = Variable(0.0);
 							default:
 								break;
@@ -484,8 +486,8 @@ void ASTWalker::Run()
 			}
 		} break;
 		
-		case PublicFunctionDef:
-		case FunctionDef:
+		case Token::PublicFunctionDef:
+		case Token::FunctionDef:
 		{
 			auto& data = std::get<0>(c->data);
 			bool isNameSpace;
@@ -497,7 +499,7 @@ void ASTWalker::Run()
 				symbol->varType = VariableType::Function;
 				Function* function = new Function();
 				function->Name = data;
-				function->IsPublic = c->type == PublicFunctionDef;
+				function->IsPublic = c->type == Token::PublicFunctionDef;
 				currentNamespace->functions.emplace(function->Name.c_str(), function).first->second;
 				c->sym = symbol;
 				function->Namespace = currentNamespace->Name;
@@ -510,8 +512,8 @@ void ASTWalker::Run()
 				for (auto& node : c->children) {
 					switch (node->type)
 					{
-					case Scope: break;
-					case CallParams: {
+					case Token::Scope: break;
+					case Token::CallParams: {
 						function->ArgCount = (uint8)node->children.size();
 						for (auto& v : node->children) {
 							auto symParam = findSymbol(std::get<0>(v->data), "", isNameSpace);
@@ -545,15 +547,15 @@ void ASTWalker::Run()
 			}
 		} break;
 
-		case Static:
+		case Token::Static:
 		{
 		} break;
 
-		case Const:
+		case Token::Const:
 		{
 		} break;
 
-		case VarDeclare:
+		case Token::VarDeclare:
 		{
 			auto& data = std::get<0>(c->data);
 			bool isNameSpace;
@@ -569,19 +571,33 @@ void ASTWalker::Run()
 
 				switch (c->children.front()->type)
 				{
-				case TypeNumber:
-					symbol->varType = VariableType::Number; 
+				case Token::TypeNumber:
+					symbol->varType = VariableType::Number;
 					variable = VariantToFloat(c->children.back());
 					break;
-				case TypeString:
+				case Token::TypeString:
 					symbol->varType = VariableType::String;
-					variable = { String::GetAllocator()->MakeString(VariantToStr(c->children.back()).c_str()), VariableType::String };
+					variable = String::GetAllocator()->Make(VariantToStr(c->children.back()).c_str());
 					break;
-				case Typename:
+				case Token::Typename:
 					symbol->varType = VariableType::Object;
 					// @todo: make objects;
 					break;
-				case AnyType:
+				case Token::AnyType:
+					switch (c->children.back()->type)
+					{
+					case Token::Number:
+						symbol->varType = VariableType::Number;
+						variable = VariantToFloat(c->children.back());
+						break;
+					case Token::Literal:
+						symbol->varType = VariableType::String;
+						variable = String::GetAllocator()->Make(VariantToStr(c->children.back()).c_str());
+						break;
+					default:
+						symbol->varType = VariableType::Undefined;
+						break;
+					}
 					break;
 				}
 			}
@@ -602,7 +618,7 @@ void ASTWalker::Run()
 std::string getFullId(Node* n) {
 	std::string full;
 	for (auto& c : n->children) {
-		if (c->type != Id) return full;
+		if (c->type != Token::Id) return full;
 		full += getFullId(c) + ".";
 	}
 	full += std::get<0>(n->data);
@@ -683,6 +699,12 @@ void ASTWalker::Walk(Node* n)
 		_N(TypeString,
 			_Type = VariableType::String;
 		);
+		_N(TypeArray,
+			_Type = VariableType::Array;
+		);
+		_N(TypeFunction,
+			_Type = VariableType::Function;
+		);
 		_N(AnyType,
 			_Type = VariableType::Undefined;
 		);
@@ -708,6 +730,31 @@ void ASTWalker::Walk(Node* n)
 			_Out;
 			_Type = VariableType::String;
 			}
+		);
+
+		_N(Array,
+			{
+				_Op(PushArray);
+				_In16 = n->children.size();
+				_Out;
+			}
+			for (auto& c : n->children) {
+				Walk(c);
+				_Op(PushIndex);
+				instruction.target = n->regTarget;
+				_In8 = c->regTarget;
+			}
+			_FreeChildren;
+			_Type = VariableType::Array;
+		);
+
+		_N(Indexer,
+			_Walk;
+			_Op(LoadIndex);
+			_In8 = _First()->regTarget;
+			_In8_2 = _Last()->regTarget;
+			_FreeChildren;
+			_Out;
 		);
 
 		_N(True,
@@ -896,7 +943,7 @@ void ASTWalker::Walk(Node* n)
 			_Compare(NotEqual)
 		);
 
-		case Decrement:
+		case Token::Decrement:
 		_N(Increment,
 			_Walk;
 			if (_First()->varType != VariableType::Number) {
@@ -904,12 +951,12 @@ void ASTWalker::Walk(Node* n)
 			}
 			_Op(PostMod);
 			_In8 = _First()->regTarget;
-			_In8_2 = n->type == Increment ? 0 : 1;
+			_In8_2 = n->type == Token::Increment ? 0 : 1;
 			_FreeChildren;
 			_Out;
 		);
 
-		case PreDecrement:
+		case Token::PreDecrement:
 		_N(PreIncrement,
 			_Walk;
 			if (_First()->varType != VariableType::Number) {
@@ -917,7 +964,7 @@ void ASTWalker::Walk(Node* n)
 			}
 			_Op(PreMod);
 			_In8 = _First()->regTarget;
-			_In8_2 = n->type == PreIncrement ? 0 : 1;
+			_In8_2 = n->type == Token::PreIncrement ? 0 : 1;
 			n->regTarget = instruction.target = _First()->regTarget;
 		);
 
@@ -966,7 +1013,7 @@ void ASTWalker::Walk(Node* n)
 					if (_Last()->varType == _Type || _Type == VariableType::Undefined) {
 						sym->varType = _Type = _Last()->varType;
 						auto type = _Last()->type;
-						if (IsConstant(type) ||IsOperator(type)) {
+						if (IsConstant(type) || IsOperator(type)) {
 							sym->reg = n->regTarget = _Last()->regTarget;
 						}
 						else {
@@ -1185,14 +1232,14 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 	for (auto& c : n->children) {
 		switch (c->type)
 		{
-		case CallParams: {
+		case Token::CallParams: {
 			for (auto& v : c->children) {
 				auto symParam = f->scope->findSymbol(std::get<0>(v->data));
 				if (symParam) symParam->reg = getFirstFree();
 			}
 		} break;
 
-		case Scope: {
+		case Token::Scope: {
 
 			instructionList.reserve(c->children.size() * n->depth);
 			currentScope = f->scope;
@@ -1224,7 +1271,7 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 	String::GetAllocator();
 	f->stringTable.reserve(stringList.size());
 	for (auto& str : stringList) {
-		f->stringTable.emplace_back(String::GetAllocator()->MakeString(str.c_str()), VariableType::String);
+		f->stringTable.emplace_back(String::GetAllocator()->Make(str.c_str()));
 	}
 	stringList.clear();
 

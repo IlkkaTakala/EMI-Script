@@ -4,11 +4,11 @@ bool TypesMatch(Token lhs, Token rhs)
 {
 	switch (lhs)
 	{
-	case TypeString:
-		return rhs == Literal;
-	case TypeNumber:
-		return rhs == Number;
-	case AnyType:
+	case Token::TypeString:
+		return rhs == Token::Literal;
+	case Token::TypeNumber:
+		return rhs == Token::Number;
+	case Token::AnyType:
 		return true;
 	default:
 		return lhs == rhs;

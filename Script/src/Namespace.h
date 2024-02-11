@@ -1,7 +1,7 @@
 #pragma once
 #include "Function.h"
-#include "Object.h"
 #include "Symbol.h"
+#include "Objects/UserObject.h"
 #include <ankerl/unordered_dense.h>
 
 struct Namespace
@@ -9,7 +9,7 @@ struct Namespace
 	std::string Name;
 	ankerl::unordered_dense::map<std::string, Function*> functions;
 	ankerl::unordered_dense::map<std::string, UserDefined> objects;
-	ankerl::unordered_dense::map<std::string, ObjectType> objectTypes;
+	ankerl::unordered_dense::map<std::string, VariableType> objectTypes;
 	ankerl::unordered_dense::map<std::string, Symbol*> symbols;
 	std::unordered_map<std::string, Variable> variables;
 

@@ -94,39 +94,3 @@ void Eril::ReleaseEnvironment(VMHandle handle)
 {
 	handle.ReleaseVM();
 }
-
-
-/*
-Start -> Program
-Program -> RProgram Program 
-Program -> '' 
-RProgram -> ObjectDef 
-RProgram -> FunctionDef 
-RProgram -> NamespaceDef 
-ObjectDef -> Object id 
-FunctionDef -> def id ( ) Scope
-Scope -> { MStmt } 
-MStmt -> Stmt MStmt 
-MStmt -> Scope MStmt 
-MStmt -> ''
-Stmt -> Expr ; 
-Expr -> Expr + Expr 
-Expr -> x 
-NamespaceDef -> Extend id : 
-
-def id ( ) { x ; x ; { x ; } }
-
-
-FunctionDef -> def id Scope
-Scope -> ( MStmt )
-MStmt -> Stmt MStmt
-MStmt -> Scope MStmt
-MStmt -> ''
-Stmt -> x ;
-
-
-def id { x ; x ; { x ; { } } }
-
-
-
-*/

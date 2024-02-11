@@ -1,13 +1,14 @@
 #include "ParseTable.h"
 #include "Defines.h"
 #include <stack>
+#include <filesystem>
 
 bool IsTerminal(Token token) {
-	return token < Start && token > None;
+	return token < Token::Start && token > Token::None;
 }
 
 bool IsNonTerminal(Token token) {
-	return token >= Start && token < Last;
+	return token >= Token::Start && token < Token::Last;
 }
 
 template <typename T>
@@ -50,7 +51,7 @@ ItemHandle NewItem(int rule = 0, int dot = 0) {
 	Items(h).dotIndex = dot;
 
 	if (rule == 0)
-		Items(h).lookaheads.push_back(None);
+		Items(h).lookaheads.push_back(Token::None);
 
 	return h;
 }
@@ -77,7 +78,7 @@ bool CollectDevelopmentFirsts(Grammar& g, const std::vector<Token>& rhs, std::ve
 		}
 
 		for (auto& k : g.Firsts[s]) {
-			noneInFirsts |= k == None;
+			noneInFirsts |= k == Token::None;
 			result |= AddUnique(nonTerminalFirsts, k);
 		}
 
@@ -87,7 +88,7 @@ bool CollectDevelopmentFirsts(Grammar& g, const std::vector<Token>& rhs, std::ve
 	}
 
 	if (noneInFirsts) {
-		result |= AddUnique(nonTerminalFirsts, None);
+		result |= AddUnique(nonTerminalFirsts, Token::None);
 	}
 
 	return result;
@@ -115,7 +116,7 @@ bool AddToClosure(std::vector<ItemHandle>& closure, ItemHandle item)
 bool NextItemAfterShift(Item& result, const Rule& r, ItemHandle h)
 {
 	auto& item = Items(h);
-	if (item.dotIndex < r.development.size() && r.development[item.dotIndex] != None) {
+	if (item.dotIndex < r.development.size() && r.development[item.dotIndex] != Token::None) {
 		result.rule = item.rule;
 		result.dotIndex = item.dotIndex + 1;
 		return true;
@@ -140,7 +141,7 @@ void Grammar::GetSequenceFirsts(std::vector<Token>& result, const std::vector<To
 		}
 
 		for (auto& first : Firsts.at(symbol)) {
-			noneFound |= first == None;
+			noneFound |= first == Token::None;
 			AddUnique(result, first);
 		}
 
@@ -152,15 +153,15 @@ void Grammar::GetSequenceFirsts(std::vector<Token>& result, const std::vector<To
 	}
 
 	if (noneFound) {
-		AddUnique(result, None);
+		AddUnique(result, Token::None);
 	}
 }
 
-void TransformGrammar(Grammar& grammar, const RuleType& rules) {
+void TransformGrammar(Grammar& grammar, RuleTable_t& RuleTable, const RuleType& rules) {
 
-	grammar.RuleTable.reserve(rules.size());
+	RuleTable.reserve(rules.size());
 	for (int i = 0; i < rules.size(); ++i) {
-		grammar.RuleTable.push_back({ i, rules[i][0], std::vector<Token>{rules[i].begin() + 1, rules[i].end()} });
+		RuleTable.push_back({ i, rules[i][0], std::vector<Token>{rules[i].begin() + 1, rules[i].end()} });
 	}
 
 	// Firsts
@@ -168,12 +169,12 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 	do {
 		notDone = false;
 
-		for (auto& r : grammar.RuleTable) {
+		for (auto& r : RuleTable) {
 
 			std::vector<Token>& nonTerminalFirsts = grammar.Firsts[r.nonTerminal];
 
-			if (r.development.size() == 1 && r.development[0] == None) {
-				notDone |= AddUnique(nonTerminalFirsts, None);
+			if (r.development.size() == 1 && r.development[0] == Token::None) {
+				notDone |= AddUnique(nonTerminalFirsts, Token::None);
 			}
 			else {
 				notDone |= CollectDevelopmentFirsts(grammar, r.development, nonTerminalFirsts);
@@ -186,12 +187,12 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 	do {
 		notDone = false;
 
-		for (int i = 0; i < grammar.RuleTable.size(); ++i) {
-			auto& rule = grammar.RuleTable[i];
+		for (int i = 0; i < RuleTable.size(); ++i) {
+			auto& rule = RuleTable[i];
 
 			if (i == 0) {
 				auto& nonTerminalFollows = grammar.Follows[rule.nonTerminal];
-				notDone |= AddUnique(nonTerminalFollows, None);
+				notDone |= AddUnique(nonTerminalFollows, Token::None);
 			}
 
 			for (int j = 0; j < rule.development.size(); ++j) {
@@ -204,7 +205,7 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 
 					for (auto& first : afterSymbolFirsts) {
 
-						if (first == None) {
+						if (first == Token::None) {
 							auto& nonTerminalFollows = grammar.Follows[rule.nonTerminal];
 
 							for (auto& l : nonTerminalFollows) {
@@ -221,15 +222,15 @@ void TransformGrammar(Grammar& grammar, const RuleType& rules) {
 	} while (notDone);
 }
 
-void UpdateClosure(const Grammar& g, Kernel& k) {
+void UpdateClosure(const Grammar& g, const RuleTable_t& RuleTable, Kernel& k) {
 	for (int i = 0; i < k.closure.size(); i++) {
 		auto h = k.closure[i];
-		const Rule& actualRule = g.RuleTable[Items(h).rule];
+		const Rule& actualRule = RuleTable[Items(h).rule];
 		int dotIndex = Items(h).dotIndex;
 
 		if (dotIndex < actualRule.development.size()) {
 			Token nonTerminal = actualRule.development[dotIndex];
-			for (const auto& r : g.RuleTable) {
+			for (const auto& r : RuleTable) {
 				if (r.nonTerminal != nonTerminal) continue;
 
 				auto item = NewItem(r.index, 0);
@@ -242,7 +243,7 @@ void UpdateClosure(const Grammar& g, Kernel& k) {
 				g.GetSequenceFirsts(firstsAfterSymbolAfterDot, actualRule.development, dotIndex + 1);
 
 				for (const auto& first : firstsAfterSymbolAfterDot) {
-					if (None == first) {
+					if (Token::None == first) {
 						epsilonPresent = true;
 					}
 					else {
@@ -263,7 +264,7 @@ void UpdateClosure(const Grammar& g, Kernel& k) {
 	}
 }
 
-bool AddGotos(Grammar& g, int k) {
+bool AddGotos(Grammar& g, RuleTable_t& RuleTable, int k) {
 	bool result = false;
 	ankerl::unordered_dense::map<Token, std::vector<ItemHandle>> newKernels;
 	auto& kernels = g.ClosureKernels;
@@ -271,7 +272,7 @@ bool AddGotos(Grammar& g, int k) {
 	for (auto& i : kernels[k].closure) {
 		Item temp{ };
 		
-		Rule& rule = g.RuleTable[Items(i).rule];
+		Rule& rule = RuleTable[Items(i).rule];
 		if (NextItemAfterShift(temp, rule, i)) {
 			ItemHandle next = NewItem(temp.rule, temp.dotIndex);
 			Items(next).lookaheads = Items(i).lookaheads;
@@ -320,7 +321,7 @@ bool AddGotos(Grammar& g, int k) {
 	return result;
 }
 
-void CreateClosureTables(Grammar& g) {
+void CreateClosureTables(Grammar& g, RuleTable_t& RuleTable) {
 
 	g.ClosureKernels.push_back({ 0, { NewItem() } });
 
@@ -328,9 +329,9 @@ void CreateClosureTables(Grammar& g) {
 	while (i < g.ClosureKernels.size()) {
 		auto& kernel = g.ClosureKernels[i];
 
-		UpdateClosure(g, kernel);
+		UpdateClosure(g, RuleTable, kernel);
 
-		if (AddGotos(g, (int)i)) {
+		if (AddGotos(g, RuleTable, (int)i)) {
 			i = 0;
 		}
 		else {
@@ -339,30 +340,33 @@ void CreateClosureTables(Grammar& g) {
 	}
 }
 
-void CreateParseTable(Grammar& g) {
-	g.ParseTable.resize(g.ClosureKernels.size());
+void CreateParseTable(Grammar& g, ParseTable_t& ParseTable, RuleTable_t& RuleTable) {
+	ParseTable.resize(g.ClosureKernels.size());
 
 	for (int i = 0; i < g.ClosureKernels.size(); ++i) {
 		const auto& kernel = g.ClosureKernels[i];
-		auto& state = g.ParseTable[i];
-		state.resize(Last);
+		auto& state = ParseTable[i];
+		state.resize((size_t)Token::Last);
 
 		for (const auto& key : kernel.keys) {
 			short nextState = (short)kernel.gotos.at(key);
+			size_t k = (size_t)key;
 
-			if (state[key].type != ERROR && state[key].type != ACCEPT)
-				state[key].type = DECIDE;
+			if (state[k].type != ERROR && state[k].type != ACCEPT)
+				state[k].type = DECIDE;
 			else
-				state[key].type = SHIFT;
+				state[k].type = SHIFT;
 
-			state[key].shift = nextState;
+			state[k].shift = nextState;
 		}
 
 		for (const auto& it : kernel.closure) {
 			auto& item = Items(it);
-			Rule& rule = g.RuleTable[item.rule];
-			if (item.dotIndex == rule.development.size() || rule.development[0] == None) {
-				for (const auto& k : item.lookaheads) {
+			Rule& rule = RuleTable[item.rule];
+			if (item.dotIndex == rule.development.size() || rule.development[0] == Token::None) {
+				for (const auto& key : item.lookaheads) {
+					size_t k = (size_t)key;
+
 					switch (state[k].type)
 					{
 					case REDUCE:
@@ -389,12 +393,33 @@ void CreateParseTable(Grammar& g) {
 	}
 }
 
-Grammar& CreateParser(Grammar& g, const RuleType& rules)
+const char* ActionToName(Action act) {
+	switch (act)
+	{
+	case ACCEPT:
+		return "ACCEPT";
+	case SHIFT:
+		return "SHIFT";
+	case REDUCE:
+		return "REDUCE";
+	case DECIDE:
+		return "DECIDE";
+	case ERROR:
+		return "ERROR";
+	case GOTO:
+		return "GOTO";
+	default:
+		return "";
+	}
+}
+
+void CreateParser(ParseTable_t& ParseTable, RuleTable_t& RuleTable, std::vector<RuleData>& Data, const RuleType& rules)
 {
-	TransformGrammar(g, rules);
-	Items().reserve((size_t)pow(g.RuleTable.size(), 1.75f));
-	CreateClosureTables(g);
-	CreateParseTable(g);
+	Grammar g;
+	TransformGrammar(g, RuleTable, rules);
+	Items().reserve((size_t)pow(RuleTable.size(), 1.75f));
+	CreateClosureTables(g, RuleTable);
+	CreateParseTable(g, ParseTable, RuleTable);
 
 	Items().clear();
 	Items().shrink_to_fit();
@@ -406,11 +431,58 @@ Grammar& CreateParser(Grammar& g, const RuleType& rules)
 	g.Firsts.clear();
 	g.Follows.clear();
 
-	return g;
-}
+	std::ofstream outh("../grammar.h");
+	std::ofstream outcpp("../grammar.cpp");
 
-void ReleaseGrammar(Grammar& g)
-{
-	g.ParseTable.clear();
-	g.RuleTable.clear();
-};
+	outh << R"(#pragma once
+#include "Parser/ParseTable.h"
+
+constexpr size_t CreateTime = )";
+
+	auto time = std::chrono::file_clock::now().time_since_epoch().count();
+	outh << time << "; \n\n";
+
+	outh << R"(extern ParseTable_t ParseTable;
+extern RuleTable_t RuleTable;
+extern std::vector<RuleData> Data;
+)";
+
+	outcpp << R"(#include "grammar.h"
+RuleTable_t RuleTable = {
+)";
+
+	for (auto& rule : RuleTable) {
+		outcpp << "{ " << rule.index << ", ";
+		outcpp << "Token::" << TokensToName[rule.nonTerminal] << ", ";
+		outcpp << "{ ";
+		for (auto& t : rule.development) {
+			outcpp << "Token::" << TokensToName[t] << ", ";
+		}
+		outcpp << " }}, \n";
+	}
+
+outcpp << R"(};
+
+ParseTable_t ParseTable = {
+)";
+	for (auto& row : ParseTable) {
+		outcpp << "{ ";
+		for (auto& action : row) {
+			outcpp << "{ " << ActionToName(action.type) << ", " << action.shift << ", " << action.reduce << " }, ";
+		}
+		outcpp << "}, \n";
+	}
+
+outcpp << R"(};
+
+std::vector<RuleData> Data = {
+)";
+	for (auto& row : Data) {
+		outcpp << "{ ";
+		outcpp << "Token::" << TokensToName[row.dataToken] << ", Token::" << TokensToName[row.nodeType] << ", Token::" << TokensToName[row.mergeToken];
+		outcpp << " }, \n";
+	}
+
+	outcpp << "};\n";
+
+}

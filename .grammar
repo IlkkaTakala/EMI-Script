@@ -13,6 +13,8 @@ RProgram Stmt
 
 Typename TypeString
 Typename TypeNumber
+Typename TypeArray
+Typename TypeFunction
 Typename Id
 
 ObjectDef Object Id Lcurly MObjectVar Rcurly
@@ -145,6 +147,8 @@ None None Stmt
 
 None TypeString 
 None TypeNumber
+None TypeArray
+None TypeFunction
 Id Typename
 
 Id None MObjectVar

@@ -19,7 +19,7 @@ public:
 			delete c;
 		}
 	}
-	Token type = None;
+	Token type = Token::None;
 	size_t line;
 	size_t depth;
 	std::variant<std::string, double, bool> data;
@@ -31,9 +31,9 @@ public:
 
 	Variable toVariable() const;
 
-
+#ifdef DEBUG
 	void print(const std::string& prefix, bool isLast = false);
-
+#endif
 };
 
 class VM;

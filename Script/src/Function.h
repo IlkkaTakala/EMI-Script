@@ -3,10 +3,7 @@
 #include <string>
 #include <vector>
 #include <ankerl/unordered_dense.h>
-
 #include "Symbol.h"
-#include "Object.h"
-#include "StringObject.h"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -82,7 +79,7 @@ struct Function
 	ankerl::unordered_dense::set<size_t> jumpTable;
 
 	std::vector<Function*> functionTable;
-	std::vector<ObjectType> typeTable;
+	std::vector<VariableType> typeTable;
 	std::vector<Variable*> globalTable;
 	std::vector<std::string> functionTableSymbols;
 	std::vector<std::string> typeTableSymbols;

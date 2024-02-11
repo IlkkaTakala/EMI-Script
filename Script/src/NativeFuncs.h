@@ -17,9 +17,3 @@ inline double BoolToFloat(bool i) { return (double)i; }
 inline bool StrToBool(const char*) { return false; }
 inline bool FloatToBool(double i) { return bool(i); }
 inline bool IntToBool(int i) { return i; }
-
-// Ops
-
-class VM;
-
-void IntAdd(const uint8*& ptr, const uint8* end);

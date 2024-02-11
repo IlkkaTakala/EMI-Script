@@ -9,6 +9,10 @@ public def call(va : string) {
 extend Script:
 
 public def func(value : string) {
+
+	var test : array = [10, 12, 154];
+	
+	value = value + " " + test[2];
 	
 	return String.addString(value);
 }

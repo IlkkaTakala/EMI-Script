@@ -3,13 +3,6 @@
 #include <string_view>
 #include "Lexer.h"
 
-struct RuleData
-{
-	Token dataToken = None;
-	Token nodeType = None;
-	Token mergeToken = None;
-};
-
 enum class Association {
 	None,
 	Left,
@@ -25,7 +18,7 @@ struct TokenData
 class Node;
 struct TokenHolder
 {
-	Token token = None;
+	Token token = Token::None;
 	Node* ptr = nullptr;
 	std::string_view data;
 };

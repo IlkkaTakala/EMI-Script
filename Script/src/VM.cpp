@@ -2,6 +2,8 @@
 #include "Parser/Parser.h"
 #include "NativeFuncs.h"
 #include "Helpers.h"
+#include "Objects/StringObject.h"
+#include "Objects/ArrayObject.h"
 
 VM::VM()
 {
@@ -220,6 +222,7 @@ void VM::RemoveUnit(const std::string& unit)
 			Namespace& n = Namespaces[name];
 			n.variables.erase(var);
 			n.symbols.erase(var);
+			GlobalVariables.erase(var);
 		}
 		
 		Units.erase(unit);
@@ -230,7 +233,8 @@ void VM::GarbageCollect()
 {
 	while (VMRunning) {
 
-		String::GetAllocator()->MakeFree();
+		String::GetAllocator()->Free();
+		Array::GetAllocator()->Free();
 
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 	}
@@ -274,6 +278,7 @@ void Runner::operator()()
 		for (int i = 0; i < current->FunctionPtr->ArgCount && i < current->Arguments.size(); i++) {
 			Registers[i] = current->Arguments[i];
 		}
+		current->Arguments.clear();
 
 #define NUMS current->FunctionPtr->numberTable.values()
 #define STRS current->FunctionPtr->stringTable
@@ -331,7 +336,7 @@ void Runner::operator()()
 							else {
 								gWarn() << "Variable does not exist: " << varname << "\n";
 								goto start;
-							}
+							}	
 						}
 					}
 
@@ -344,15 +349,18 @@ void Runner::operator()()
 					if (byte.in1 == 1) {
 						val = Registers[byte.target];
 					}
-					Registers.to(current->StackOffset);
-					CallStack.pop_back();
-					if (!CallStack.empty()) {
+					Registers.destroy(current->FunctionPtr->RegisterCount);
+					if (CallStack.size() > 1) {
+						CallStack.pop_back();
 						current = &CallStack.back();
+						Registers.to(current->StackOffset);
 						const Instruction& oldByte = *(Instruction*)(current->Ptr - 1);
 						Registers[oldByte.target] = val;
 					}
 					else {
 						Owner->ReturnPromiseValues[current->PromiseIndex].set_value(val);
+						CallStack.pop_back();
+						Registers.to(0);
 						current = nullptr;
 						interrupt = false;
 						goto out;
@@ -425,9 +433,31 @@ void Runner::operator()()
 				TARGET(PushTypeDefault) {
 					Registers[byte.target] = GetTypeDefault((VariableType)byte.param);
 				} goto start;
+				TARGET(PushArray) {
+					Registers[byte.target] = Array::GetAllocator()->Make(byte.param);
+				} goto start;
 
 				TARGET(Copy) {
 					Registers[byte.target] = Registers[byte.in1];
+				} goto start;
+				TARGET(PushIndex) {
+					Registers[byte.target].as<Array>()->data().push_back(Registers[byte.in1]);
+				} goto start;
+				
+				TARGET(StoreIndex) {
+					if (Registers[byte.target].getType() == VariableType::Array) {
+						auto& arr = Registers[byte.target].as<Array>()->data();
+						size_t idx = static_cast<size_t>(toNumber(Registers[byte.in2]));
+						if (arr.size() > idx) {
+							arr[idx] = Registers[byte.in1];
+						}
+					}
+				} goto start;
+
+				TARGET(LoadIndex) {
+					if (Registers[byte.in1].getType() == VariableType::Array) {
+						Registers[byte.target] = Registers[byte.in1].as<Array>()->data()[static_cast<size_t>(toNumber(Registers[byte.in2]))];
+					}
 				} goto start;
 
 				TARGET(PreMod) {

@@ -3,15 +3,18 @@
 #include <string_view>
 #include <fstream>
 #include <ankerl/unordered_dense.h>
+#include "Defines.h"
 
 #define X(name) name,
-enum Token
+enum class Token
 {
 #include "Lexemes.h"
 };
 #undef X 
 
+#ifdef DEBUG
 extern ankerl::unordered_dense::map<Token, const char*> TokensToName;
+#endif // DEBUG
 
 struct Context
 {
