@@ -1,10 +1,14 @@
 
-var variable = "this is a test ";
-
 public def call(va : string) {
 
+	Storage.variable = "Modified ";
 	return Script.func(va);
 }
+
+extend Storage:
+
+var variable = "this is a test ";
+var arrTest : array = [0,0,0,0];
 
 extend Script:
 
@@ -12,15 +16,17 @@ public def func(value : string) {
 
 	var test : array = [10, 12, 154];
 	
-	value = value + " " + test[2];
-	
+	value += " " + test[2] + " ";
+	Storage.arrTest[3] = "otherText";
+	value += Storage.arrTest[3];
+		
 	return String.addString(value);
 }
 
 extend String:
 
 public def addString(value : string) {
-	return variable + value;
+	return Storage.variable + value;
 }
 
 

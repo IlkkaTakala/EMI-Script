@@ -406,6 +406,8 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n)
 	auto it = namespaces.emplace("Global", Namespace{});
 	it.first->second.Name = "Global";
 	currentNamespace = &it.first->second;
+	currentNamespace->Sym = new Symbol();
+	currentNamespace->Sym->setType(SymbolType::Namespace);
 	currentFunction = nullptr;
 	currentScope = nullptr;
 	HasError = false;
@@ -419,6 +421,16 @@ ASTWalker::~ASTWalker()
 	delete root;
 }
 
+std::string getFullId(Node* n) {
+	std::string full;
+	for (auto& c : n->children) {
+		if (c->type != Token::Id) break;
+		full += getFullId(c) + ".";
+	}
+	full += std::get<0>(n->data);
+	return full;
+}
+
 void ASTWalker::Run()
 {
 	std::vector<std::pair<Node*, Function*>> functionList;
@@ -429,6 +441,10 @@ void ASTWalker::Run()
 		{
 			currentNamespace = &namespaces[std::get<0>(c->data)];
 			currentNamespace->Name = std::get<0>(c->data);
+			auto sym = new Symbol();
+			sym->setType(SymbolType::Namespace);
+			sym->resolved = true;
+			currentNamespace->Sym = sym;
 		} break;
 		
 		case Token::ObjectDef:
@@ -548,22 +564,22 @@ void ASTWalker::Run()
 		} break;
 
 		case Token::Static:
-		{
-		} break;
-
 		case Token::Const:
-		{
-		} break;
-
 		case Token::VarDeclare:
 		{
 			auto& data = std::get<0>(c->data);
 			bool isNameSpace;
 			auto s = findSymbol(data, "", isNameSpace);
 			if (!s && !isNameSpace) {
+				auto name = currentNamespace->Name + '.' + data;
 				auto it = currentNamespace->symbols.emplace(data, new Symbol{});
 				auto& symbol = it.first->second;
-				symbol->setType(SymbolType::Variable);
+				switch (c->type)
+				{
+				case Token::Static: symbol->setType(SymbolType::Static); break;
+				case Token::Const: symbol->setType(SymbolType::Static); break;
+				case Token::VarDeclare: symbol->setType(SymbolType::Variable); break;
+				}
 				auto& variable = currentNamespace->variables.emplace(data, Variable{}).first->second;
 
 				symbol->startLife = (size_t)-1;
@@ -574,14 +590,23 @@ void ASTWalker::Run()
 				case Token::TypeNumber:
 					symbol->varType = VariableType::Number;
 					variable = VariantToFloat(c->children.back());
+					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
 				case Token::TypeString:
 					symbol->varType = VariableType::String;
 					variable = String::GetAllocator()->Make(VariantToStr(c->children.back()).c_str());
+					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
 				case Token::Typename:
 					symbol->varType = VariableType::Object;
+					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					// @todo: make objects;
+					break;
+				case Token::TypeArray:
+					symbol->varType = VariableType::Array;
+					variable = Array::GetAllocator()->Make(c->children.back()->children.size());
+					// @todo: Initialize global array
+					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
 				case Token::AnyType:
 					switch (c->children.back()->type)
@@ -593,6 +618,10 @@ void ASTWalker::Run()
 					case Token::Literal:
 						symbol->varType = VariableType::String;
 						variable = String::GetAllocator()->Make(VariantToStr(c->children.back()).c_str());
+						break;
+					case Token::Array:
+						symbol->varType = VariableType::Array;
+						variable = Array::GetAllocator()->Make(c->children.back()->children.size());
 						break;
 					default:
 						symbol->varType = VariableType::Undefined;
@@ -615,31 +644,20 @@ void ASTWalker::Run()
 	}
 }
 
-std::string getFullId(Node* n) {
-	std::string full;
-	for (auto& c : n->children) {
-		if (c->type != Token::Id) return full;
-		full += getFullId(c) + ".";
-	}
-	full += std::get<0>(n->data);
-	return full;
-}
-
 #define _Op(op) n->instruction = instructionList.size(); auto& instruction = instructionList.emplace_back(); instruction.code = OpCodes::op; 
-#define _N(n, func) case Token::n: {func} break
 #define _Walk for(auto& child : n->children) Walk(child);
 #define _In16 instruction.param
 #define _In8 instruction.in1
 #define _In8_2 instruction.in2
 #define _Out n->regTarget = instruction.target = getFirstFree()
-#define _FreeChildren for (auto& c : n->children) { if (IsConstant(c->type) || IsOperator(c->type)) freeReg(c->regTarget); }
+#define _FreeChildren for (auto& c : n->children) { if (IsConstant(c->type) || IsOperator(c->type) || (c->sym && c->sym->needsLoading) ) freeReg(c->regTarget); }
 #define _Type n->varType 
 #define _SetOut(n) n->regTarget = instructionList[n->instruction].target
 #define _First() n->children.front()
 #define _Last() n->children.back()
 #define _Error(text) gError() << "Line " << n->line << ": " << text << "\n"; HasError = true;
 #define _Warn(text) gWarn() << "Line " << n->line << ": " << text << "\n";
-#define _FreeConstant(n) if (IsConstant(n->type) || IsOperator(n->type)) freeReg(n->regTarget);
+#define _FreeConstant(n) if (IsConstant(n->type) || IsOperator(n->type) || (n->sym && n->sym->needsLoading) ) freeReg(n->regTarget);
 
 #define _Operator(varTy, op, op2) \
 case VariableType::varTy: {\
@@ -656,15 +674,33 @@ case VariableType::varTy: {\
 } break;
 
 #define _OperatorAssign \
-if (n->data.index() == 0 && *std::get<std::string>(n->data).c_str() == '=') {\
-	if (_First()-> sym && isAssignable(_First()->sym->flags)) {\
-		n->regTarget = instruction.target = _First()->regTarget;\
+_Out;\
+//if (n->data.index() == 0 && *std::get<std::string>(n->data).c_str() == '=') {\
+//	_Last() = n; \
+//	goto assign; \
+//}\
+
+	/*auto first = _First();\
+	if (first->sym && isAssignable(first->sym->flags)) {\
+		n->regTarget = instruction.target = first->regTarget;\
+		n->type = Token::Assign; \
+		if (instructionList[first->instruction].code == OpCodes::LoadSymbol) { \
+			auto& store = instructionList.emplace_back(); store.code = OpCodes::StoreSymbol; \
+			store.param = instructionList[first->instruction].param; \
+			store.target = first->regTarget; \
+			instructionList[first->instruction].data = 0; \
+		} \
+		else if (instructionList[first->instruction].code == OpCodes::LoadIndex) { \
+			auto& store = instructionList.emplace_back(); store.code = OpCodes::StoreIndex; \
+			store.in1 = instructionList[first->instruction].in1;\
+			store.in2 = instructionList[first->instruction].in2;\
+			n->regTarget = instruction.target = first->regTarget;\
+			instructionList[first->instruction].data = 0;\
+		}\
 	}\
 	else {\
 		_Error("Cannot assign types");\
-	}\
-}\
-else _Out;
+	}\*/
 
 #define _Compare(op) \
 _Walk;\
@@ -683,513 +719,557 @@ void ASTWalker::Walk(Node* n)
 	Function* f = currentFunction;
 	if (HasDebug) f->debugLines[(int)n->line] = (int)instructionList.size();
 	switch (n->type) {
-		_N(Scope,
-			auto& next = currentScope->children.emplace_back();
-			next.parent = currentScope;
-			currentScope = &next;
-			auto regs = registers;
-			_Walk;
-			currentScope = currentScope->parent;
-			registers = regs;
-		);
+	case Token::Scope: {
+		auto& next = currentScope->children.emplace_back();
+		next.parent = currentScope;
+		currentScope = &next;
+		auto regs = registers;
+		_Walk;
+		currentScope = currentScope->parent;
+		registers = regs;
+	} break;
 
-		_N(TypeNumber,
-			_Type = VariableType::Number;
-		);
-		_N(TypeString,
-			_Type = VariableType::String;
-		);
-		_N(TypeArray,
-			_Type = VariableType::Array;
-		);
-		_N(TypeFunction,
-			_Type = VariableType::Function;
-		);
-		_N(AnyType,
-			_Type = VariableType::Undefined;
-		);
-		_N(Typename,
-			_Type = VariableType::Object;
-		);
+	case Token::TypeNumber: {
+		_Type = VariableType::Number;
+	}break;
+	case Token::TypeString: {
+		_Type = VariableType::String;
+	}break;
+	case Token::TypeArray: {
+		_Type = VariableType::Array;
+	}break;
+	case Token::TypeFunction: {
+		_Type = VariableType::Function;
+	}break;
+	case Token::AnyType: {
+		_Type = VariableType::Undefined;
+	}break;
+	case Token::Typename: {
+		_Type = VariableType::Object;
+	}break;
 
-		_N(Number, {
+	case Token::Number: { {
 			_Op(LoadNumber);
 			auto res = f->numberTable.emplace(std::get<double>(n->data));
 			uint16 idx = (uint16)std::distance(f->numberTable.begin(), res.first);
 			_In16 = idx;
 			_Out;
 			_Type = VariableType::Number;
-			}
-		);
+		}
+	}break;
 
-		_N(Literal, {
+	case Token::Literal: { {
 			_Op(LoadString);
 			auto res = stringList.emplace(std::get<std::string>(n->data));
 			uint16 idx = (uint16)std::distance(stringList.begin(), res.first);
 			_In16 = idx;
 			_Out;
 			_Type = VariableType::String;
-			}
-		);
+		}
+	}break;
 
-		_N(Array,
-			{
-				_Op(PushArray);
-				_In16 = n->children.size();
-				_Out;
-			}
-			for (auto& c : n->children) {
-				Walk(c);
-				_Op(PushIndex);
-				instruction.target = n->regTarget;
-				_In8 = c->regTarget;
-			}
-			_FreeChildren;
-			_Type = VariableType::Array;
-		);
+	case Token::Array: {
+		{
+			_Op(PushArray);
+			_In16 = n->children.size();
+			_Out;
+		}
+		for (auto& c : n->children) {
+			Walk(c);
+			_Op(PushIndex);
+			instruction.target = n->regTarget;
+			_In8 = c->regTarget;
+			_FreeConstant(c);
+		}
+		_FreeChildren;
+		_Type = VariableType::Array;
+	}break;
 
-		_N(Indexer,
-			_Walk;
-			_Op(LoadIndex);
+	case Token::Indexer: {
+		_Walk;
+		_Op(LoadIndex);
+		//n->sym = _First()->sym;
+		_In8 = _First()->regTarget;
+		_In8_2 = _Last()->regTarget;
+		//_FreeConstant(_Last());
+		_Out;
+	}break;
+
+	case Token::True: {
+		_Op(PushBoolean);
+		_Out;
+		_In8 = 1;
+		_Type = VariableType::Boolean;
+	}break;
+	case Token::False: {
+		_Op(PushBoolean);
+		_Out;
+		_In8 = 0;
+		_Type = VariableType::Boolean;
+	}break;
+
+	case Token::Add: {
+		_Walk;
+		_Op(NumAdd);
+		switch (_First()->varType)
+		{
+			_Operator(Number, NumAdd, Add)
+			_Operator(String, StrAdd, Add)
+		default:
+			_Type = VariableType::Undefined;
+			instruction.code = OpCodes::Add;
 			_In8 = _First()->regTarget;
 			_In8_2 = _Last()->regTarget;
 			_FreeChildren;
-			_Out;
-		);
+			break;
+		}
+		_OperatorAssign;
+	}break;
+	case Token::Sub: {
+		_Walk;
+		_Op(NumAdd);
+		switch (_First()->varType)
+		{
+			_Operator(Number, NumSub, Sub);
+		default:
+			_Type = VariableType::Undefined;
+			instruction.code = OpCodes::Sub;
+			_In8 = _First()->regTarget;
+			_In8_2 = _Last()->regTarget;
+			_FreeChildren;
+			break;
+		}
+		_OperatorAssign;
 
-		_N(True,
-			_Op(PushBoolean);
-			_Out;
-			_In8 = 1;
-			_Type = VariableType::Boolean;
-		);
-		_N(False,
-			_Op(PushBoolean);
-			_Out;
-			_In8 = 0;
-			_Type = VariableType::Boolean;
-		);
+	}break;
+	case Token::Div: {
+		_Walk;
+		_Op(NumAdd);
+		switch (_First()->varType)
+		{
+			_Operator(Number, NumDiv, Div);
+		default:
+			_Type = VariableType::Undefined;
+			instruction.code = OpCodes::Div;
+			_In8 = _First()->regTarget;
+			_In8_2 = _Last()->regTarget;
+			_FreeChildren;
+			break;
+		}
+		_OperatorAssign;
 
-		_N(Add, 
-			_Walk; 
-			_Op(NumAdd);
-			switch (_First()->varType)
-			{
-			_Operator(Number, NumAdd, Add)
-			_Operator(String, StrAdd, Add)
-			default:
-				_Type = VariableType::Undefined;
-				instruction.code = OpCodes::Add;
-				_In8 = _First()->regTarget;
-				_In8_2 = _Last()->regTarget;
-				_FreeChildren;
-				break;
-			}
-			_OperatorAssign;
-		);
-		_N(Sub,
-			_Walk;
-			_Op(NumAdd);
-			switch (_First()->varType)
-			{
-				_Operator(Number, NumSub, Sub);
-			default:
-				_Type = VariableType::Undefined;
-				instruction.code = OpCodes::Sub;
-				_In8 = _First()->regTarget;
-				_In8_2 = _Last()->regTarget;
-				_FreeChildren;
-				break;
-				break;
-			}
-			_OperatorAssign;
+	}break;
+	case Token::Mult: {
+		_Walk;
+		_Op(NumAdd);
+		switch (_First()->varType)
+		{
+			_Operator(Number, NumMul, Mul);
+		default:
+			_Type = VariableType::Undefined;
+			instruction.code = OpCodes::Mul;
+			_In8 = _First()->regTarget;
+			_In8_2 = _Last()->regTarget;
+			_FreeChildren;
+			break;
+		}
+		_OperatorAssign;
 
-		);
-		_N(Div,
-			_Walk;
-			_Op(NumAdd);
-			switch (_First()->varType)
-			{
-				_Operator(Number, NumDiv, Div);
-			default:
-				_Type = VariableType::Undefined;
-				instruction.code = OpCodes::Div;
-				_In8 = _First()->regTarget;
-				_In8_2 = _Last()->regTarget;
-				_FreeChildren;
-				break;
-				break;
-			}
-			_OperatorAssign;
+	}break;
 
-		);
-		_N(Mult,
-			_Walk;
-			_Op(NumAdd);
-			switch (_First()->varType)
-			{
-				_Operator(Number, NumMul, Mul);
-			default:
-				_Type = VariableType::Undefined;
-				instruction.code = OpCodes::Mul;
-				_In8 = _First()->regTarget;
-				_In8_2 = _Last()->regTarget;
-				_FreeChildren;
-				break;
-				break;
-			}
-			_OperatorAssign;
+	case Token::AssignAdd: {
+		n->type = Token::Add;
+		Walk(n);
+		_Last() = n;
+		n->type = Token::Assign;
+		goto assign;
+	} break;
+	case Token::AssignSub: {
+		n->type = Token::Sub;
+		Walk(n);
+		_Last() = n;
+		n->type = Token::Assign;
+		goto assign;
+	} break;
+	case Token::AssignDiv: {
+		n->type = Token::Div;
+		Walk(n);
+		_Last() = n;
+		n->type = Token::Assign;
+		goto assign;
+	} break;
+	case Token::AssignMult: {
+		n->type = Token::Mult;
+		Walk(n);
+		_Last() = n;
+		n->type = Token::Assign;
+		goto assign;
+	} break;
 
-		);
-
-		_N(Id,
-			_Walk;
-			bool isNameSpace;
-			Symbol* symbol = nullptr;
-			if (n->children.size() != 1) {
-				symbol = findSymbol(std::get<std::string>(n->data), "", isNameSpace);
-			}
-			else {
+	case Token::Id: {
+		_Walk;
+		bool isNameSpace = false;
+		Symbol* symbol = nullptr;
+		if (n->children.size() != 1) {
+			symbol = findSymbol(std::get<std::string>(n->data), "", isNameSpace);
+		}
+		else {
+			if (_First()->sym && _First()->sym->type == SymbolType::Namespace) {
 				symbol = findSymbol(std::get<std::string>(n->data), std::get<std::string>(_First()->data), isNameSpace);
 			}
-			if (symbol) {
-				if (symbol->needsLoading) {
-					auto name = getFullId(n);
-					auto it = std::find(currentFunction->globalTableSymbols.begin(), currentFunction->globalTableSymbols.end(), name);
-					size_t index = 0;
+			else {
+				// @todo: This is object
+				_Error("Objects not supported yet");
+			}
+		}
+		if (symbol) {
+			if (symbol->needsLoading) {
+				auto name = getFullId(n);
+				auto it = std::find(currentFunction->globalTableSymbols.begin(), currentFunction->globalTableSymbols.end(), name);
+				size_t index = 0;
 
-					if (it != currentFunction->globalTableSymbols.end()) {
-						index = it - currentFunction->globalTableSymbols.begin();
-					}
-					else {
-						currentFunction->globalTableSymbols.push_back(name);
-						currentFunction->globalTable.push_back(nullptr);
-					}
-
-					_Op(LoadSymbol);
-					_Type = symbol->varType;
-					_In16 = index;
-					_Out;
-					break;
+				if (it != currentFunction->globalTableSymbols.end()) {
+					index = it - currentFunction->globalTableSymbols.begin();
 				}
 				else {
-					n->regTarget = symbol->reg;
-					symbol->endLife = instructionList.size();
+					currentFunction->globalTableSymbols.push_back(name);
+					currentFunction->globalTable.push_back(nullptr);
 				}
-				_Type = symbol->varType;
-				n->sym = symbol;
+
+				_Op(LoadSymbol);
+				_In16 = index;
+				_Out;
 			}
-			else if (isNameSpace) {
-				
+			else {
+				n->regTarget = symbol->reg;
+				symbol->endLife = instructionList.size();
 			}
-			else { // @todo: fix this, symbols might be loaded later
-				_Error("Symbol not defined: " << std::get<std::string>(n->data));
+			_Type = symbol->varType;
+			n->sym = symbol;
+		}
+		else { // @todo: fix this, symbols might be loaded later
+			_Error("Symbol not defined: " << std::get<std::string>(n->data));
+			HasError = true;
+		}
+	}break;
+
+	case Token::Negate: { // @todo: Maybe own instruction
+		auto& var = _First()->varType;
+		if (var != VariableType::Number && var != VariableType::Undefined) {
+			_Error("Cannot negate non number types");
+		}
+		auto& load = instructionList.emplace_back();
+		load.code = OpCodes::LoadNumber;
+		auto res = f->numberTable.emplace(0.0);
+		uint16 idx = (uint16)std::distance(f->numberTable.begin(), res.first);
+		load.target = getFirstFree();
+		load.param = idx;
+
+		_Op(NumSub);
+		_Walk;
+		_In8 = load.target;
+		_In8_2 = _First()->regTarget;
+		_FreeChildren; // @todo: Can we do that??
+		freeReg(load.target);
+		_Out;
+		_Type = VariableType::Number;
+	}break;
+
+	case Token::Not: { // @todo: Maybe own instruction
+		_Op(Not);
+		_Walk;
+		_In8 = _First()->regTarget;
+		_FreeChildren; // @todo: Can we do that??
+		_Out;
+		_Type = VariableType::Boolean;
+	}break;
+
+	case Token::Less: {
+		_Compare(Less)
+	}break;
+
+	case Token::LessEqual: {
+		_Compare(LessEqual)
+	}break;
+
+	case Token::Larger: {
+		_Compare(Greater)
+	}break;
+
+	case Token::LargerEqual: {
+		_Compare(GreaterEqual)
+	}break;
+
+	case Token::Equal: {
+		_Compare(Equal)
+	}break;
+
+	case Token::NotEqual: {
+		_Compare(NotEqual)
+	}break;
+
+	case Token::Decrement:
+	case Token::Increment: {
+		_Walk;
+		if (_First()->varType != VariableType::Number) {
+			_Error("Cannot increment");
+		}
+		_Op(PostMod);
+		_In8 = _First()->regTarget;
+		_In8_2 = n->type == Token::Increment ? 0 : 1;
+		_FreeChildren;
+		_Out;
+	}break;
+
+	case Token::PreDecrement:
+	case Token::PreIncrement: {
+		_Walk;
+		if (_First()->varType != VariableType::Number) {
+			_Error("Cannot increment");
+		}
+		_Op(PreMod);
+		_In8 = _First()->regTarget;
+		_In8_2 = n->type == Token::PreIncrement ? 0 : 1;
+		n->regTarget = instruction.target = _First()->regTarget;
+	}break;
+
+	case Token::Assign: {
+		if (n->children.size() != 2) break;
+		_Walk;
+		assign:
+		auto& lhs = _First();
+		auto& rhs = _Last();
+		if (lhs->sym && !isAssignable(lhs->sym->flags)) {
+			_Error("Trying to assign to unassignable type");
+			HasError = true;
+		}
+		if (rhs->varType != VariableType::Undefined && lhs->varType != rhs->varType && lhs->sym) {
+			if (isTyped(lhs->sym->flags) || lhs->data.index() != 0) {
+				_Error("Trying to assign unrelated types");
 				HasError = true;
 			}
-		);
-
-		_N(Negate, // @todo: Maybe own instruction
-			auto& var = _First()->varType;
-			if (var != VariableType::Number && var != VariableType::Undefined) {
-				_Error("Cannot negate non number types");
+			else if (lhs->varType == VariableType::Undefined) { // @todo: something else here, lhs might not be symbol
+				lhs->sym->varType = _Type = lhs->varType = rhs->varType;
 			}
-			auto& load = instructionList.emplace_back(); 
-			load.code = OpCodes::LoadNumber;
-			auto res = f->numberTable.emplace(0.0);
-			uint16 idx = (uint16)std::distance(f->numberTable.begin(), res.first);
-			load.target = getFirstFree();
-			load.param = idx;
+		}
+		_FreeConstant(rhs);
+		if (IsConstant(rhs->type) || IsOperator(rhs->type)) {
+			n->regTarget = _SetOut(rhs) = lhs->regTarget;
+		}
+		else {
+			_Op(Copy);
+			_In8 = rhs->regTarget;
+			n->regTarget = instruction.target = lhs->regTarget;
+		}
+		if (instructionList[lhs->instruction].code == OpCodes::LoadSymbol) {
+			_Op(StoreSymbol);
+			_In16 = instructionList[lhs->instruction].param;
+			n->regTarget = instruction.target = lhs->regTarget;
+			instructionList[lhs->instruction].data = 0;
+		}
+		else if (instructionList[lhs->instruction].code == OpCodes::LoadIndex) {
+			_Op(StoreIndex);
+			_In8 = instructionList[lhs->instruction].in1;
+			_In8_2 = instructionList[lhs->instruction].in2;
+			n->regTarget = instruction.target = lhs->regTarget;
+			instructionList[lhs->instruction].data = 0;
+		}
+	}break;
 
-			_Op(NumSub);
+	case Token::VarDeclare: {
+		auto sym = currentScope->addSymbol(std::get<std::string>(n->data));
+		sym->startLife = instructionList.size();
+		sym->endLife = instructionList.size();
+		sym->setType(SymbolType::Variable);
+		sym->resolved = true;
+		sym->needsLoading = false;
+		if (n->children.size() > 0) {
 			_Walk;
-			_In8 = load.target;
-			_In8_2 = _First()->regTarget;
-			_FreeChildren; // @todo: Can we do that??
-			freeReg(load.target);
-			_Out;
-			_Type = VariableType::Number;
-		);
-
-		_N(Not, // @todo: Maybe own instruction
-			_Op(Not);
-			_Walk;
-			_In8 = _First()->regTarget;
-			_FreeChildren; // @todo: Can we do that??
-			_Out;
-			_Type = VariableType::Boolean;
-		);
-
-		_N(Less,
-			_Compare(Less)
-		);
-
-		_N(LessEqual,
-			_Compare(LessEqual)
-		);
-
-		_N(Larger,
-			_Compare(Greater)
-		);
-
-		_N(LargerEqual,
-			_Compare(GreaterEqual)
-		);
-
-		_N(Equal,
-			_Compare(Equal)
-		);
-
-		_N(NotEqual,
-			_Compare(NotEqual)
-		);
-
-		case Token::Decrement:
-		_N(Increment,
-			_Walk;
-			if (_First()->varType != VariableType::Number) {
-				_Error("Cannot increment");
+			sym->varType = _Type = _First()->varType; // @todo: types for user defined objects;
+			if (sym->varType != VariableType::Undefined) {
+				sym->flags = sym->flags | SymbolFlags::Typed;
 			}
-			_Op(PostMod);
-			_In8 = _First()->regTarget;
-			_In8_2 = n->type == Token::Increment ? 0 : 1;
-			_FreeChildren;
-			_Out;
-		);
-
-		case Token::PreDecrement:
-		_N(PreIncrement,
-			_Walk;
-			if (_First()->varType != VariableType::Number) {
-				_Error("Cannot increment");
-			}
-			_Op(PreMod);
-			_In8 = _First()->regTarget;
-			_In8_2 = n->type == Token::PreIncrement ? 0 : 1;
-			n->regTarget = instruction.target = _First()->regTarget;
-		);
-
-		_N(Assign,
-			if (n->children.size() != 2) break;
-			_Walk;
-			auto& lhs = _First();
-			auto& rhs = _Last();
-			if (!lhs->sym || !isAssignable(lhs->sym->flags)) {
-				_Error("Trying to assign to unassignable type");
-				HasError = true;
-			}
-			if (rhs->varType != VariableType::Undefined && lhs->varType != rhs->varType && lhs->sym) {
-				if (isTyped(lhs->sym->flags) || lhs->data.index() != 0) {
-					_Error("Trying to assign unrelated types");
-					HasError = true;
+			if (n->children.size() == 2) {
+				if (_Last()->varType == _Type || _Type == VariableType::Undefined) {
+					sym->varType = _Type = _Last()->varType;
+					auto type = _Last()->type;
+					if (IsConstant(type) || IsOperator(type)) {
+						sym->reg = n->regTarget = _Last()->regTarget;
+					}
+					else {
+						_Op(Copy);
+						_In8 = _Last()->regTarget;
+						sym->reg = _Out;
+					}
+					break;
 				}
-				else { // @todo: something else here, lhs might not be symbol
-					lhs->sym->varType = _Type = lhs->varType = rhs->varType;
-				}
+				_Error("Cannot assign unrelated types");
 			}
-			_FreeConstant(rhs);
-			if (IsConstant(rhs->type) || IsOperator(rhs->type)) {
-				n->regTarget = _SetOut(rhs) = lhs->regTarget;
+		}
+		_Op(PushTypeDefault);
+		_In16 = (uint16)sym->varType;
+		sym->reg = _Out;
+	}break;
+
+	case Token::Return: {
+		_Walk;
+		_Op(Return);
+		if (!n->children.empty()) {
+			instruction.target = _First()->regTarget;
+			_In8 = 1;
+		}
+	}break;
+
+	case Token::If: {
+		if (n->children.size() != 3) {
+			_Error("Incorrect if-block");
+		}
+
+		auto& next = currentScope->children.emplace_back();
+		next.parent = currentScope;
+		currentScope = &next;
+		auto regs = registers;
+		Walk(_First());
+		_Op(JumpNeg);
+		n->regTarget = instruction.target = _First()->regTarget;
+		_FreeConstant(n);
+
+		auto oldSize = instructionList.size();
+		auto it = ++n->children.begin();
+		Walk(*it);
+		_FreeConstant((*it));
+
+		auto& elseinst = instructionList.emplace_back();
+		elseinst.code = OpCodes::JumpForward;
+
+		_In16 = instructionList.size() - oldSize;
+		oldSize = instructionList.size();
+
+		Walk(_Last());
+		_FreeConstant(_Last());
+
+		elseinst.param = instructionList.size() - oldSize;
+
+		currentScope = currentScope->parent;
+		registers = regs;
+	}break;
+
+	case Token::For: { // @todo: Add else block for loops
+		if (n->children.size() != 4) {
+			_Error("Incorrect for-block");
+		}
+
+		auto& next = currentScope->children.emplace_back();
+		next.parent = currentScope;
+		currentScope = &next;
+		auto regs = registers;
+		Walk(_First());
+
+		auto start = instructionList.size();
+		auto it = ++n->children.begin();
+		Walk(*it);
+		_FreeConstant((*it));
+
+		_Op(JumpNeg);
+		n->regTarget = instruction.target = (*it)->regTarget;
+		auto jumpStart = instructionList.size();
+
+		Walk(_Last());
+		_FreeConstant((*it));
+
+		it++;
+		Walk(*it);
+		_FreeConstant((*it));
+
+		auto& elseinst = instructionList.emplace_back();
+		elseinst.code = OpCodes::JumpBackward;
+		elseinst.param = instructionList.size() - start;
+
+		_In16 = instructionList.size() - jumpStart;
+
+		currentScope = currentScope->parent;
+		registers = regs;
+	}break;
+
+	case Token::While: {
+		if (n->children.size() != 2) {
+			_Error("Incorrect while-block");
+		}
+
+		auto& next = currentScope->children.emplace_back();
+		next.parent = currentScope;
+		currentScope = &next;
+		auto regs = registers;
+
+		auto start = instructionList.size();
+		Walk(_First());
+		_Op(JumpNeg);
+		auto jumpStart = instructionList.size();
+		n->regTarget = instruction.target = _First()->regTarget;
+
+		auto it = ++n->children.begin();
+		Walk(*it);
+		_FreeConstant((*it));
+
+		auto& elseinst = instructionList.emplace_back();
+		elseinst.code = OpCodes::JumpBackward;
+		elseinst.param = instructionList.size() - start;
+
+		_In16 = instructionList.size() - jumpStart;
+
+		currentScope = currentScope->parent;
+		registers = regs;
+	}break;
+
+	case Token::Else: {
+		_Walk;
+	}break;
+
+	case Token::FunctionCall: {
+
+		Walk(_First());
+		if (!_First()->sym || _First()->sym->type != SymbolType::Function) {
+			_Error("Variable functions not supported yet"); // @todo: Add support
+		}
+		auto name = getFullId(_First());
+
+		auto& params = _Last();
+		for (auto& c : params->children) {
+			Walk(c);
+			if (IsConstant(c->type) || IsOperator(c->type)) {
+				freeReg(c->regTarget);
+				c->regTarget = getLastFree();
 			}
 			else {
 				_Op(Copy);
-				_In8 = rhs->regTarget;
-				n->regTarget = instruction.target = lhs->regTarget;
+				instruction.target = getLastFree();
+				_In8 = c->regTarget;
+				c->regTarget = instruction.target;
 			}
-		);
+		}
 
-		_N(VarDeclare,
-			auto sym = currentScope->addSymbol(std::get<std::string>(n->data));
-			sym->startLife = instructionList.size();
-			sym->endLife = instructionList.size();
-			sym->setType(SymbolType::Variable);
-			sym->resolved = true;
-			if (n->children.size() > 0) {
-				_Walk;
-				sym->varType = _Type = _First()->varType; // @todo: types for user defined objects;
-				if (sym->varType != VariableType::Undefined) {
-					sym->flags = sym->flags | SymbolFlags::Typed;
-				}
-				if (n->children.size() == 2) {
-					if (_Last()->varType == _Type || _Type == VariableType::Undefined) {
-						sym->varType = _Type = _Last()->varType;
-						auto type = _Last()->type;
-						if (IsConstant(type) || IsOperator(type)) {
-							sym->reg = n->regTarget = _Last()->regTarget;
-						}
-						else {
-							_Op(Copy);
-							_In8 = _Last()->regTarget;
-							sym->reg = _Out;
-						}
-						break;
-					}
-					_Error("Cannot assign unrelated types");
-				}
-			}
-			_Op(PushTypeDefault);
-			_In16 = (uint16)sym->varType;
-			sym->reg = _Out;
-		);
+		for (auto& c : params->children) {
+			freeReg(c->regTarget);
+		}
 
-		_N(Return,
-			_Walk;
-			_Op(Return);
-			if (!n->children.empty()) {
-				instruction.target = _First()->regTarget;
-				_In8 = 1;
-			}
-		);
+		auto it = std::find(currentFunction->functionTableSymbols.begin(), currentFunction->functionTableSymbols.end(), name);
+		size_t index = 0;
 
-		_N(If,
-			if (n->children.size() != 3) {
-				_Error("Incorrect if-block");
-			}
+		if (it != currentFunction->functionTableSymbols.end()) {
+			index = it - currentFunction->functionTableSymbols.begin();
+		}
+		else {
+			currentFunction->functionTableSymbols.push_back(name);
+			currentFunction->functionTable.push_back(nullptr);
+		}
 
-			auto& next = currentScope->children.emplace_back();
-			next.parent = currentScope;
-			currentScope = &next;
-			auto regs = registers;
-			Walk(_First());
-			_Op(JumpNeg);
-			n->regTarget = instruction.target = _First()->regTarget;
-			_FreeConstant(n);
-
-			auto oldSize = instructionList.size();
-			auto it = ++n->children.begin();
-			Walk(*it);
-			_FreeConstant((*it));
-
-			auto& elseinst = instructionList.emplace_back(); 
-			elseinst.code = OpCodes::JumpForward;
-			
-			_In16 = instructionList.size() - oldSize;
-			oldSize = instructionList.size();
-
-			Walk(_Last());
-			_FreeConstant(_Last());
-
-			elseinst.param = instructionList.size() - oldSize;
-
-			currentScope = currentScope->parent;
-			registers = regs;
-			);
-
-		_N(For, // @todo: Add else block for loops
-			if (n->children.size() != 4) {
-				_Error("Incorrect for-block");
-			}
-
-			auto& next = currentScope->children.emplace_back();
-			next.parent = currentScope;
-			currentScope = &next;
-			auto regs = registers;
-			Walk(_First());
-
-			auto start = instructionList.size();
-			auto it = ++n->children.begin();
-			Walk(*it);
-			_FreeConstant((*it));
-
-			_Op(JumpNeg);
-			n->regTarget = instruction.target = (*it)->regTarget;
-			auto jumpStart = instructionList.size();
-
-			Walk(_Last());
-			_FreeConstant((*it));
-
-			it++;
-			Walk(*it);
-			_FreeConstant((*it));
-
-			auto& elseinst = instructionList.emplace_back();
-			elseinst.code = OpCodes::JumpBackward;
-			elseinst.param = instructionList.size() - start;
-
-			_In16 = instructionList.size() - jumpStart;
-
-			currentScope = currentScope->parent;
-			registers = regs;
-			);
-
-		_N(While,
-			if (n->children.size() != 2) {
-				_Error("Incorrect while-block");
-			}
-
-			auto& next = currentScope->children.emplace_back();
-			next.parent = currentScope;
-			currentScope = &next;
-			auto regs = registers;
-
-			auto start = instructionList.size();
-			Walk(_First());
-			_Op(JumpNeg);
-			auto jumpStart = instructionList.size();
-			n->regTarget = instruction.target = _First()->regTarget;
-
-			auto it = ++n->children.begin();
-			Walk(*it);
-			_FreeConstant((*it));
-
-			auto& elseinst = instructionList.emplace_back();
-			elseinst.code = OpCodes::JumpBackward;
-			elseinst.param = instructionList.size() - start;
-			
-			_In16 = instructionList.size() - jumpStart;
-
-			currentScope = currentScope->parent;
-			registers = regs;
-			);
-
-		_N(Else,
-			_Walk;
-		);
-
-		_N(FunctionCall,
-
-			Walk(_First());
-			if (!_First()->sym || _First()->sym->type != SymbolType::Function) {
-				_Error("Variable functions not supported yet"); // @todo: Add support
-			}
-			auto name = getFullId(_First());
-
-			auto& params = _Last();
-			for (auto& c : params->children) {
-				Walk(c);
-				if (IsConstant(c->type) || IsOperator(c->type)) {
-					freeReg(c->regTarget);
-					c->regTarget = getLastFree();
-				}
-				else {
-					_Op(Copy);
-					instruction.target = getLastFree();
-					_In8 = c->regTarget;
-					c->regTarget = instruction.target;
-				}
-			}
-
-			for (auto& c : params->children) {
-				freeReg(c->regTarget);
-			}
-
-			auto it = std::find(currentFunction->functionTableSymbols.begin(), currentFunction->functionTableSymbols.end(), name);
-			size_t index = 0;
-
-			if (it != currentFunction->functionTableSymbols.end()) {
-				index = it - currentFunction->functionTableSymbols.begin();
-			}
-			else {
-				currentFunction->functionTableSymbols.push_back(name);
-				currentFunction->functionTable.push_back(nullptr);
-			}
-
-			_Op(CallFunction);
-			_In8 = (uint8)index;
-			if (params->children.size() != 0) {
-				_In8_2 = (uint8)params->children.front()->regTarget;
-			}
-			_Out;
-		);
+		_Op(CallFunction);
+		_In8 = (uint8)index;
+		if (params->children.size() != 0) {
+			_In8_2 = (uint8)params->children.front()->regTarget;
+		}
+		_Out;
+	}break;
 
 	default:
 		_Error("Unexpected token found");
@@ -1199,11 +1279,11 @@ void ASTWalker::Walk(Node* n)
 
 Symbol* ASTWalker::findSymbol(const std::string& name, const std::string& space, bool& isNamespace)
 {
+	if (auto it = namespaces.find(name); it != namespaces.end()) {
+		isNamespace = true;
+		return it->second.Sym;
+	}
 	if (space.size() == 0) {
-		if (namespaces.find(name) != namespaces.end()) {
-			isNamespace = true;
-			return nullptr;
-		}
 		if (auto s = currentNamespace->findSymbol(name); s != nullptr) return s;
 		if (auto s = namespaces["Global"].findSymbol(name); s != nullptr) return s;
 		if (auto s = vm->FindSymbol(name, currentNamespace->Name, isNamespace); s != nullptr) return s;
@@ -1211,10 +1291,6 @@ Symbol* ASTWalker::findSymbol(const std::string& name, const std::string& space,
 		return nullptr;
 	}
 	else {
-		if (namespaces.find(name) != namespaces.end()) {
-			isNamespace = true;
-			return nullptr;
-		}
 		if (auto it = namespaces.find(space); it != namespaces.end()) {
 			if (auto s = it->second.findSymbol(name); s != nullptr) return s;
 			if (auto s = vm->FindSymbol(name, space, isNamespace); s != nullptr) return s;
@@ -1246,7 +1322,8 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 			for (auto& stmt : c->children) {
 				try {
 					Walk(stmt);
-					if (IsConstant(stmt->type) || IsOperator(stmt->type)) freeReg(stmt->regTarget);
+					if (IsConstant(stmt->type) || IsOperator(stmt->type) || (stmt->sym && stmt->sym->needsLoading)) 
+						freeReg(stmt->regTarget);;
 				}
 				catch (...) {
 					gError() << "Internal error occured!\n";
@@ -1268,7 +1345,6 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 		f->Bytecode[i] = instructionList[i].data;
 	}
 
-	String::GetAllocator();
 	f->stringTable.reserve(stringList.size());
 	for (auto& str : stringList) {
 		f->stringTable.emplace_back(String::GetAllocator()->Make(str.c_str()));

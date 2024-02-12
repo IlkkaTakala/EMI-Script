@@ -16,7 +16,8 @@ public:
 	{}
 	~Node() {
 		for (auto& c : children) {
-			delete c;
+			if (c != this)
+				delete c;
 		}
 	}
 	Token type = Token::None;

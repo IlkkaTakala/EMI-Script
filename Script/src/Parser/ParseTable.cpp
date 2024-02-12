@@ -3,6 +3,10 @@
 #include <stack>
 #include <filesystem>
 
+/*
+	Translated and optimized to C++ from https://jsmachines.sourceforge.net/machines/lalr1.html
+*/
+
 bool IsTerminal(Token token) {
 	return token < Token::Start && token > Token::None;
 }

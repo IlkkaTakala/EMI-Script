@@ -147,9 +147,9 @@ InternalValue VM::GetReturnValue(size_t index)
 
 Symbol* VM::FindSymbol(const std::string& name, const std::string& space, bool& isNamespace)
 {
-	if (Namespaces.find(name) != Namespaces.end()) {
+	if (auto it = Namespaces.find(name); it != Namespaces.end()) {
 		isNamespace = true;
-		return nullptr;
+		return it->second.Sym;
 	}
 	isNamespace = false;
 	if (auto it = Namespaces.find(space); it != Namespaces.end()) {
@@ -183,7 +183,7 @@ void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std:
 		}
 		for (auto& [vname, var] : s.variables) {
 			Units[path].variables.push_back({ name, vname });
-			GlobalVariables.emplace(vname, var);
+			GlobalVariables.emplace(name + '.' + vname, var);
 		}
 
 		if (auto it = Namespaces.find(name); it != Namespaces.end()) {
@@ -344,6 +344,28 @@ void Runner::operator()()
 
 				} goto start;
 
+				TARGET(StoreSymbol) {
+					auto& var = current->FunctionPtr->globalTable[byte.param];
+					if (var == nullptr) {
+						auto& name = current->FunctionPtr->globalTableSymbols[byte.param];
+						if (auto idx = Owner->GlobalVariables.find(name); idx != Owner->GlobalVariables.end()) {
+							var = &idx->second;
+						}
+						else {
+							std::string varname = current->FunctionPtr->Namespace + "." + name;
+							if (idx = Owner->GlobalVariables.find(varname); idx != Owner->GlobalVariables.end()) {
+								var = &idx->second;
+							}
+							else {
+								gWarn() << "Variable does not exist: " << varname << "\n";
+								goto start;
+							}
+						}
+					}
+
+					*var = Registers[byte.target];
+				} goto start;
+
 				TARGET(Return) {
 					Variable val;
 					if (byte.in1 == 1) {
@@ -399,8 +421,8 @@ void Runner::operator()()
 
 					for (int i = 1; i < fn->Types.size(); i++) {
 						if ((fn->Types[i] != VariableType::Undefined 
-							&& fn->Types[i] != Registers[byte.in2].getType())
-							&& Registers[byte.in2].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
+							&& fn->Types[i] != Registers[byte.in2 + (i - 1)].getType())
+							&& Registers[byte.in2 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
 
 							gWarn() << "Invalid argument types\n";
 							goto start;
@@ -445,18 +467,25 @@ void Runner::operator()()
 				} goto start;
 				
 				TARGET(StoreIndex) {
-					if (Registers[byte.target].getType() == VariableType::Array) {
-						auto& arr = Registers[byte.target].as<Array>()->data();
+					if (Registers[byte.in1].getType() == VariableType::Array) {
+						auto& arr = Registers[byte.in1].as<Array>()->data();
 						size_t idx = static_cast<size_t>(toNumber(Registers[byte.in2]));
-						if (arr.size() > idx) {
-							arr[idx] = Registers[byte.in1];
+						if (arr.size() < idx) {
+							arr.resize(idx + 1);
 						}
+						arr[idx] = Registers[byte.target];
+					}
+					else {
+						gWarn() << "Indexing target is not array\n";
 					}
 				} goto start;
 
 				TARGET(LoadIndex) {
 					if (Registers[byte.in1].getType() == VariableType::Array) {
 						Registers[byte.target] = Registers[byte.in1].as<Array>()->data()[static_cast<size_t>(toNumber(Registers[byte.in2]))];
+					}
+					else {
+						gWarn() << "Indexing target is not array\n";
 					}
 				} goto start;
 

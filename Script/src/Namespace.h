@@ -7,6 +7,7 @@
 struct Namespace
 {
 	std::string Name;
+	Symbol* Sym = nullptr;
 	ankerl::unordered_dense::map<std::string, Function*> functions;
 	ankerl::unordered_dense::map<std::string, UserDefined> objects;
 	ankerl::unordered_dense::map<std::string, VariableType> objectTypes;
@@ -28,6 +29,10 @@ struct Namespace
 		rhs.objects.clear();
 		rhs.symbols.clear();
 		rhs.variables.clear();
+
+		delete Sym;
+		Sym = rhs.Sym;
+		rhs.Sym = nullptr;
 	}
 
 	inline void remove(Namespace& rhs) {
@@ -55,6 +60,7 @@ struct Namespace
 		for (auto& [name, f] : symbols) {
 			delete f;
 		}
+		delete Sym;
 	}
 	// @todo: check these
 	Namespace() = default;

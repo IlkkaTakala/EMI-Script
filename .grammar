@@ -222,10 +222,10 @@ None Pipe
 None None FunctionCall
 
 Assign Assign
-Assign Add
-Assign Sub
-Assign Div
-Assign Mult
+None AssignAdd
+None AssignSub
+None AssignDiv
+None AssignMult
 None None VarDeclare
 None None FunctionCall
 None None Indexer
