@@ -211,6 +211,14 @@ Token Lexer::Analyse(std::string_view& Data)
 					TOKEN(Error);
 				})
 
+			CASE('&',
+				Current.Advance();
+				if (*ptr == '&') {
+					TOKEN(And);
+				}
+				else TOKEN(Error);
+				)
+
 			CASE('#',
 				bool res = true;
 				while (*ptr != '\n' && res) res = Current.Advance();

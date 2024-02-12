@@ -50,10 +50,10 @@ Expr Expr Sub Expr
 Expr Expr Div Expr
 Expr Expr Mult Expr
 
-Expr Expr And Expr
-Expr Expr Or Expr
 Expr Expr NotEqual Expr
 Expr Expr Equal Expr
+Expr Expr And Expr
+Expr Expr Or Expr
 Expr Expr Less Expr
 Expr Expr Larger Expr
 Expr Expr Less Assign Expr
@@ -184,10 +184,10 @@ None Sub
 None Div 
 None Mult 
 
-None And 
-None Or 
 None NotEqual 
 None Equal 
+None And 
+None Or 
 None Less 
 None Larger 
 None LessEqual 

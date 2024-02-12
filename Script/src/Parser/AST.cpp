@@ -932,6 +932,7 @@ void ASTWalker::Walk(Node* n)
 					index = it - currentFunction->globalTableSymbols.begin();
 				}
 				else {
+					index = currentFunction->globalTableSymbols.size();
 					currentFunction->globalTableSymbols.push_back(name);
 					currentFunction->globalTable.push_back(nullptr);
 				}
@@ -1007,6 +1008,25 @@ void ASTWalker::Walk(Node* n)
 	case Token::NotEqual: {
 		_Compare(NotEqual)
 	}break;
+
+	case Token::And: {
+		_Walk;
+		_Type = VariableType::Boolean;
+		_Op(And);
+		_In8 = _First()->regTarget;
+		_In8_2 = _Last()->regTarget;
+		_FreeChildren;
+		_Out;
+	} break;
+	case Token::Or: {
+		_Walk;
+		_Type = VariableType::Boolean;
+		_Op(Or);
+		_In8 = _First()->regTarget;
+		_In8_2 = _Last()->regTarget;
+		_FreeChildren;
+		_Out;
+	} break;
 
 	case Token::Decrement:
 	case Token::Increment: {

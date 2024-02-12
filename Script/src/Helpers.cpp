@@ -99,7 +99,9 @@ bool equal(const Variable& lhs, const Variable& rhs)
 	if (lhs.getType() != rhs.getType()) return false;
 	switch (lhs.getType())
 	{
-	case VariableType::String: return strcmp(lhs.as<String>()->data(), toString(rhs)->data()) == 0;
+	case VariableType::String: return strcmp(lhs.as<String>()->data(), rhs.as<String>()->data()) == 0;
+	case VariableType::Number: return abs(lhs.as<double>() - rhs.as<double>()) <= 0.00001;
+	case VariableType::Boolean: return lhs.as<bool>() == rhs.as<bool>();
 	default:
 		return lhs.operator==(rhs);
 		break;

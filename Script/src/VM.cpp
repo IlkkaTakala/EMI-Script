@@ -557,6 +557,14 @@ void Runner::operator()()
 				TARGET(Not) {
 					Registers[byte.target] = !isTruthy(Registers[byte.in1]); // @todo: fix this
 				} goto start;
+				
+				TARGET(And) {
+					Registers[byte.target] = isTruthy(Registers[byte.in1]) && isTruthy(Registers[byte.in2]);
+				} goto start;
+				
+				TARGET(Or) {
+					Registers[byte.target] = isTruthy(Registers[byte.in1]) || isTruthy(Registers[byte.in2]);
+				} goto start;
 
 				TARGET(JumpEq) {
 					if (isTruthy(Registers[byte.target])) {

@@ -19,6 +19,10 @@ public def func(value : string) {
 	value += " " + test[2] + " ";
 	Storage.arrTest[3] = "otherText";
 	value += Storage.arrTest[3];
+	
+	if (Storage.variable == "Modified " && false) {
+		Storage.variable = "Not modified ";
+	}
 		
 	return String.addString(value);
 }
