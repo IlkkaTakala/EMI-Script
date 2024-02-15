@@ -7,9 +7,16 @@ using namespace Eril;
 bool Eril::__internal_register(__internal_function* func)
 {
 	if (ValidHostFunctions().find((uint64_t)func) != ValidHostFunctions().end()) return false;
-	auto& space = HostFunctions()[func->space];
-	if (space.find(func->name) != space.end()) return false;
-	space[func->name] = func;
+	std::string name;
+	if (func->space) {
+		name = std::string(func->space) + "." + func->name;
+	}
+	else {
+		name = func->name;
+	}
+	auto& function = HostFunctions()[name];
+	if (function) return false;
+	function = func;
 	ValidHostFunctions().emplace((uint64_t)func);
 	return true;
 }
@@ -17,12 +24,17 @@ bool Eril::__internal_register(__internal_function* func)
 bool Eril::__internal_unregister(const char* space, const char* name)
 {
 	auto& f = HostFunctions();
-	if (auto it = f.find(space); it != f.end()) {
-		if (auto fun = it->second.find(name); fun != it->second.end()) {
-			ValidHostFunctions().erase((uint64_t)fun->second);
-			delete fun->second;
-			it->second.erase(fun);
-		}
+	std::string strname;
+	if (space) {
+		strname = std::string(space) + "." + name;
+	}
+	else {
+		strname = name;
+	}
+	if (auto it = f.find(strname); it != f.end()) {
+		ValidHostFunctions().erase((uint64_t)it->second);
+		delete it->second;
+		f.erase(it);
 	}
 	return false;
 }
@@ -30,10 +42,8 @@ bool Eril::__internal_unregister(const char* space, const char* name)
 CORE_API void Eril::UnregisterAllExternals()
 {
 	ValidHostFunctions().clear();
-	for (auto& space : HostFunctions()) {
-		for (auto& f : space.second) {
-			delete f.second;
-		}
+	for (auto& f : HostFunctions()) {
+		delete f.second;
 	}
 	HostFunctions().clear();
 }

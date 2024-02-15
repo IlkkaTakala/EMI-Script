@@ -1,5 +1,6 @@
 #include "Variable.h"
 #include "BaseObject.h"
+#include "Objects/StringObject.h"
 
 Variable::Variable(const Variable& rhs)
 {
@@ -42,6 +43,11 @@ Variable::~Variable()
 	value = NIL_VAL;
 }
 
+bool Variable::isString() const
+{
+	return isObject() && as<Object>()->Type == VariableType::String;
+}
+
 VariableType Variable::getType() const
 {
 	if (isUndefined()) return VariableType::Undefined;
@@ -49,6 +55,23 @@ VariableType Variable::getType() const
 	if (isBool()) return VariableType::Boolean;
 	if (isObject()) return as<Object>()->Type;
 	return VariableType::Undefined;
+}
+
+Variable::operator InternalValue() const
+{
+	switch (getType())
+	{
+	case VariableType::String: {
+		return as<String>()->data();
+	}
+	case VariableType::Number:
+		return as<double>();
+	case VariableType::Boolean:
+		return as<bool>();
+	default:
+		break;
+	}
+	return {};
 }
 
 Variable& Variable::operator=(const Variable& rhs)

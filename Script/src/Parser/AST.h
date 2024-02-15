@@ -38,13 +38,16 @@ public:
 };
 
 class VM;
-struct ASTWalker
+class ASTWalker
 {
+public:
 	ASTWalker(VM*, Node*);
 	~ASTWalker();
 	void Run();
+	bool HasError;
+	ankerl::unordered_dense::map<std::string, Namespace> namespaces;
+private:
 	void Walk(Node*);
-
 	Symbol* findSymbol(const std::string& name, const std::string& space, bool& isNamespace);
 
 	void handleFunction(Node* n, Function* f, Symbol* s);
@@ -52,9 +55,7 @@ struct ASTWalker
 	VM* vm;
 	Node* root;
 	Namespace* currentNamespace;
-	ankerl::unordered_dense::map<std::string, Namespace> namespaces;
 
-	bool HasError;
 	bool HasDebug;
 
 	// Function parsing
@@ -100,6 +101,7 @@ struct ASTWalker
 		registers[reg] = false;
 	}
 
+	void placeBreaks(Node* n, size_t start, size_t end);
 };
 
 void TypeConverter(Node* n, const TokenHolder& h);

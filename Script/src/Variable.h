@@ -2,6 +2,7 @@
 #define _VARIABLE_INC_GUARD_H_
 #pragma once
 #include <type_traits>
+#include "Eril/Value.h"
 /**
  
 Using NaN boxing 
@@ -10,16 +11,6 @@ https://craftinginterpreters.com/optimization.html#nan-boxing
 
 */
 
-#define SIGN_BIT		((uint64_t)0x8000000000000000)
-#define QNAN			((uint64_t)0x7ffc000000000000)
-#define TAG_NIL			1
-#define TAG_FALSE		2
-#define TAG_TRUE		3
-#define NIL_VAL			(uint64_t)(QNAN | TAG_NIL)
-#define FALSE_VAL		(uint64_t)(QNAN | TAG_FALSE)
-#define TRUE_VAL		(uint64_t)(QNAN | TAG_TRUE)
-#define BOOL_VAL(b)		((b) ? TRUE_VAL : FALSE_VAL)
-#define OBJ_VAL(obj)	(SIGN_BIT | QNAN | (uint64_t)(uintptr_t)(obj))
 #define OBJ_TYPE(obj)	(obj & 0xffff)
 
 enum class VariableType
@@ -72,6 +63,7 @@ public:
 	inline bool isObject() const {
 		return ((value) & (QNAN | SIGN_BIT)) == (QNAN | SIGN_BIT);
 	}
+	bool isString() const;
 
 	VariableType getType() const;
 
@@ -95,6 +87,8 @@ public:
 	bool operator==(const Variable& rhs) const {
 		return value == rhs.value;
 	}
+
+	operator InternalValue() const;
 
 	Variable& operator=(const Variable& rhs);
 	Variable& operator=(Variable&& rhs) noexcept;

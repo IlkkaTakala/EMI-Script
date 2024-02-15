@@ -11,6 +11,7 @@
 #include "Eril/Eril.hpp"
 #include "Variable.h"
 #include "Function.h"
+#include "Intrinsic.h"
 #include "Namespace.h"
 #include "Objects/UserObject.h"
 
@@ -83,7 +84,12 @@ private:
 };
 
 inline auto& HostFunctions() {
-	static ankerl::unordered_dense::map<std::string, ankerl::unordered_dense::map<std::string, __internal_function*>> f;
+	static ankerl::unordered_dense::map<std::string, __internal_function*> f;
+	return f;
+};
+
+inline auto& InternalFunctions() {
+	static ankerl::unordered_dense::map<std::string, IntrinsicPtr> f;
 	return f;
 };
 

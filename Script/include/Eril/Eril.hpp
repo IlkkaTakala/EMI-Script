@@ -134,9 +134,12 @@ namespace Eril
 		char* c = new char[name.length() + 1];
 		strcpy_s(c, name.length() + 1, name.c_str());
 		retval->name = c;
-		c = new char[space.length() + 1];
-		strcpy_s(c, space.length() + 1, space.c_str());
-		retval->space = c;
+		retval->space = nullptr;
+		if (space.length() > 0 && space != "Global") {
+			c = new char[space.length() + 1];
+			strcpy_s(c, space.length() + 1, space.c_str());
+			retval->space = c;
+		}
 		retval->arg_types = new ValueType[size]{type<Args>()...};
 		retval->arg_count = size;
 		retval->state = new std::decay_t<std::function<F(Args...)>>(std::forward<std::function<F(Args...)>>(f));

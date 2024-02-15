@@ -3,7 +3,7 @@
 #include "Objects/ArrayObject.h"
 #include <string>
 
-Variable moveOwnershipToVM(InternalValue& var)
+Variable moveOwnershipToVM(const InternalValue& var)
 {
 	switch (var.getType())
 	{
@@ -25,7 +25,7 @@ Variable moveOwnershipToVM(InternalValue& var)
 	return {};
 }
 
-InternalValue moveOwnershipToHost(Variable& var)
+InternalValue moveOwnershipToHost(const Variable& var)
 {
 	switch (var.getType())
 	{
@@ -42,6 +42,23 @@ InternalValue moveOwnershipToHost(Variable& var)
 		return var.as<bool>();
 	/*case VariableType::External:
 		return var.as<void*>();*/
+	default:
+		break;
+	}
+	return {};
+}
+
+InternalValue makeHostArg(const Variable& var)
+{
+	switch (var.getType())
+	{
+	case VariableType::String: {
+		return var.as<String>()->data();
+	}
+	case VariableType::Number:
+		return var.as<double>();
+	case VariableType::Boolean:
+		return var.as<bool>();
 	default:
 		break;
 	}
@@ -111,13 +128,27 @@ bool equal(const Variable& lhs, const Variable& rhs)
 void stradd(Variable& out, const Variable& lhs, const Variable& rhs)
 {
 	auto l = toString(lhs);
-	auto r = toString(rhs);
+	String* str = nullptr;
 
-	size_t len = l->size() + r->size() - 1;
-	auto str = String::GetAllocator()->Make(len);
+	if (rhs.isString()) {
+		auto r = rhs.as<String>();
 
-	memcpy(str->data(), l->data(), l->size());
-	memcpy(str->data() + l->size() - 1, r->data(), r->size());
+		size_t len = l->size() + r->size();
+		str = String::GetAllocator()->Make(len - 1);
+
+		memcpy(str->data(), l->data(), l->size());
+		memcpy(str->data() + l->size() - 1, r->data(), r->size());
+	}
+	else {
+		auto r = toStdString(rhs);
+
+		size_t len = l->size() + r.size();
+		str = String::GetAllocator()->Make(len);
+
+		memcpy(str->data(), l->data(), l->size());
+		memcpy(str->data() + l->size() - 1, r.data(), r.size());
+		str->data()[len - 1] = 0;
+	}
 
 	out = str;
 }
@@ -200,5 +231,24 @@ String* toString(const Variable& in)
 
 	default:
 		return alloc->GetDefault();
+	}
+}
+
+std::string toStdString(const Variable& in)
+{
+	switch (in.getType())
+	{
+	case VariableType::Number: {
+		double value = in.as<double>();
+		if (trunc(value) == value) {
+			return std::to_string((size_t)value).c_str();
+		}
+		return std::to_string(value).c_str();
+	}
+	case VariableType::Boolean: return in.as<bool>() ? "true" : "false";
+	case VariableType::String: return in.as<String>()->data();
+
+	default:
+		return "";
 	}
 }

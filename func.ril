@@ -23,6 +23,15 @@ public def func(value : string) {
 	if (Storage.variable == "Modified " && false) {
 		Storage.variable = "Not modified ";
 	}
+	
+	var idx : number = 0;
+	for (var i = 0; i < 30; i++) {
+		idx++;
+		if (idx < 15) continue;
+		break;
+	}
+	
+	println(idx);
 		
 	return String.addString(value);
 }

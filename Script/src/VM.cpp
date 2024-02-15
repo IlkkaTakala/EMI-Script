@@ -280,9 +280,9 @@ void Runner::operator()()
 		}
 		current->Arguments.clear();
 
-#define NUMS current->FunctionPtr->numberTable.values()
-#define STRS current->FunctionPtr->stringTable
-#define JUMPS current->FunctionPtr->jumpTable.values()
+#define NUMS current->FunctionPtr->NumberTable.values()
+#define STRS current->FunctionPtr->StringTable
+#define JUMPS current->FunctionPtr->JumpTable.values()
 		out:
 		while (interrupt && Owner->IsRunning()) {
 
@@ -310,7 +310,7 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(Jump) {
-					current->Ptr = &current->FunctionPtr->Bytecode.data()[JUMPS[byte.param]];
+					current->Ptr = &current->FunctionPtr->Bytecode.data()[byte.param];
 				} goto start;
 
 				TARGET(LoadNumber) {
@@ -322,9 +322,9 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(LoadSymbol) {
-					auto& var = current->FunctionPtr->globalTable[byte.param];
+					auto& var = current->FunctionPtr->GlobalTable[byte.param];
 					if (var == nullptr) {
-						auto& name = current->FunctionPtr->globalTableSymbols[byte.param];
+						auto& name = current->FunctionPtr->GlobalTableSymbols[byte.param];
 						if (auto idx = Owner->GlobalVariables.find(name); idx != Owner->GlobalVariables.end()) {
 							var = &idx->second;
 						}
@@ -345,9 +345,9 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(StoreSymbol) {
-					auto& var = current->FunctionPtr->globalTable[byte.param];
+					auto& var = current->FunctionPtr->GlobalTable[byte.param];
 					if (var == nullptr) {
-						auto& name = current->FunctionPtr->globalTableSymbols[byte.param];
+						auto& name = current->FunctionPtr->GlobalTableSymbols[byte.param];
 						if (auto idx = Owner->GlobalVariables.find(name); idx != Owner->GlobalVariables.end()) {
 							var = &idx->second;
 						}
@@ -376,7 +376,7 @@ void Runner::operator()()
 						CallStack.pop_back();
 						current = &CallStack.back();
 						Registers.to(current->StackOffset);
-						const Instruction& oldByte = *(Instruction*)(current->Ptr - 1);
+						const Instruction& oldByte = *(Instruction*)(current->Ptr - 2);
 						Registers[oldByte.target] = val;
 					}
 					else {
@@ -390,10 +390,11 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(CallFunction) {
+					const Instruction& data = *(Instruction*)current->Ptr++;
 
-					auto& fn = current->FunctionPtr->functionTable[byte.in1];
+					auto& fn = current->FunctionPtr->FunctionTable[data.data];
 					if (fn == nullptr) {
-						auto& name = current->FunctionPtr->functionTableSymbols[byte.in1];
+						auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
 						if (auto idx = Owner->NameToFunctionMap.find(name); idx != Owner->NameToFunctionMap.end()) {
 							fn = idx->second;
 						}
@@ -409,7 +410,7 @@ void Runner::operator()()
 						}
 					}
 					//else if (Owner->ValidFunctions.find(fn) == Owner->ValidFunctions.end()) { // @todo: check is maybe required but very slow
-					//	current->FunctionPtr->functionTable[byte.in1] = nullptr;
+					//	current->FunctionPtr->FunctionTable[data.data] = nullptr;
 					//	gWarn() << "Cannot call deleted function\n";
 					//	goto start;
 					//}
@@ -419,17 +420,17 @@ void Runner::operator()()
 						goto start;
 					}
 
-					for (int i = 1; i < fn->Types.size(); i++) {
+					for (int i = 1; i < fn->Types.size() && i < byte.in2; i++) {
 						if ((fn->Types[i] != VariableType::Undefined 
-							&& fn->Types[i] != Registers[byte.in2 + (i - 1)].getType())
-							&& Registers[byte.in2 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
+							&& fn->Types[i] != Registers[byte.in1 + (i - 1)].getType())
+							&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
 
 							gWarn() << "Invalid argument types\n";
 							goto start;
 						}
 					}
 					
-					auto offset = current->StackOffset + byte.in2;
+					auto offset = current->StackOffset + byte.in1;
 					auto& call = CallStack.emplace_back(fn); // @todo: do this better, too slow
 					call.StackOffset = offset;
 					Registers.reserve(call.StackOffset + fn->RegisterCount);
@@ -439,11 +440,72 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(CallSymbol) {
+					/*const Instruction& data = *(Instruction*)*/current->Ptr++;
+					gError() << "CallSymbol Not implemented\n";
 
 				} goto start;
 
 				TARGET(CallInternal) {
+					const Instruction& data = *(Instruction*)current->Ptr++;
+					auto& fn = current->FunctionPtr->IntrinsicTable[data.data];
+					if (fn == nullptr) {
+						auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
+						if (auto idx = IntrinsicFunctions.find(name); idx != IntrinsicFunctions.end()) {
+							fn = idx->second;
+						}
+						else {
+							std::string fnname = current->FunctionPtr->Namespace + "." + name;
+							if (idx = IntrinsicFunctions.find(fnname); idx != IntrinsicFunctions.end()) {
+								fn = idx->second;
+							}
+							else {
+								gWarn() << "Function does not exist: " << fnname << "\n";
+								goto start;
+								break;
+							}
+						}
+					}
 
+					fn(Registers[byte.target], &Registers[byte.in1], byte.in2);
+
+				} goto start;
+
+				TARGET(CallExternal) {
+					const Instruction& data = *(Instruction*)current->Ptr++;
+					auto& fn = current->FunctionPtr->ExternalTable[data.data];
+					if (fn == nullptr) {
+						auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
+						if (auto idx = HostFunctions().find(name); idx != HostFunctions().end()) {
+							fn = idx->second;
+						}
+						else {
+							std::string fnname = current->FunctionPtr->Namespace + "." + name;
+							if (idx = HostFunctions().find(fnname); idx != HostFunctions().end()) {
+								fn = idx->second;
+							}
+							else {
+								gWarn() << "Function does not exist: " << fnname << "\n";
+								goto start;
+								break;
+							}
+						}
+					}
+
+					Registers.reserve(current->StackOffset + byte.in2 + byte.in1);
+
+					thread_local static std::vector<InternalValue> args;
+					args.resize(byte.in2);
+					for (int i = 0; i < byte.in2; ++i) {
+						args[i] = Registers[byte.in1 + i];
+					}
+					InternalValue ret = (*fn)(byte.in2, args.data());
+					Registers[byte.target] = moveOwnershipToVM(ret);
+
+				} goto start;
+
+				TARGET(Call) {
+					/*const Instruction& data = *(Instruction*)*/current->Ptr++;
+					gError() << "Call Not implemented\n";
 				} goto start;
 
 				TARGET(PushUndefined) {

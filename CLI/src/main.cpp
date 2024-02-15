@@ -23,13 +23,13 @@ std::vector<std::string> split(const std::string& s, char delim) {
 	return elems;
 }
 
-int print(int number) {
-	std::cout << number;
+int print(const char* number) {
+	std::cout << number << '\n';
 
 	return 100;
 }
 
-REGISTER_NOVA(Global, print, print);
+REGISTER_NOVA(Global, printStr, print);
 
 int main()
 {

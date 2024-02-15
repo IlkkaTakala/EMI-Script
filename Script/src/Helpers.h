@@ -1,9 +1,11 @@
 #pragma once
 #include "Variable.h"
 #include "Eril/Value.h"
+#include <string>
 
-Variable moveOwnershipToVM(InternalValue& var);
-InternalValue moveOwnershipToHost(Variable& var);
+Variable moveOwnershipToVM(const InternalValue& var);
+InternalValue moveOwnershipToHost(const Variable& var);
+InternalValue makeHostArg(const Variable& var);
 
 Variable GetTypeDefault(VariableType type);
 
@@ -20,3 +22,4 @@ double toNumber(const Variable& in);
 
 class String;
 String* toString(const Variable& in);
+std::string toStdString(const Variable& in);

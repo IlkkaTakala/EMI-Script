@@ -4,6 +4,8 @@
 #include <vector>
 #include <ankerl/unordered_dense.h>
 #include "Symbol.h"
+#include "Eril/Eril.hpp"
+#include "Intrinsic.h"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -18,13 +20,17 @@ union Instruction
 {
 	struct {
 		OpCodes code : 8;
-		uint8 target : 8;
 		union {
 			struct {
-				uint8 in1 : 8;
-				uint8 in2 : 8;
-			};
-			uint16 param : 16;
+				uint8 target : 8;
+				union {
+					struct {
+						uint8 in1 : 8;
+						uint8 in2 : 8;
+					} PACKED;
+					uint16 param : 16;
+				};
+			} PACKED;
 		};
 	}PACKED;
 	uint32 data : 32;
@@ -74,20 +80,23 @@ struct Function
 	size_t NamespaceHash;
 	bool IsPublic;
 
-	std::vector<Variable> stringTable;
-	ankerl::unordered_dense::set<double> numberTable;
-	ankerl::unordered_dense::set<size_t> jumpTable;
+	std::vector<Variable> StringTable;
+	ankerl::unordered_dense::set<double> NumberTable;
+	ankerl::unordered_dense::set<size_t> JumpTable;
 
-	std::vector<Function*> functionTable;
-	std::vector<VariableType> typeTable;
-	std::vector<Variable*> globalTable;
-	std::vector<std::string> functionTableSymbols;
-	std::vector<std::string> typeTableSymbols;
-	std::vector<std::string> globalTableSymbols;
+	std::vector<Function*> FunctionTable;
+	std::vector<Eril::__internal_function*> ExternalTable;
+	std::vector<IntrinsicPtr> IntrinsicTable;
+	std::vector<Variable*> GlobalTable;
+	std::vector<VariableType> TypeTable;
 
-	ankerl::unordered_dense::map<int, int> debugLines;
+	std::vector<std::string> FunctionTableSymbols;
+	std::vector<std::string> TypeTableSymbols;
+	std::vector<std::string> GlobalTableSymbols;
 
-	Scoped* scope;
+	ankerl::unordered_dense::map<int, int> DebugLines;
+
+	Scoped* FunctionScope;
 
 	std::vector<VariableType> Types;
 
@@ -97,13 +106,13 @@ struct Function
 	std::vector<uint32> Bytecode;
 
 	Function() {
-		scope = nullptr;
+		FunctionScope = nullptr;
 		ArgCount = 0;
 		RegisterCount = 0;
 		IsPublic = false;
 		NamespaceHash = 0;
 	}
 	~Function() {
-		delete scope;
+		delete FunctionScope;
 	}
 };

@@ -522,7 +522,7 @@ void ASTWalker::Run()
 				function->NamespaceHash = ankerl::unordered_dense::hash<std::basic_string<char>>()(currentNamespace->Name);
 				functionList.emplace_back(c, function);
 				function->Types.resize(1);
-				function->scope = new Scoped();
+				function->FunctionScope = new Scoped();
 				currentFunction = function;
 
 				for (auto& node : c->children) {
@@ -538,7 +538,7 @@ void ASTWalker::Run()
 								HasError = true;
 								break;
 							}
-							symParam = function->scope->addSymbol(std::get<0>(v->data));
+							symParam = function->FunctionScope->addSymbol(std::get<0>(v->data));
 							Walk(v->children.front());
 							symParam->setType(SymbolType::Variable);
 							symParam->varType = v->children.front()->varType;
@@ -644,6 +644,7 @@ void ASTWalker::Run()
 	}
 }
 
+
 #define _Op(op) n->instruction = instructionList.size(); auto& instruction = instructionList.emplace_back(); instruction.code = OpCodes::op; 
 #define _Walk for(auto& child : n->children) Walk(child);
 #define _In16 instruction.param
@@ -717,7 +718,7 @@ _Out;\
 void ASTWalker::Walk(Node* n)
 {
 	Function* f = currentFunction;
-	if (HasDebug) f->debugLines[(int)n->line] = (int)instructionList.size();
+	if (HasDebug) f->DebugLines[(int)n->line] = (int)instructionList.size();
 	switch (n->type) {
 	case Token::Scope: {
 		auto& next = currentScope->children.emplace_back();
@@ -750,8 +751,8 @@ void ASTWalker::Walk(Node* n)
 
 	case Token::Number: { {
 			_Op(LoadNumber);
-			auto res = f->numberTable.emplace(std::get<double>(n->data));
-			uint16 idx = (uint16)std::distance(f->numberTable.begin(), res.first);
+			auto res = f->NumberTable.emplace(std::get<double>(n->data));
+			uint16 idx = (uint16)std::distance(f->NumberTable.begin(), res.first);
 			_In16 = idx;
 			_Out;
 			_Type = VariableType::Number;
@@ -925,16 +926,16 @@ void ASTWalker::Walk(Node* n)
 		if (symbol) {
 			if (symbol->needsLoading) {
 				auto name = getFullId(n);
-				auto it = std::find(currentFunction->globalTableSymbols.begin(), currentFunction->globalTableSymbols.end(), name);
+				auto it = std::find(currentFunction->GlobalTableSymbols.begin(), currentFunction->GlobalTableSymbols.end(), name);
 				size_t index = 0;
 
-				if (it != currentFunction->globalTableSymbols.end()) {
-					index = it - currentFunction->globalTableSymbols.begin();
+				if (it != currentFunction->GlobalTableSymbols.end()) {
+					index = it - currentFunction->GlobalTableSymbols.begin();
 				}
 				else {
-					index = currentFunction->globalTableSymbols.size();
-					currentFunction->globalTableSymbols.push_back(name);
-					currentFunction->globalTable.push_back(nullptr);
+					index = currentFunction->GlobalTableSymbols.size();
+					currentFunction->GlobalTableSymbols.push_back(name);
+					currentFunction->GlobalTable.push_back(nullptr);
 				}
 
 				_Op(LoadSymbol);
@@ -948,10 +949,6 @@ void ASTWalker::Walk(Node* n)
 			_Type = symbol->varType;
 			n->sym = symbol;
 		}
-		else { // @todo: fix this, symbols might be loaded later
-			_Error("Symbol not defined: " << std::get<std::string>(n->data));
-			HasError = true;
-		}
 	}break;
 
 	case Token::Negate: { // @todo: Maybe own instruction
@@ -961,8 +958,8 @@ void ASTWalker::Walk(Node* n)
 		}
 		auto& load = instructionList.emplace_back();
 		load.code = OpCodes::LoadNumber;
-		auto res = f->numberTable.emplace(0.0);
-		uint16 idx = (uint16)std::distance(f->numberTable.begin(), res.first);
+		auto res = f->NumberTable.emplace(0.0);
+		uint16 idx = (uint16)std::distance(f->NumberTable.begin(), res.first);
 		load.target = getFirstFree();
 		load.param = idx;
 
@@ -1174,8 +1171,8 @@ void ASTWalker::Walk(Node* n)
 		registers = regs;
 	}break;
 
-	case Token::For: { // @todo: Add else block for loops
-		if (n->children.size() != 4) {
+	case Token::For: {
+		if (n->children.size() != 5) {
 			_Error("Incorrect for-block");
 		}
 
@@ -1194,8 +1191,9 @@ void ASTWalker::Walk(Node* n)
 		n->regTarget = instruction.target = (*it)->regTarget;
 		auto jumpStart = instructionList.size();
 
-		Walk(_Last());
-		_FreeConstant((*it));
+		auto target = std::next(n->children.begin(), 3);
+		Walk(*target);
+		_FreeConstant((*target));
 
 		it++;
 		Walk(*it);
@@ -1205,7 +1203,13 @@ void ASTWalker::Walk(Node* n)
 		elseinst.code = OpCodes::JumpBackward;
 		elseinst.param = instructionList.size() - start;
 
+		size_t elsestart = instructionList.size();
+		Walk(_Last());
+		_FreeConstant(_Last());
+
 		_In16 = instructionList.size() - jumpStart;
+
+		placeBreaks(n, start, elsestart);
 
 		currentScope = currentScope->parent;
 		registers = regs;
@@ -1237,20 +1241,44 @@ void ASTWalker::Walk(Node* n)
 
 		_In16 = instructionList.size() - jumpStart;
 
+		placeBreaks(n, start, instructionList.size());
+
 		currentScope = currentScope->parent;
 		registers = regs;
 	}break;
+
+	case Token::Continue: 
+	case Token::Break: {
+		_Op(Jump);
+	} break;
 
 	case Token::Else: {
 		_Walk;
 	}break;
 
 	case Token::FunctionCall: {
-
+		int Type = 0;
 		Walk(_First());
-		if (!_First()->sym || _First()->sym->type != SymbolType::Function) {
-			_Error("Variable functions not supported yet"); // @todo: Add support
+		if (!_First()->sym) {
+			auto name = getFullId(_First());
+
+			if (HostFunctions().find(name) != HostFunctions().end()) {
+				Type = 1;
+				goto function;
+			}
+			if (IntrinsicFunctions.find(name) != IntrinsicFunctions.end()) {
+				Type = 2;
+				goto function;
+			}
+			_Error("Unknown functions not supported yet");
+			Type = 4;
+			break;
 		}
+		else if (_First()->sym->type != SymbolType::Function && _First()->sym->type == SymbolType::Variable) {
+			_Error("Variable functions not supported yet");
+			Type = 3;
+		}
+		function:
 		auto name = getFullId(_First());
 
 		auto& params = _Last();
@@ -1272,23 +1300,37 @@ void ASTWalker::Walk(Node* n)
 			freeReg(c->regTarget);
 		}
 
-		auto it = std::find(currentFunction->functionTableSymbols.begin(), currentFunction->functionTableSymbols.end(), name);
+		auto it = std::find(currentFunction->FunctionTableSymbols.begin(), currentFunction->FunctionTableSymbols.end(), name);
 		size_t index = 0;
 
-		if (it != currentFunction->functionTableSymbols.end()) {
-			index = it - currentFunction->functionTableSymbols.begin();
+		if (it != currentFunction->FunctionTableSymbols.end()) {
+			index = it - currentFunction->FunctionTableSymbols.begin();
 		}
 		else {
-			currentFunction->functionTableSymbols.push_back(name);
-			currentFunction->functionTable.push_back(nullptr);
+			index = currentFunction->FunctionTableSymbols.size();
+			currentFunction->FunctionTableSymbols.push_back(name);
 		}
 
 		_Op(CallFunction);
-		_In8 = (uint8)index;
-		if (params->children.size() != 0) {
-			_In8_2 = (uint8)params->children.front()->regTarget;
+		switch (Type)
+		{
+		case 0: instruction.code = OpCodes::CallFunction;	  break;
+		case 1: instruction.code = OpCodes::CallExternal; 	  break;
+		case 2: instruction.code = OpCodes::CallInternal; 	  break;
+		case 3: instruction.code = OpCodes::CallSymbol; 	  break;
+		case 4: instruction.code = OpCodes::Call;			  break;
 		}
+
+		if (params->children.size() != 0) {
+			_In8 = (uint8)params->children.front()->regTarget;
+		}
+		_In8_2 = params->children.size();
 		_Out;
+
+		auto& arg = instructionList.emplace_back(); 
+		arg.code = OpCodes::Noop;
+		arg.data = (uint32)index;
+
 	}break;
 
 	default:
@@ -1330,7 +1372,7 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 		{
 		case Token::CallParams: {
 			for (auto& v : c->children) {
-				auto symParam = f->scope->findSymbol(std::get<0>(v->data));
+				auto symParam = f->FunctionScope->findSymbol(std::get<0>(v->data));
 				if (symParam) symParam->reg = getFirstFree();
 			}
 		} break;
@@ -1338,7 +1380,7 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 		case Token::Scope: {
 
 			instructionList.reserve(c->children.size() * n->depth);
-			currentScope = f->scope;
+			currentScope = f->FunctionScope;
 			for (auto& stmt : c->children) {
 				try {
 					Walk(stmt);
@@ -1365,9 +1407,14 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 		f->Bytecode[i] = instructionList[i].data;
 	}
 
-	f->stringTable.reserve(stringList.size());
+	f->FunctionTable.resize(f->FunctionTableSymbols.size(), nullptr);
+	f->ExternalTable.resize(f->FunctionTableSymbols.size(), nullptr);
+	f->IntrinsicTable.resize(f->FunctionTableSymbols.size(), nullptr);
+
+
+	f->StringTable.reserve(stringList.size());
 	for (auto& str : stringList) {
-		f->stringTable.emplace_back(String::GetAllocator()->Make(str.c_str()));
+		f->StringTable.emplace_back(String::GetAllocator()->Make(str.c_str()));
 	}
 	stringList.clear();
 
@@ -1379,6 +1426,24 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 	currentScope = nullptr;
 
 	// Cleanup
-	delete f->scope;
-	f->scope = nullptr;
+	delete f->FunctionScope;
+	f->FunctionScope = nullptr;
+}
+
+void ASTWalker::placeBreaks(Node* n, size_t start, size_t end)
+{
+	for (auto& node : n->children) {
+		switch (node->type)
+		{
+		case Token::Break: {
+			instructionList[node->instruction].param = (uint16)end;
+		} break;
+		case Token::Continue: {
+			instructionList[node->instruction].param = (uint16)start;
+		} break;
+		default:
+			break;
+		}
+		placeBreaks(node, start, end);
+	}
 }

@@ -110,7 +110,7 @@ Flow ForFlow
 Flow WhileFlow
 
 IfFlow If Lparenthesis Expr Rparenthesis FlowBlock ElseFlow
-ForFlow For Lparenthesis Expr Semi Expr Semi Expr Rparenthesis FlowBlock
+ForFlow For Lparenthesis Expr Semi Expr Semi Expr Rparenthesis FlowBlock ElseFlow
 WhileFlow While Lparenthesis Expr Rparenthesis FlowBlock
 ElseFlow Else FlowBlock
 ElseFlow None

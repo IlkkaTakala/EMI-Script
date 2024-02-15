@@ -36,16 +36,14 @@ public:
 			FreeList.pop();
 			auto& obj = PointerList[idx];
 			obj->RefCount = 0;
-			constexpr bool hasRealloc = requires(T& t) {
+			/*constexpr bool hasRealloc = requires(T& t) {
 				t.Realloc(args...);
 			};
 			if constexpr (hasRealloc) {
 				obj->Realloc(args...);
-			}
-			else {
-				delete obj;
-				obj = new T(args...);
-			}
+			}*/
+			delete obj;
+			obj = new T(args...);
 
 			return obj;
 		}
