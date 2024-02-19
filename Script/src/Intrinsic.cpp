@@ -24,7 +24,11 @@ void printLn(Variable& out, Variable* args, size_t argc) {
 	}
 }
 
-
+void delay(Variable&, Variable* args, size_t argc) {
+	if (argc > 0) {
+		std::this_thread::sleep_for(std::chrono::milliseconds((size_t)toNumber(args[0])));
+	}
+}
 
 
 
@@ -39,4 +43,11 @@ void printLn(Variable& out, Variable* args, size_t argc) {
 ankerl::unordered_dense::map<std::string, IntrinsicPtr> IntrinsicFunctions {
 	{ "print", print },
 	{ "println", printLn },
+	{ "delay", delay },
+};
+
+ankerl::unordered_dense::map<std::string, std::vector<VariableType>> IntrinsicFunctionTypes {
+	{ "print", { VariableType::Undefined } },
+	{ "println", { VariableType::Undefined } },
+	{ "delay", { VariableType::Undefined, VariableType::Number } },
 };

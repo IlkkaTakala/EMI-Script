@@ -1,16 +1,32 @@
 #pragma once
+#include "Defines.h"
 #include "BaseObject.h"
-#include <queue>
-#include <mutex>
+#include <variant>
+#include "Function.h"
+#include "Eril/Eril.hpp"
 
 class FunctionAllocator;
 
-class Function : public Object
+enum class FunctionType 
+{
+	User,
+	Host,
+	Intrinsic,
+	None
+};
+
+class FunctionObject : public Object
 {
 public:
-	Function() {}
+	FunctionObject(const std::string& name) : FunctionObject(FunctionType::None, name) {}
+	FunctionObject(FunctionType type, const std::string& name);
+	FunctionObject() : FunctionObject(FunctionType::None, "") {}
 
-	static Allocator<Function>* GetAllocator();
+	static Allocator<FunctionObject>* GetAllocator();
 
-private:
+	FunctionType InternalType;
+	std::string Name;
+
+	std::variant<Function*, Eril::__internal_function*, IntrinsicPtr> Callee;
+
 };

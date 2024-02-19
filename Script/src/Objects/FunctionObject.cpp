@@ -1,7 +1,13 @@
 #include "FunctionObject.h"
 
-Allocator<Function>* Function::GetAllocator()
+FunctionObject::FunctionObject(FunctionType type, const std::string& name)
+	: InternalType(type), Name(name)
 {
-	static Allocator<Function> alloc;
+	Type = VariableType::Function;
+}
+
+Allocator<FunctionObject>* FunctionObject::GetAllocator()
+{
+	static Allocator<FunctionObject> alloc;
 	return &alloc;
 }

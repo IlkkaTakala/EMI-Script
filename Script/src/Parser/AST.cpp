@@ -513,6 +513,7 @@ void ASTWalker::Run()
 				auto& symbol = it.first->second;
 				symbol->setType(SymbolType::Function);
 				symbol->varType = VariableType::Function;
+				symbol->needsLoading = true;
 				Function* function = new Function();
 				function->Name = data;
 				function->IsPublic = c->type == Token::PublicFunctionDef;
@@ -551,7 +552,6 @@ void ASTWalker::Run()
 					} break;
 					default:
 						Walk(node);
-						symbol->varType = node->varType;
 						function->Types[0] = symbol->varType;
 						break;
 					}
@@ -674,34 +674,7 @@ case VariableType::varTy: {\
 	_FreeChildren;\
 } break;
 
-#define _OperatorAssign \
-_Out;\
-//if (n->data.index() == 0 && *std::get<std::string>(n->data).c_str() == '=') {\
-//	_Last() = n; \
-//	goto assign; \
-//}\
-
-	/*auto first = _First();\
-	if (first->sym && isAssignable(first->sym->flags)) {\
-		n->regTarget = instruction.target = first->regTarget;\
-		n->type = Token::Assign; \
-		if (instructionList[first->instruction].code == OpCodes::LoadSymbol) { \
-			auto& store = instructionList.emplace_back(); store.code = OpCodes::StoreSymbol; \
-			store.param = instructionList[first->instruction].param; \
-			store.target = first->regTarget; \
-			instructionList[first->instruction].data = 0; \
-		} \
-		else if (instructionList[first->instruction].code == OpCodes::LoadIndex) { \
-			auto& store = instructionList.emplace_back(); store.code = OpCodes::StoreIndex; \
-			store.in1 = instructionList[first->instruction].in1;\
-			store.in2 = instructionList[first->instruction].in2;\
-			n->regTarget = instruction.target = first->regTarget;\
-			instructionList[first->instruction].data = 0;\
-		}\
-	}\
-	else {\
-		_Error("Cannot assign types");\
-	}\*/
+#define _OperatorAssign _Out;
 
 #define _Compare(op) \
 _Walk;\
@@ -725,13 +698,19 @@ void ASTWalker::Walk(Node* n)
 		next.parent = currentScope;
 		currentScope = &next;
 		auto regs = registers;
-		_Walk;
+		for (auto& c : n->children) {
+			Walk(c);
+			_FreeConstant(c);
+		}
 		currentScope = currentScope->parent;
 		registers = regs;
 	} break;
 
 	case Token::TypeNumber: {
 		_Type = VariableType::Number;
+	}break;
+	case Token::TypeBoolean: {
+		_Type = VariableType::Boolean;
 	}break;
 	case Token::TypeString: {
 		_Type = VariableType::String;
@@ -1195,6 +1174,7 @@ void ASTWalker::Walk(Node* n)
 		Walk(*target);
 		_FreeConstant((*target));
 
+		size_t loopend = instructionList.size();
 		it++;
 		Walk(*it);
 		_FreeConstant((*it));
@@ -1207,9 +1187,9 @@ void ASTWalker::Walk(Node* n)
 		Walk(_Last());
 		_FreeConstant(_Last());
 
-		_In16 = instructionList.size() - jumpStart;
+		instructionList[n->instruction].param = instructionList.size() - jumpStart;
 
-		placeBreaks(n, start, elsestart);
+		placeBreaks(n, loopend, elsestart);
 
 		currentScope = currentScope->parent;
 		registers = regs;
@@ -1239,7 +1219,7 @@ void ASTWalker::Walk(Node* n)
 		elseinst.code = OpCodes::JumpBackward;
 		elseinst.param = instructionList.size() - start;
 
-		_In16 = instructionList.size() - jumpStart;
+		instructionList[n->instruction].param = instructionList.size() - jumpStart;
 
 		placeBreaks(n, start, instructionList.size());
 
@@ -1262,37 +1242,42 @@ void ASTWalker::Walk(Node* n)
 		if (!_First()->sym) {
 			auto name = getFullId(_First());
 
-			if (HostFunctions().find(name) != HostFunctions().end()) {
+			if (auto it = HostFunctions().find(name); it != HostFunctions().end()) {
+				_Type = TypeFromValue(it->second->return_type);
 				Type = 1;
 				goto function;
 			}
 			if (IntrinsicFunctions.find(name) != IntrinsicFunctions.end()) {
+				_Type = IntrinsicFunctionTypes[name][0];
 				Type = 2;
 				goto function;
 			}
-			_Error("Unknown functions not supported yet");
 			Type = 4;
-			break;
+			goto function;
 		}
 		else if (_First()->sym->type != SymbolType::Function && _First()->sym->type == SymbolType::Variable) {
-			_Error("Variable functions not supported yet");
 			Type = 3;
+			goto function;
+		}
+		else {
+			// @todo: Get return type for user functions
 		}
 		function:
 		auto name = getFullId(_First());
 
+		uint8 last = 255;
 		auto& params = _Last();
 		for (auto& c : params->children) {
 			Walk(c);
-			if (IsConstant(c->type) || IsOperator(c->type)) {
+			if (IsConstant(c->type) || IsOperator(c->type) || c->regTarget == last + 1) {
 				freeReg(c->regTarget);
-				c->regTarget = getLastFree();
+				last = _SetOut(c) = getLastFree();
 			}
 			else {
 				_Op(Copy);
 				instruction.target = getLastFree();
 				_In8 = c->regTarget;
-				c->regTarget = instruction.target;
+				last = c->regTarget = instruction.target;
 			}
 		}
 
@@ -1312,25 +1297,26 @@ void ASTWalker::Walk(Node* n)
 		}
 
 		_Op(CallFunction);
+		auto& arg = instructionList.emplace_back();
+		arg.code = OpCodes::Noop;
+		
 		switch (Type)
 		{
-		case 0: instruction.code = OpCodes::CallFunction;	  break;
-		case 1: instruction.code = OpCodes::CallExternal; 	  break;
-		case 2: instruction.code = OpCodes::CallInternal; 	  break;
-		case 3: instruction.code = OpCodes::CallSymbol; 	  break;
-		case 4: instruction.code = OpCodes::Call;			  break;
+		case 0: instruction.code = OpCodes::CallFunction; arg.data = (uint32)index;		  break;
+		case 1: instruction.code = OpCodes::CallExternal; arg.data = (uint32)index; 	  break;
+		case 2: instruction.code = OpCodes::CallInternal; arg.data = (uint32)index; 	  break;
+		case 3: instruction.code = OpCodes::CallSymbol; arg.target = _First()->regTarget; break;
+		case 4: instruction.code = OpCodes::Call; arg.data = (uint32)index;				  break;
 		}
 
 		if (params->children.size() != 0) {
 			_In8 = (uint8)params->children.front()->regTarget;
 		}
+		else {
+			_In8 = getLastFree();
+		}
 		_In8_2 = params->children.size();
 		_Out;
-
-		auto& arg = instructionList.emplace_back(); 
-		arg.code = OpCodes::Noop;
-		arg.data = (uint32)index;
-
 	}break;
 
 	default:
@@ -1392,7 +1378,8 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 				}
 			}
 			Instruction op;
-			op.code = OpCodes::Break;
+			op.code = OpCodes::Return;
+			op.in1 = 0;
 			instructionList.emplace_back(op);
 
 		} break;

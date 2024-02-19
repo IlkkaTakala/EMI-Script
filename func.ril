@@ -1,55 +1,46 @@
 
-public def call(va : string) {
-
-	Storage.variable = "Modified ";
-	return Script.func(va);
+public def play() {
+	return Game.game();
 }
 
 extend Storage:
 
-var variable = "this is a test ";
-var arrTest : array = [0,0,0,0];
+extend Game:
 
-extend Script:
+const wall = 219;
+const wall2 = 178;
+const wall3 = 177;
+const wall4 = 176;
+const shade = 111;
+const empty = 255;
 
-public def func(value : string) {
+public def game() {
 
-	var test : array = [10, 12, 154];
+	var running : bool = true;
 	
-	value += " " + test[2] + " ";
-	Storage.arrTest[3] = "otherText";
-	value += Storage.arrTest[3];
+	var funcTest : function = test;
 	
-	if (Storage.variable == "Modified " && false) {
-		Storage.variable = "Not modified ";
-	}
+	call(test);
 	
-	var idx : number = 0;
-	for (var i = 0; i < 30; i++) {
-		idx++;
-		if (idx < 15) continue;
-		break;
-	}
-	
-	println(idx);
+	#setupconsole();
+	/*
+	while(running) {
 		
-	return String.addString(value);
+		for (var i = 0; i < 50; ++i) {
+			writepixel(i - 1, 30, empty, 0);
+			writepixel(i, 30, wall, 1);
+			
+			render();
+			
+			delay(100);
+		}
+	}*/
 }
 
-extend String:
-
-public def addString(value : string) {
-	return Storage.variable + value;
+def call(f) {
+	return f();
 }
 
-
-
-
-
-
-
-
-
-
-
-# compile ../../ScriptTest.ril -s
+def test() {
+	print("Called");
+}

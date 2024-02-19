@@ -9,6 +9,8 @@ InternalValue makeHostArg(const Variable& var);
 
 Variable GetTypeDefault(VariableType type);
 
+VariableType TypeFromValue(ValueType type);
+
 bool isTruthy(const Variable& var);
 
 bool equal(const Variable& lhs, const Variable& rhs);

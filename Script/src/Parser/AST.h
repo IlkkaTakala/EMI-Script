@@ -85,7 +85,7 @@ private:
 	}
 
 	uint8 getLastFree() {
-		uint8 idx = 0;
+		uint8 idx = 255;
 		for (uint8 i = 0; i < 255; i++) {
 			if (registers[i]) {
 				idx = i;

@@ -4,6 +4,7 @@
 #include "Helpers.h"
 #include "Objects/StringObject.h"
 #include "Objects/ArrayObject.h"
+#include "Objects/FunctionObject.h"
 
 VM::VM()
 {
@@ -210,6 +211,7 @@ void VM::RemoveUnit(const std::string& unit)
 			n.functions.erase(function.c_str());
 			auto full = name + '.' + function;
 			NameToFunctionMap.erase(full);
+			GlobalVariables.erase(full);
 		}
 		for (auto& [name, obj] : u.objects) {
 			Manager.RemoveType(name + '.' + obj);
@@ -266,6 +268,7 @@ void Runner::operator()()
 			Owner->CallQueue.pop();
 		}
 
+		bool hasReturn = false;
 		bool interrupt = true;
 		CallObject* current = &CallStack.back();
 		current->Ptr = current->FunctionPtr->Bytecode.data();
@@ -328,10 +331,46 @@ void Runner::operator()()
 						if (auto idx = Owner->GlobalVariables.find(name); idx != Owner->GlobalVariables.end()) {
 							var = &idx->second;
 						}
+						else if (auto intrfunc = IntrinsicFunctions.find(name); intrfunc != IntrinsicFunctions.end()) {
+							auto func = FunctionObject::GetAllocator()->Make(FunctionType::Intrinsic, name);
+							auto& v = Owner->GlobalVariables[name] = func;
+							func->Callee = intrfunc->second;
+							var = &v;
+						}
+						else if (auto hostfunc = HostFunctions().find(name); hostfunc != HostFunctions().end()) {
+							auto func = FunctionObject::GetAllocator()->Make(FunctionType::Host, name);
+							auto& v = Owner->GlobalVariables[name] = func;
+							func->Callee = hostfunc->second;
+							var = &v;
+						}
+						else if (auto userfunc = Owner->NameToFunctionMap.find(name); userfunc != Owner->NameToFunctionMap.end()) {
+							auto func = FunctionObject::GetAllocator()->Make(FunctionType::User, name);
+							auto& v = Owner->GlobalVariables[name] = func;
+							func->Callee = userfunc->second;
+							var = &v;
+						}
 						else {
 							std::string varname = current->FunctionPtr->Namespace + "." + name;
 							if (idx = Owner->GlobalVariables.find(varname); idx != Owner->GlobalVariables.end()) {
 								var = &idx->second;
+							}
+							else if (auto localintrfunc = IntrinsicFunctions.find(varname); localintrfunc != IntrinsicFunctions.end()) {
+								auto func = FunctionObject::GetAllocator()->Make(FunctionType::Intrinsic, varname);
+								auto& v = Owner->GlobalVariables[varname] = func;
+								func->Callee = localintrfunc->second;
+								var = &v;
+							}
+							else if (auto localhostfunc = HostFunctions().find(varname); localhostfunc != HostFunctions().end()) {
+								auto func = FunctionObject::GetAllocator()->Make(FunctionType::Host, varname);
+								auto& v = Owner->GlobalVariables[varname] = func;
+								func->Callee = localhostfunc->second;
+								var = &v;
+							}
+							else if (auto localuserfunc = Owner->NameToFunctionMap.find(varname); localuserfunc != Owner->NameToFunctionMap.end()) {
+								auto func = FunctionObject::GetAllocator()->Make(FunctionType::User, varname);
+								auto& v = Owner->GlobalVariables[varname] = func;
+								func->Callee = localuserfunc->second;
+								var = &v;
 							}
 							else {
 								gWarn() << "Variable does not exist: " << varname << "\n";
@@ -357,7 +396,7 @@ void Runner::operator()()
 								var = &idx->second;
 							}
 							else {
-								gWarn() << "Variable does not exist: " << varname << "\n";
+								gWarn() << "Symbol does not exist: " << varname << "\n";
 								goto start;
 							}
 						}
@@ -385,7 +424,8 @@ void Runner::operator()()
 						Registers.to(0);
 						current = nullptr;
 						interrupt = false;
-						goto out;
+						hasReturn = true;
+						goto end;
 					}
 				} goto start;
 
@@ -440,9 +480,68 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(CallSymbol) {
-					/*const Instruction& data = *(Instruction*)*/current->Ptr++;
-					gError() << "CallSymbol Not implemented\n";
+					const Instruction& data = *(Instruction*)current->Ptr++;
 
+					if (Registers[data.target].getType() != VariableType::Function) {
+						gWarn() << "Variable does not contain a function\n";
+						goto start;
+					}
+
+					FunctionObject* f = Registers[data.target].as<FunctionObject>();
+
+					switch (f->InternalType)
+					{
+					case FunctionType::User: {
+						if (auto ptr = std::get<Function*>(f->Callee)) {
+							if (!ptr->IsPublic && current->FunctionPtr->NamespaceHash != ptr->NamespaceHash) {
+								gWarn() << "Cannot call private function " << ptr->Name << "\n";
+								goto start;
+							}
+
+							for (int i = 1; i < ptr->Types.size() && i < byte.in2; i++) {
+								if ((ptr->Types[i] != VariableType::Undefined
+									&& ptr->Types[i] != Registers[byte.in1 + (i - 1)].getType())
+									&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
+
+									gWarn() << "Invalid argument types\n";
+									goto start;
+								}
+							}
+
+							auto offset = current->StackOffset + byte.in1;
+							auto& call = CallStack.emplace_back(ptr); // @todo: do this better, too slow
+							call.StackOffset = offset;
+							Registers.reserve(call.StackOffset + ptr->RegisterCount);
+							Registers.to(call.StackOffset);
+							current = &call;
+						}
+					} break;
+
+					case FunctionType::Host: {
+						if (auto ptr = std::get<Eril::__internal_function*>(f->Callee)) {
+
+							thread_local static std::vector<InternalValue> args;
+							args.resize(byte.in2);
+							for (int i = 0; i < byte.in2; ++i) {
+								args[i] = Registers[byte.in1 + i];
+							}
+							InternalValue ret = (*ptr)(byte.in2, args.data());
+							Registers[byte.target] = moveOwnershipToVM(ret);
+						}
+					} break;
+
+					case FunctionType::Intrinsic: {
+						if (auto ptr = std::get<IntrinsicPtr>(f->Callee)) {
+							ptr(Registers[byte.target], &Registers[byte.in1], byte.in2);
+						}
+					} break;
+
+					case FunctionType::None: {
+						goto start;
+					} break;
+
+					default: __assume(0);
+					}
 				} goto start;
 
 				TARGET(CallInternal) {
@@ -491,8 +590,6 @@ void Runner::operator()()
 						}
 					}
 
-					Registers.reserve(current->StackOffset + byte.in2 + byte.in1);
-
 					thread_local static std::vector<InternalValue> args;
 					args.resize(byte.in2);
 					for (int i = 0; i < byte.in2; ++i) {
@@ -504,8 +601,7 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(Call) {
-					/*const Instruction& data = *(Instruction*)*/current->Ptr++;
-					gError() << "Call Not implemented\n";
+					gError() << "Unknown functions not implemented\n";
 				} goto start;
 
 				TARGET(PushUndefined) {
@@ -657,6 +753,11 @@ void Runner::operator()()
 				} goto start;
 
 		}
+	end:
+		if (hasReturn) {
+
+		}
+
 	}
 }
 

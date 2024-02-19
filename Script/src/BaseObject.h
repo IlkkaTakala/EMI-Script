@@ -27,9 +27,9 @@ public:
 	T* Make(const Args&... args) {
 		std::unique_lock lk(AllocLock);
 		if (FreeList.empty()) {
-			auto str = new T(args...);
-			PointerList.push_back(str);
-			return str;
+			auto obj = new T(args...);
+			PointerList.push_back(obj);
+			return obj;
 		}
 		else {
 			auto idx = FreeList.front();

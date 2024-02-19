@@ -29,6 +29,7 @@ ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
 	{"const", Token::Const },
 
 	{"string", Token::TypeString},
+	{"bool", Token::TypeBoolean},
 	{"number", Token::TypeNumber},
 	{"array", Token::TypeArray},
 	{"function", Token::TypeFunction},
@@ -78,8 +79,12 @@ inline bool is_alnum(unsigned char c) {
 	return is_alpha(c) || is_digit(c);
 }
 
-inline bool ValidID(unsigned char c) {
+inline bool ValidIDFirst(unsigned char c) {
 	return is_alpha(c) || c == 95;
+}
+
+inline bool ValidID(unsigned char c) {
+	return is_alnum(c) || c == 95;
 }
 
 void Lexer::Reset()
@@ -112,13 +117,13 @@ Token Lexer::Analyse(std::string_view& Data)
 	auto start = ptr;
 	size_t endOffset = 0;
 
-	if (ValidID(*ptr)) {
+	if (ValidIDFirst(*ptr)) {
 		if ((*ptr == 'x' || *ptr == '.') && is_digit(*(ptr + 1))) {
 			TOKEN(Number);
 			while (is_alnum(*ptr)) Current.Advance();
 		}
 		else {
-			while (is_alnum(*ptr)) Current.Advance();
+			while (ValidID(*ptr)) Current.Advance();
 
 			std::string_view value(start, ptr - start);
 			if (auto it = TokenMap.find(value); it != TokenMap.end()) {

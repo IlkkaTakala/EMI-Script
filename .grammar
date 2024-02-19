@@ -12,6 +12,7 @@ RProgram VarDeclare Semi
 RProgram Stmt
 
 Typename TypeString
+Typename TypeBoolean
 Typename TypeNumber
 Typename TypeArray
 Typename TypeFunction
@@ -146,6 +147,7 @@ None None VarDeclare
 None None Stmt
 
 None TypeString 
+None TypeBoolean
 None TypeNumber
 None TypeArray
 None TypeFunction

@@ -1,6 +1,7 @@
 #include "Helpers.h"
 #include "Objects/StringObject.h"
 #include "Objects/ArrayObject.h"
+#include "Objects/FunctionObject.h"
 #include <string>
 
 Variable moveOwnershipToVM(const InternalValue& var)
@@ -79,6 +80,8 @@ Variable GetTypeDefault(VariableType type)
 		return Variable();
 	case VariableType::String:
 		return String::GetAllocator()->GetDefault();
+	case VariableType::Function:
+		return FunctionObject::GetAllocator()->GetDefault();
 	case VariableType::Array:
 		return Variable();
 	case VariableType::Object:
@@ -86,6 +89,25 @@ Variable GetTypeDefault(VariableType type)
 	default:
 		// @todo: find proper defaults
 		return Variable();
+	}
+}
+
+VariableType TypeFromValue(ValueType type)
+{
+	switch (type)
+	{
+	case ValueType::Undefined:
+		return VariableType::Undefined;
+	case ValueType::Number:
+		return VariableType::Number;
+	case ValueType::Boolean:
+		return VariableType::Boolean;
+	case ValueType::External:
+		return VariableType::External;
+	case ValueType::String:
+		return VariableType::String;
+	default:
+		return VariableType::Undefined;
 	}
 }
 
@@ -105,6 +127,8 @@ bool isTruthy(const Variable& var)
 		return true;
 	case VariableType::Object:
 		return true;
+	case VariableType::Function:
+		return var.as<FunctionObject>()->InternalType != FunctionType::None;
 	default:
 		// @todo: find proper truths
 		return false;
@@ -228,6 +252,7 @@ String* toString(const Variable& in)
 	}
 	case VariableType::Boolean: return alloc->Make(in.as<bool>() ? "true" : "false");
 	case VariableType::String: return in.as<String>();
+	case VariableType::Function: return alloc->Make(in.as<FunctionObject>()->Name.c_str());
 
 	default:
 		return alloc->GetDefault();
@@ -247,8 +272,9 @@ std::string toStdString(const Variable& in)
 	}
 	case VariableType::Boolean: return in.as<bool>() ? "true" : "false";
 	case VariableType::String: return in.as<String>()->data();
+	case VariableType::Function: return in.as<FunctionObject>()->Name;
 
 	default:
-		return "";
+		return "Undefined";
 	}
 }

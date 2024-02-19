@@ -74,6 +74,7 @@ namespace Eril
 		const char* name = nullptr;
 		const char* space = nullptr;
 		ValueType* arg_types = nullptr;
+		ValueType return_type = ValueType::Undefined;
 
 		void clear() { 
 			if (cleanup) { cleanup(state); } 
@@ -84,7 +85,7 @@ namespace Eril
 		}
 		__internal_function(__internal_function const&) = delete;
 		__internal_function(__internal_function&& o) noexcept : 
-			state(o.state), operate(o.operate), cleanup(o.cleanup), arg_count(o.arg_count), name(o.name), space(o.space)
+			state(o.state), operate(o.operate), cleanup(o.cleanup), arg_count(o.arg_count), name(o.name), space(o.space), return_type(o.return_type)
 		{ o.cleanup = 0; o.name = nullptr; o.space = nullptr; o.arg_types = nullptr; o.clear(); }
 		__internal_function& operator=(__internal_function&& o) noexcept {
 			if (this == &o) return *this;
@@ -95,6 +96,7 @@ namespace Eril
 			arg_count = o.arg_count;
 			name = o.name;
 			space = o.space;
+			return_type = o.return_type;
 			o.cleanup = 0; 
 			o.name = nullptr; 
 			o.space = nullptr;
@@ -141,6 +143,7 @@ namespace Eril
 			retval->space = c;
 		}
 		retval->arg_types = new ValueType[size]{type<Args>()...};
+		retval->return_type = type<F>();
 		retval->arg_count = size;
 		retval->state = new std::decay_t<std::function<F(Args...)>>(std::forward<std::function<F(Args...)>>(f));
 		retval->operate = __make_caller<F, std::decay_t<std::function<F(Args...)>>, Args...>(std::make_index_sequence<size>());
