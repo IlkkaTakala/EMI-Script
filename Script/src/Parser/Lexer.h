@@ -41,6 +41,17 @@ struct Context
 		Valid = Ptr < Last;
 		return Valid;
 	}
+
+	void Back() {
+		Ptr--;
+		if (Column > 0) {
+			Column--;
+		}
+		else {
+			Row--;
+			Column = 0;
+		}
+	}
 };
 
 class Lexer
@@ -61,5 +72,7 @@ private:
 	const char* FileData;
 	size_t Size;
 	Context Current;
+	bool InString;
+	bool InQuote;
 	bool Valid;
 };

@@ -179,6 +179,8 @@ namespace Eril
 
 		InternalValue GetReturn(ValueHandle handle);
 
+		void Interrupt();
+
 		void ReleaseVM();
 
 		void ReinitializeGrammar(const char* grammar);

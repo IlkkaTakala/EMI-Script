@@ -76,13 +76,19 @@ Unary Sub Expr
 Unary Not Expr
 Value True
 Value False
-Value Literal
+Value FormatStr
+Value Quote Literal Quote
 Value Number
 Value Identifier
 Identifier Id
 Identifier Identifier Dot Id
 Value Array
 Array Lbracket CallParams Rbracket 
+
+OFormatArg StrDelimiterL Expr StrDelimiterR
+OFormatArg Literal
+FormatStr Quote OFormatArg Quote
+OFormatArg OFormatArg OFormatArg
 
 MPipe Pipe MPipe
 MPipe Pipe
@@ -211,13 +217,19 @@ None Negate
 None Not
 True True
 False False 
-Literal Literal 
+None None FormatStr
+Literal Literal
 Number Number 
 None None Identifier 
 Id Id 
 Id Id 
 None None Array
 None Array CallParams
+
+None None Expr
+Literal Literal
+None Add OFormatArg
+None Add
 
 None None MPipe
 None Pipe 

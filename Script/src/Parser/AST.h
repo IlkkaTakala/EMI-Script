@@ -47,7 +47,8 @@ public:
 	bool HasError;
 	ankerl::unordered_dense::map<std::string, Namespace> namespaces;
 private:
-	void Walk(Node*);
+	void WalkLoad(Node*);
+	void WalkStore(Node*, uint8 reg);
 	Symbol* findSymbol(const std::string& name, const std::string& space, bool& isNamespace);
 
 	void handleFunction(Node* n, Function* f, Symbol* s);

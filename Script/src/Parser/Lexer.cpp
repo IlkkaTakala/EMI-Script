@@ -94,6 +94,8 @@ void Lexer::Reset()
 	Current.Column = 1;
 	Current.Row = 1;
 	Current.Valid = true;
+	InString = false;
+	InQuote = false;
 }
 
 Token Lexer::GetNext(std::string_view& Data)
@@ -112,14 +114,58 @@ Token Lexer::Analyse(std::string_view& Data)
 	auto& ptr = Current.Ptr;
 	if (!Current.Valid) return token;
 	if (*ptr == '\0') return Token::None;
+	size_t endOffset = 0;
+	auto start = ptr;
+
+	if (InString && InQuote) {
+		while (InString && Current.Valid) {
+			switch (*(ptr))
+			{
+			case '}': {
+				if (*(ptr + 1) == '´') {
+					InString = false;
+				}
+				else Current.Advance();
+			} break;
+
+			case '´': {
+				if (*(ptr + 1) == '{') {
+					InString = false;
+				}
+				else Current.Advance();
+			} break;
+
+			case '"': {
+				InString = false;
+			} break;
+
+			default:
+				Current.Advance();
+				break;
+			}
+		}
+
+		token = Token::Literal;
+		//if (*(ptr + 1) == '´' && *(ptr + 2) == '{') {
+		//	endOffset = 0;
+		//}
+		//else {
+		//	endOffset = 1;
+		//}
+		InString = false;
+
+		Data = std::string_view(start, ptr - start - endOffset);
+		Current.Previous = token;
+
+		return token;
+	}
 
 	while (is_whitespace(*ptr)) Current.Advance();
-	auto start = ptr;
-	size_t endOffset = 0;
+	start = ptr;
 
 	if (ValidIDFirst(*ptr)) {
 		if ((*ptr == 'x' || *ptr == '.') && is_digit(*(ptr + 1))) {
-			TOKEN(Number);
+			token = Token::Number;
 			while (is_alnum(*ptr)) Current.Advance();
 		}
 		else {
@@ -129,109 +175,117 @@ Token Lexer::Analyse(std::string_view& Data)
 			if (auto it = TokenMap.find(value); it != TokenMap.end()) {
 				token = it->second;
 			}
-			else TOKEN(Id);
+			else token = Token::Id;
 		}
 	}
 	else if (is_digit(*ptr)) {
 		while (is_digit(*ptr)) Current.Advance();
 		switch (*ptr) {
-			CASE('.',
-				Current.Advance();
-			while (is_digit(*ptr)) Current.Advance();
-			TOKEN(Number);
-			)
-				CASE('x',
-					Current.Advance();
-			while (is_alnum(*ptr)) Current.Advance();
-			TOKEN(Number);
-			)
+		case '.': { Current.Advance(); while (is_digit(*ptr)) Current.Advance(); token = Token::Number; } break;
+		case 'x': { Current.Advance(); while (is_alnum(*ptr)) Current.Advance(); token = Token::Number; } break;
 		default:
-			TOKEN(Number);
+			token = Token::Number;
 		}
 	}
 	else {
 		switch (*ptr) {
-			CASE(';', TOKEN(Semi);)
-			CASE('(', TOKEN(Lparenthesis);)
-			CASE(')', TOKEN(Rparenthesis);)
-			CASE('{', TOKEN(Lcurly);)
-			CASE('}', TOKEN(Rcurly);)
-			CASE('[', TOKEN(Lbracket);)
-			CASE(']', TOKEN(Rbracket);)
-			CASE('<', TOKEN(Less);)
-			CASE('>', TOKEN(Larger);)
-			CASE(',', TOKEN(Comma);)
-			CASE('?', TOKEN(Opt);)
-			CASE('.', TOKEN(Dot);)
-			CASE(':',
-				if (is_alpha(*(ptr + 1))) {
-					TOKEN(ValueId);
-					Current.Advance();
-					while (ValidID(*(ptr + 1))) Current.Advance();
-				}
-				else TOKEN(Colon);)
-
-			CASE('+', TOKEN(Add);)
-			CASE('-', TOKEN(Sub);)
-			CASE('*', TOKEN(Mult);)
-			CASE('/', 
-				if (*(ptr + 1) == '*') {
-					Current.Advance();
-					while (!(*ptr == '*' && *(ptr + 1) == '/')) Current.Advance();
-					Current.Advance();
-					TOKEN(Skip);
-				} else
-					TOKEN(Div);
-				)
-
-			CASE('"',
+		case ';': { token = Token::Semi; } break;
+		case '(': { token = Token::Lparenthesis; } break;
+		case ')': { token = Token::Rparenthesis; } break;
+		case '{': { token = Token::Lcurly; } break;
+		case '}': { 
+			if (*(ptr + 1) == '´') {
+				token = Token::StrDelimiterR; 
+				Current.Advance(); 
+				InString = true;
+			}
+			else token = Token::Rcurly; 
+		} break;
+		case '´': {
+			if (*(ptr + 1) == '{') {
+				token = Token::StrDelimiterL;
 				Current.Advance();
-				while (*ptr != '"') Current.Advance();
-				TOKEN(Literal);
-				start++; endOffset = 1;
-				)
-
-			CASE('=',
-				if (*(ptr + 1) == '=') {
-					TOKEN(Equal);
+			}
+			else token = Token::Error;
+		} break;
+		case '[': { token = Token::Lbracket; } break;
+		case ']': { token = Token::Rbracket; } break;
+		case '<': { token = Token::Less; } break;
+		case '>': { token = Token::Larger; } break;
+		case ',': { token = Token::Comma; } break;
+		case '?': { token = Token::Opt; } break;
+		case '.': { token = Token::Dot; } break;
+		case ':': { 
+			if (is_alpha(*(ptr + 1))) {
+				token = Token::ValueId; 
+				Current.Advance(); 
+				while (ValidID(*(ptr + 1))) 
 					Current.Advance();
-				}
-				else TOKEN(Assign);
-				)
-					
-			CASE('!',
-				if (*(ptr + 1) == '=') {
-					TOKEN(NotEqual);
-					Current.Advance();
-				}
-				else TOKEN(Not);
-				)
+			}
+			else token = Token::Colon; 
+		} break;
+		case '+': { token = Token::Add; } break;
+		case '-': { token = Token::Sub; } break;
+		case '*': { token = Token::Mult; } break;
+		case '/': { 
+			if (*(ptr + 1) == '*') {
+				Current.Advance(); 
+				while (!(*ptr == '*' && *(ptr + 1) == '/')) 
+					Current.Advance(); 
+				Current.Advance(); 
+				token = Token::Skip;
+			}
+			else token = Token::Div; 
+		} break;
 
-			CASE('|',
+		case '"': { 
+			token = Token::Quote;
+			InString = !InQuote;
+			InQuote = InString;
+		} break;
+
+		case '=': { 
+			if (*(ptr + 1) == '=') {
+				token = Token::Equal; 
 				Current.Advance();
-				switch (*ptr) {
-					CASE('|', TOKEN(Or);)
-						CASE('>', TOKEN(Router);)
-				default:
-					TOKEN(Error);
-				})
+			}
+			else token = Token::Assign; 
+		} break;
 
-			CASE('&',
+		case '!': { 
+			if (*(ptr + 1) == '=') {
+				token = Token::NotEqual; 
 				Current.Advance();
-				if (*ptr == '&') {
-					TOKEN(And);
-				}
-				else TOKEN(Error);
-				)
+			}
+			else token = Token::Not; 
+		} break;
 
-			CASE('#',
-				bool res = true;
-				while (*ptr != '\n' && res) res = Current.Advance();
-				TOKEN(Skip);
-			)
+		case '|': { 
+			Current.Advance(); 
+			switch (*ptr) {
+				case '|': { token = Token::Or; } break; 
+				case '>': { token = Token::Router; } break; 
+				default: token = Token::Error;
+			}
+		} break;
+
+		case '&': { 
+			Current.Advance(); 
+			if (*ptr == '&') {
+				token = Token::And;
+			}
+			else token = Token::Error; 
+		} break;
+
+		case '#': { 
+			bool res = true; 
+			while (*ptr != '\n' && res) 
+				res = Current.Advance(); 
+			token = Token::Skip; 
+		} break;
 
 		default:
-			TOKEN(Skip);
+			token = Token::Skip;
 		}
 
 		Current.Advance();

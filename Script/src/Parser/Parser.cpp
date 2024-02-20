@@ -28,6 +28,10 @@ void Parser::InitializeParser()
 	TokenParseData[TOKEN(Not)] = { 50, Association::Left };
 	TokenParseData[TOKEN(And)] = { 18, Association::Left };
 	TokenParseData[TOKEN(Or)] = { 17, Association::Left };
+	TokenParseData[TOKEN(Literal)] = { 20, Association::Left };
+	TokenParseData[TOKEN(StrDelimiterL)] = { 20, Association::Left };
+	TokenParseData[TOKEN(StrDelimiterR)] = { 20, Association::Left };
+	TokenParseData[TOKEN(OFormatArg)] = { 29, Association::Left };
 }
 
 void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
@@ -220,7 +224,8 @@ Node* Parser::ConstructAST(CompileOptions& options)
 		case Action::SHIFT: {
 			stateStack.push(action.shift);
 			symbolStack.push(holder);
-			if (TokenParseData[(int)holder.token].Precedence != 0) operatorStack.push(holder.token);
+			if (TokenParseData[(int)holder.token].Precedence != 0) 
+				operatorStack.push(holder.token);
 			holder.token = lex.GetNext(holder.data);
 			holder.ptr = nullptr;
 		} break;

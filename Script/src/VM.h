@@ -107,6 +107,7 @@ public:
 	void ReinitializeGrammar(const char* grammar);
 	ScriptHandle Compile(const char* path, const Options& options);
 	void CompileTemporary(const char* data);
+	void Interrupt();
 
 	void* GetFunctionID(const std::string& name);
 

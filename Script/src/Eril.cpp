@@ -88,6 +88,11 @@ InternalValue Eril::VMHandle::GetReturn(ValueHandle handle)
 	return ((VM*)Vm)->GetReturnValue(handle);
 }
 
+void Eril::VMHandle::Interrupt()
+{
+	return ((VM*)Vm)->Interrupt();
+}
+
 void Eril::VMHandle::ReleaseVM()
 {
 	::ReleaseVM(Index);

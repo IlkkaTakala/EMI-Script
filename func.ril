@@ -1,46 +1,14 @@
 
-public def play() {
-	return Game.game();
-}
+var NumberTest = 10;
 
-extend Storage:
-
-extend Game:
-
-const wall = 219;
-const wall2 = 178;
-const wall3 = 177;
-const wall4 = 176;
-const shade = 111;
-const empty = 255;
+var Thread = 0;
 
 public def game() {
-
-	var running : bool = true;
 	
-	var funcTest : function = test;
+	var local = Thread++;
 	
-	call(test);
-	
-	#setupconsole();
-	/*
-	while(running) {
-		
-		for (var i = 0; i < 50; ++i) {
-			writepixel(i - 1, 30, empty, 0);
-			writepixel(i, 30, wall, 1);
-			
-			render();
-			
-			delay(100);
-		}
-	}*/
-}
-
-def call(f) {
-	return f();
-}
-
-def test() {
-	print("Called");
+	while (true) {
+		println("Thread: ´{local}´, Number: ´{NumberTest++}´");
+		delay(500);
+	}
 }

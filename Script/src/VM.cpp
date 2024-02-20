@@ -78,6 +78,11 @@ void VM::CompileTemporary(const char* data)
 	QueueNotify.notify_one();
 }
 
+void VM::Interrupt()
+{
+
+}
+
 void* VM::GetFunctionID(const std::string& name)
 {
 	if (name.find('.') == std::string::npos) {
@@ -224,7 +229,7 @@ void VM::RemoveUnit(const std::string& unit)
 			Namespace& n = Namespaces[name];
 			n.variables.erase(var);
 			n.symbols.erase(var);
-			GlobalVariables.erase(var);
+			GlobalVariables.erase(name + '.' + var);
 		}
 		
 		Units.erase(unit);
@@ -290,6 +295,7 @@ void Runner::operator()()
 		while (interrupt && Owner->IsRunning()) {
 
 		start: // @todo: maybe something better so we can exit whenever?
+			if (!Owner->IsRunning()) goto out;
 			const Instruction& byte = *(Instruction*)current->Ptr++;
 
 #define X(x) case OpCodes::x: goto x;
@@ -492,7 +498,7 @@ void Runner::operator()()
 					switch (f->InternalType)
 					{
 					case FunctionType::User: {
-						if (auto ptr = std::get<Function*>(f->Callee)) {
+						if (auto ptr = std::get<Function*>(f->Callee)) { // @todo: Add finding function
 							if (!ptr->IsPublic && current->FunctionPtr->NamespaceHash != ptr->NamespaceHash) {
 								gWarn() << "Cannot call private function " << ptr->Name << "\n";
 								goto start;
@@ -658,12 +664,12 @@ void Runner::operator()()
 				
 				TARGET(PostMod) {
 					if (byte.in2 == 0) {
-						Registers[byte.in1] = Registers[byte.in1].as<double>() + 1.0;
 						Registers[byte.target] = Registers[byte.in1];
+						Registers[byte.in1] = Registers[byte.in1].as<double>() + 1.0;
 					}
 					else {
-						Registers[byte.in1] = Registers[byte.in1].as<double>() - 1.0;
 						Registers[byte.target] = Registers[byte.in1];
+						Registers[byte.in1] = Registers[byte.in1].as<double>() - 1.0;
 					}
 				} goto start;
 

@@ -83,11 +83,10 @@ Variable GetTypeDefault(VariableType type)
 	case VariableType::Function:
 		return FunctionObject::GetAllocator()->GetDefault();
 	case VariableType::Array:
-		return Variable();
+		return Array::GetAllocator()->GetDefault();
 	case VariableType::Object:
 		return Variable();
 	default:
-		// @todo: find proper defaults
 		return Variable();
 	}
 }
@@ -124,13 +123,12 @@ bool isTruthy(const Variable& var)
 	case VariableType::String:
 		return var.as<String>()->size() > 0; // @todo: string check
 	case VariableType::Array:
-		return true;
+		return var.as<Array>()->size() > 0;
 	case VariableType::Object:
 		return true;
 	case VariableType::Function:
 		return var.as<FunctionObject>()->InternalType != FunctionType::None;
 	default:
-		// @todo: find proper truths
 		return false;
 	}
 }
