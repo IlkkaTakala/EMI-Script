@@ -42,6 +42,18 @@ void arraySize(Variable& out, Variable* args, size_t argc) {
 	}
 }
 
+void arrayResize(Variable& out, Variable* args, size_t argc) {
+	if (argc >= 2 && args[0].getType() == VariableType::Array) {
+		size_t size = static_cast<size_t>(args[1].as<double>());
+		Variable fill;
+		if (argc == 3) {
+			fill = args[2];
+		}
+		args[0].as<Array>()->data().resize(size, fill);
+		out = static_cast<double>(size);
+	}
+}
+
 void arrayPush(Variable&, Variable* args, size_t argc) {
 	if (argc == 2 && args[0].getType() == VariableType::Array) {
 		auto& data = args[0].as<Array>()->data();
@@ -92,6 +104,7 @@ ankerl::unordered_dense::map<std::string, IntrinsicPtr> IntrinsicFunctions {
 	{ "println", printLn },
 	{ "delay", delay },
 	{ "Array.Size", arraySize },
+	{ "Array.Resize", arrayResize },
 	{ "Array.Push", arrayPush },
 	{ "Array.Pop", arrayPop },
 	{ "Array.Remove", arrayRemove },
@@ -105,9 +118,14 @@ ankerl::unordered_dense::map<std::string, std::vector<VariableType>> IntrinsicFu
 	{ "println", { VariableType::Undefined } },
 	{ "delay", { VariableType::Undefined, VariableType::Number } },
 	{ "Array.Size", { VariableType::Number, VariableType::Array } },
+	{ "Array.Resize", { VariableType::Number, VariableType::Array, VariableType::Number, VariableType::Undefined } },
 	{ "Array.Push", { VariableType::Undefined, VariableType::Array, VariableType::Undefined } },
 	{ "Array.Pop", { VariableType::Undefined, VariableType::Array} },
 	{ "Array.Remove", { VariableType::Undefined, VariableType::Array, VariableType::Undefined } },
 	{ "Array.RemoveIndex", { VariableType::Undefined, VariableType::Array, VariableType::Number } },
 	{ "Array.Clear", { VariableType::Undefined, VariableType::Array } },
+};
+
+std::vector<std::string> DefaultNamespaces = {
+	"Array"
 };

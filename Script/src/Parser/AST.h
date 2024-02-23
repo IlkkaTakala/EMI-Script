@@ -3,6 +3,8 @@
 #include "ParseHelper.h"
 #include "Namespace.h"
 
+using NodeDataType = std::variant<std::string, double, bool>;
+
 class Node
 {
 public:
@@ -23,8 +25,8 @@ public:
 	Token type = Token::None;
 	size_t line;
 	size_t depth;
-	std::variant<std::string, double, bool> data;
-	std::list<Node*> children;
+	NodeDataType data;
+	std::vector<Node*> children;
 	Symbol* sym;
 	VariableType varType;
 	uint8 regTarget;
@@ -105,6 +107,6 @@ private:
 	void placeBreaks(Node* n, size_t start, size_t end);
 };
 
-void TypeConverter(Node* n, const TokenHolder& h);
+void TypeConverter(NodeDataType& n, const TokenHolder& h);
 bool Optimize(Node*&);
 void Desugar(Node*&);

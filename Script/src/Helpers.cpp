@@ -3,6 +3,7 @@
 #include "Objects/ArrayObject.h"
 #include "Objects/FunctionObject.h"
 #include <string>
+#include <numeric>
 
 Variable moveOwnershipToVM(const InternalValue& var)
 {
@@ -271,6 +272,15 @@ std::string toStdString(const Variable& in)
 	case VariableType::Boolean: return in.as<bool>() ? "true" : "false";
 	case VariableType::String: return in.as<String>()->data();
 	case VariableType::Function: return in.as<FunctionObject>()->Name;
+	case VariableType::Array: {
+		std::string out = "[ ";
+		size_t index = 0; 
+		auto& arr = in.as<Array>()->data();
+		for (auto& var : arr) {
+			out += toStdString(var) + (index++ + 1 < arr.size() ? ", " : "");
+		}
+		return out + " ]";
+	} 
 
 	default:
 		return "Undefined";

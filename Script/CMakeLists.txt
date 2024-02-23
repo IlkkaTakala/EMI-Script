@@ -44,6 +44,7 @@ endmacro()
 add_dependency(unordered_dense https://github.com/martinus/unordered_dense v4.4.0 TRUE)
 
 set(_src_root_path "${ScriptCore_SOURCE_DIR}/src")
+set(_grammar_path "${ScriptCore_SOURCE_DIR}/src/Parser")
 set(_header_path "${ScriptCore_SOURCE_DIR}/include")
 file(
     GLOB_RECURSE _source_list 
@@ -52,9 +53,6 @@ file(
     "${_src_root_path}/*.h*"
     "${_header_path}/*.h*"
 )
-
-include_directories(${CMAKE_BINARY_DIR})
-list (APPEND _source_list ${CMAKE_BINARY_DIR}/grammar.cpp)
 
 foreach(_source IN ITEMS ${_source_list})
     get_filename_component(_source_path "${_source}" PATH)
@@ -66,6 +64,7 @@ endforeach()
 add_library(Script ${_source_list})
 
 target_compile_definitions(Script PRIVATE SCRIPTEXPORT)
+target_compile_definitions(Script PRIVATE "GRAMMAR_PATH=\"${_grammar_path}\"")
 target_include_directories(Script PUBLIC ${_header_path})
 target_include_directories(Script PRIVATE ${_src_root_path})
 target_include_directories(Script INTERFACE ${_header_path})

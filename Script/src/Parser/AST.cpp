@@ -258,7 +258,7 @@ bool Optimize(Node*& n)
 			if (IsConstant(n->children.front()->type)) {
 				auto old = n;
 				n = *std::next(old->children.begin(), VariantToBool(n->children.front()) ? 1 : 2);
-				old->children.remove(n);
+				std::erase(old->children, n);
 				delete old;
 			}
 		}
@@ -365,7 +365,7 @@ void Desugar(Node*& n)
 		Node* previous = nullptr;
 		for (auto& node : n->children) {
 			if (node->type == Token::FunctionCall && previous) {
-				node->children.back()->children.emplace_front(previous);
+				node->children[1]->children.insert(node->children[1]->children.begin(), previous);
 			}
 			previous = node;
 		}
@@ -379,22 +379,22 @@ void Desugar(Node*& n)
 	}
 }
 
-void TypeConverter(Node* n, const TokenHolder& h)
+void TypeConverter(NodeDataType& n, const TokenHolder& h)
 {
 	switch (h.token)
 	{
 	case Token::Number:
-		n->data = 0.f;
-		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<double>(n->data));
+		n = 0.f;
+		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<double>(n));
 		break;
 	case Token::True:
-		n->data = true;
+		n = true;
 		break;
 	case Token::False:
-		n->data = false;
+		n = false;
 		break;
 	default:
-		std::get<std::string>(n->data) = h.data;
+		std::get<std::string>(n) = h.data;
 		break;
 	}
 }
@@ -585,16 +585,16 @@ void ASTWalker::Run()
 				symbol->startLife = (size_t)-1;
 				symbol->needsLoading = true;
 
-				switch (c->children.front()->type)
+				switch (c->children[0]->type)
 				{
 				case Token::TypeNumber:
 					symbol->varType = VariableType::Number;
-					variable = VariantToFloat(c->children.back());
+					variable = VariantToFloat(c->children[1]);
 					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
 				case Token::TypeString:
 					symbol->varType = VariableType::String;
-					variable = String::GetAllocator()->Make(VariantToStr(c->children.back()).c_str());
+					variable = String::GetAllocator()->Make(VariantToStr(c->children[1]).c_str());
 					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
 				case Token::Typename:
@@ -604,24 +604,24 @@ void ASTWalker::Run()
 					break;
 				case Token::TypeArray:
 					symbol->varType = VariableType::Array;
-					variable = Array::GetAllocator()->Make(c->children.back()->children.size());
+					variable = Array::GetAllocator()->Make(c->children[1]->children.size());
 					// @todo: Initialize global array
 					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
 				case Token::AnyType:
-					switch (c->children.back()->type)
+					switch (c->children[1]->type)
 					{
 					case Token::Number:
 						symbol->varType = VariableType::Number;
-						variable = VariantToFloat(c->children.back());
+						variable = VariantToFloat(c->children[1]);
 						break;
 					case Token::Literal:
 						symbol->varType = VariableType::String;
-						variable = String::GetAllocator()->Make(VariantToStr(c->children.back()).c_str());
+						variable = String::GetAllocator()->Make(VariantToStr(c->children[1]).c_str());
 						break;
 					case Token::Array:
 						symbol->varType = VariableType::Array;
-						variable = Array::GetAllocator()->Make(c->children.back()->children.size());
+						variable = Array::GetAllocator()->Make(c->children[1]->children.size());
 						break;
 					default:
 						symbol->varType = VariableType::Undefined;
@@ -774,7 +774,7 @@ void ASTWalker::WalkLoad(Node* n)
 		//n->sym = _First()->sym;
 		_In8 = _First()->regTarget;
 		_In8_2 = _Last()->regTarget;
-		//_FreeConstant(_Last());
+		_FreeConstant(_Last());
 		_Out;
 	}break;
 
@@ -905,8 +905,7 @@ void ASTWalker::WalkLoad(Node* n)
 				symbol = findSymbol(std::get<std::string>(n->data), std::get<std::string>(_First()->data), isNameSpace);
 			}
 			else {
-				// @todo: This is object
-				_Error("Objects not supported yet");
+				_Error("Unknown symbol");
 			}
 		}
 		if (!symbol || (symbol && symbol->needsLoading)) {
@@ -1150,9 +1149,9 @@ void ASTWalker::WalkLoad(Node* n)
 		_FreeConstant(n);
 
 		auto oldSize = instructionList.size();
-		auto it = ++n->children.begin();
-		WalkLoad(*it);
-		_FreeConstant((*it));
+		auto it = n->children[1];
+		WalkLoad(it);
+		_FreeConstant(it);
 
 		auto& elseinst = instructionList.emplace_back();
 		elseinst.code = OpCodes::JumpForward;
@@ -1181,22 +1180,22 @@ void ASTWalker::WalkLoad(Node* n)
 		WalkLoad(_First());
 
 		auto start = instructionList.size();
-		auto it = ++n->children.begin();
-		WalkLoad(*it);
-		_FreeConstant((*it));
+		auto it = n->children[1];
+		WalkLoad(it);
+		_FreeConstant(it);
 
 		_Op(JumpNeg);
-		n->regTarget = instruction.target = (*it)->regTarget;
+		n->regTarget = instruction.target = it->regTarget;
 		auto jumpStart = instructionList.size();
 
-		auto target = std::next(n->children.begin(), 3);
-		WalkLoad(*target);
-		_FreeConstant((*target));
+		auto target = n->children[3];
+		WalkLoad(target);
+		_FreeConstant(target);
 
 		size_t loopend = instructionList.size();
-		it++;
-		WalkLoad(*it);
-		_FreeConstant((*it));
+		it = n->children[2];
+		WalkLoad(it);
+		_FreeConstant(it);
 
 		auto& elseinst = instructionList.emplace_back();
 		elseinst.code = OpCodes::JumpBackward;
@@ -1230,9 +1229,9 @@ void ASTWalker::WalkLoad(Node* n)
 		auto jumpStart = instructionList.size();
 		n->regTarget = instruction.target = _First()->regTarget;
 
-		auto it = ++n->children.begin();
-		WalkLoad(*it);
-		_FreeConstant((*it));
+		auto it = n->children[1];
+		WalkLoad(it);
+		_FreeConstant(it);
 
 		auto& elseinst = instructionList.emplace_back();
 		elseinst.code = OpCodes::JumpBackward;
@@ -1358,7 +1357,7 @@ void ASTWalker::WalkStore(Node* n, uint8 reg) {
 	Function* f = currentFunction;
 	if (HasDebug) f->DebugLines[(int)n->line] = (int)instructionList.size();
 	auto first_child = n->children.size() ? n->children.front() : nullptr;
-	//auto last_child = n->children.size() ? n->children.back() : nullptr;
+	auto last_child = n->children.size() ? n->children.back() : nullptr;
 	switch (n->type) {
 	case Token::Id: {
 		_Walk;
@@ -1373,7 +1372,7 @@ void ASTWalker::WalkStore(Node* n, uint8 reg) {
 			}
 			else {
 				// @todo: This is object
-				_Error("Objects not supported yet");
+				_Error("Unknown symbol");
 			}
 		}
 		if (!symbol || (symbol && symbol->needsLoading)) {
@@ -1406,6 +1405,16 @@ void ASTWalker::WalkStore(Node* n, uint8 reg) {
 			n->sym = symbol;
 		}
 	} break;
+
+	case Token::Indexer: {
+		_Walk;
+		_Op(StoreIndex);
+		//n->sym = _First()->sym;
+		_In8 = _First()->regTarget;
+		_In8_2 = _Last()->regTarget;
+		_FreeConstant(_Last());
+		_SetOut(n) = reg;
+	}break;
 
 	case Token::Number:
 	case Token::Literal:

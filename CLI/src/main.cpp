@@ -37,7 +37,7 @@ int main()
 		{"exit", [](Eril::VMHandle& vm, const std::vector<std::string>&) { exit(0); return 0; }},
 		{"compile", [](Eril::VMHandle& vm, const std::vector<std::string>& params) {
 			static std::unordered_map<std::string, std::function<void(Eril::Options&)>> optionMap = {
-				{"-s", [](Eril::Options& options) { options.Simplify = true; }}
+				//{"-s", [](Eril::Options& options) { options.Simplify = true; }}
 			};
 			std::vector<std::string> path;
 			Eril::Options options;

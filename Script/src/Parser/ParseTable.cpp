@@ -435,8 +435,8 @@ void CreateParser(ParseTable_t& ParseTable, RuleTable_t& RuleTable, std::vector<
 	g.Firsts.clear();
 	g.Follows.clear();
 
-	std::ofstream outh("../grammar.h");
-	std::ofstream outcpp("../grammar.cpp");
+	std::ofstream outh(GRAMMAR_PATH"/grammar.h");
+	std::ofstream outcpp(GRAMMAR_PATH"/grammar.cpp");
 
 	outh << R"(#pragma once
 #include "Parser/ParseTable.h"

@@ -12,6 +12,14 @@ VM::VM()
 	auto counter = std::thread::hardware_concurrency();
 	CompileRunning = true;
 
+	for (auto& space : DefaultNamespaces) {
+		auto [it, success] = Namespaces.emplace(space, Namespace{});
+		auto sym = new Symbol();
+		sym->setType(SymbolType::Namespace);
+		sym->resolved = true;
+		it->second.Sym = sym;
+	}
+
 	VMRunning = true;
 	for (uint i = 0; i < counter / 2; i++) {
 		ParserPool.emplace_back(Parser::ThreadedParse, this);
@@ -70,7 +78,6 @@ void VM::CompileTemporary(const char* data)
 	CompileOptions fulloptions{};
 	fulloptions.Handle = 0;
 	fulloptions.Data = data;
-	fulloptions.UserOptions.Simplify = true;
 	{
 		std::lock_guard lock(CompileMutex);
 		CompileQueue.push(fulloptions);

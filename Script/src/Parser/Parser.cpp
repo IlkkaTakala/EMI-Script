@@ -196,13 +196,11 @@ Node* Parser::ConstructAST(CompileOptions& options)
 
 	if (!lex.IsValid()) return nullptr;
 
-	bool useSimplify = options.UserOptions.Simplify;
-
 	std::stack<Token> ss;
 
-	std::stack<int> stateStack;
-	std::stack<TokenHolder> symbolStack;
-	std::stack<Token> operatorStack;
+	std::stack<int, std::vector<int>> stateStack;
+	std::stack<TokenHolder, std::vector<TokenHolder>> symbolStack;
+	std::stack<Token, std::vector<Token>> operatorStack;
 	stateStack.push(0);
 
 	//int inputIndex = 0;
@@ -237,48 +235,56 @@ Node* Parser::ConstructAST(CompileOptions& options)
 
 			TokenHolder next;
 			next.token = rule.nonTerminal;
-			if (useSimplify) {
+
+
+			if (data.mergeToken == Token::None) {
 				next.ptr = new Node();
-				if (data.mergeToken == Token::None) {
-					next.ptr->type = data.nodeType == Token::None ? next.token : data.nodeType;
-				}
-				else {
-					next.ptr->type = next.token;
-				}
+				next.ptr->type = data.nodeType == Token::None ? next.token : data.nodeType;
 				next.ptr->depth = 0;
 				next.ptr->line = lex.GetContext().Row;
 			}
 			else {
-				next.ptr = new Node();
-				next.ptr->type = next.token;
+				//next.ptr->type = next.token;
 			}
+
+			thread_local static std::vector<Node*> childrenList;
+			childrenList.clear();
+			size_t maxDepth = 0;
+			NodeDataType nodeData;
+			bool hasData = false;
 
 			for (int i = 0; i < rule.development.size(); ++i) {
 				if (rule.development[i] == Token::None) break;
 				if (!operatorStack.empty() && symbolStack.top().token == operatorStack.top()) operatorStack.pop();
 
 				auto& old = symbolStack.top();
-				if (useSimplify) {
-					if (data.mergeToken == old.token) {
-						if (next.ptr) delete next.ptr;
-						next.ptr = old.ptr;
-						if (data.nodeType != Token::None) next.ptr->type = data.nodeType;
-					}
-					else if (old.ptr && next.ptr) {
-						next.ptr->children.push_front(old.ptr);
-						next.ptr->depth = std::max(next.ptr->depth, old.ptr->depth + 1);
+
+				if (data.mergeToken == old.token) {
+					if (next.ptr) delete next.ptr;
+					next.ptr = old.ptr;
+					if (data.nodeType != Token::None) next.ptr->type = data.nodeType;
+				}
+				else {
+					if (old.ptr) {
+						childrenList.push_back(old.ptr);
+						maxDepth = std::max(maxDepth, old.ptr->depth + 1);
 					}
 					else if (old.token == data.dataToken) {
-						TypeConverter(next.ptr, old);
+						TypeConverter(nodeData, old);
+						hasData = true;
 					}
 				}
-				else if(old.ptr && next.ptr)
-					next.ptr->children.push_front(old.ptr);
 
 				symbolStack.pop();
 				stateStack.pop();
 			}
 			if (next.ptr) {
+				if (hasData) next.ptr->data = nodeData;
+				next.ptr->depth = std::max(maxDepth, next.ptr->depth);
+				next.ptr->children.reserve(next.ptr->children.size() + childrenList.size());
+				for (auto it = childrenList.begin(); it != childrenList.end(); it++) {
+					next.ptr->children.insert(next.ptr->children.begin(), *it);
+				}
 				Optimize(next.ptr);
 			}
 

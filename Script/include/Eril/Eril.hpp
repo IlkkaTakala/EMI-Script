@@ -62,7 +62,6 @@ namespace Eril
 
 	struct Options
 	{
-		bool Simplify = false;
 	};
 
 	// https://stackoverflow.com/a/65382619
