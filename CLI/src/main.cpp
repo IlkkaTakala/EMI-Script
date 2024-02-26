@@ -1,4 +1,4 @@
-#include <Eril/Eril.hpp>
+#include <EMI/EMI.h>
 #include <thread>
 #include <chrono>
 #include <numeric>
@@ -29,18 +29,18 @@ int print(const char* number) {
 	return 100;
 }
 
-REGISTER_NOVA(Global, printStr, print);
+EMI_REGISTER(Global, printStr, print);
 
 int main()
 {
-	std::unordered_map<std::string, std::function<int(Eril::VMHandle&, const std::vector<std::string>&)>> commandTable = {
-		{"exit", [](Eril::VMHandle& vm, const std::vector<std::string>&) { exit(0); return 0; }},
-		{"compile", [](Eril::VMHandle& vm, const std::vector<std::string>& params) {
-			static std::unordered_map<std::string, std::function<void(Eril::Options&)>> optionMap = {
-				//{"-s", [](Eril::Options& options) { options.Simplify = true; }}
+	std::unordered_map<std::string, std::function<int(EMI::VMHandle&, const std::vector<std::string>&)>> commandTable = {
+		{"exit", [](EMI::VMHandle& vm, const std::vector<std::string>&) { exit(0); return 0; }},
+		{"compile", [](EMI::VMHandle& vm, const std::vector<std::string>& params) {
+			static std::unordered_map<std::string, std::function<void(EMI::Options&)>> optionMap = {
+				//{"-s", [](EMI::Options& options) { options.Simplify = true; }}
 			};
 			std::vector<std::string> path;
-			Eril::Options options;
+			EMI::Options options;
 			for (int i = 1; i < params.size(); i++) {
 				if (auto it = optionMap.find(params[i]); it != optionMap.end()) {
 					it->second(options);
@@ -54,11 +54,11 @@ int main()
 				result += vm.CompileScript(p.c_str(), options); 
 			return result > 0 ? 1 : 0;
 		}},
-		{"reinit", [](Eril::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
-		{"eril", [](Eril::VMHandle& vm, const std::vector<std::string>& params) { return 2; }},
+		{"reinit", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
+		{"emi", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { return 2; }},
 	};
 
-	auto vm = Eril::CreateEnvironment();
+	auto vm = EMI::CreateEnvironment();
 	vm.ReinitializeGrammar("../../.grammar");
 
 	bool run = true;
@@ -92,7 +92,7 @@ int main()
 				}
 				auto res = split(input, ' ');
 				if (res.size() > 0) {
-					Eril::FunctionHandle h = vm.GetFunctionHandle(res[0].c_str());
+					EMI::FunctionHandle h = vm.GetFunctionHandle(res[0].c_str());
 					auto handle = h(res.size() > 1 ? res[1].c_str() : "10");
 					/*if (handle.get<const char*>()) 
 						std::cout << handle.get<const char*>() << '\n';*/
@@ -124,7 +124,7 @@ int main()
 		
 	}
 
-	Eril::ReleaseEnvironment(vm);
+	EMI::ReleaseEnvironment(vm);
 	std::this_thread::sleep_for(10ms);
 
 	/*srand(time(NULL));

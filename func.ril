@@ -1,31 +1,26 @@
 
-var NumberTest = 10;
+def makeArray(size : number, value) : array {
+	var out : array;
+	Array.Resize(out, size);
+	for (out) {
+		out[_index_] = Copy(value);
+	}
+	return out;
+}
 
-var Thread = 0;
+object Loc
+{
+	x = 2;
+	y = 0;
+}
 
 public def game() {
 	
-	var local = Thread++;
+	var test = false;
+	var l : Loc;
+	var Field : array = makeArray(3, test == true ? 2 : 4);
 	
-	var arr = [1, 3, 5, 6];
+	for (item in Field) println(item);
 	
-	print(arr[2]);
-	arr[2] = [1, 2];
-	print(arr[2][1]);
-	
-	var index = 0;
-	for (var i = 0; i < 6; ++i) {
-		
-		if (i < 3) continue;
-		index++;
-	}
-	println(index);
-	
-	return;
-	
-	while (true) {
-		println("Thread: ´{local}´, Number: ´{NumberTest++}´");
-		delay(500);
-	}
-	
+	println(Field);
 }

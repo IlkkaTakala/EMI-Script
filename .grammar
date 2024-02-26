@@ -84,6 +84,7 @@ Identifier Id
 Identifier Identifier Dot Id
 Value Array
 Array Lbracket CallParams Rbracket 
+Expr Expr Dot Id
 
 OFormatArg StrDelimiterL Expr StrDelimiterR
 OFormatArg Literal
@@ -118,6 +119,8 @@ Flow WhileFlow
 
 IfFlow If Lparenthesis Expr Rparenthesis FlowBlock ElseFlow
 ForFlow For Lparenthesis Expr Semi Expr Semi Expr Rparenthesis FlowBlock ElseFlow
+ForFlow For Lparenthesis Expr Rparenthesis FlowBlock ElseFlow
+ForFlow For Lparenthesis Id In Expr Rparenthesis FlowBlock ElseFlow
 WhileFlow While Lparenthesis Expr Rparenthesis FlowBlock
 ElseFlow Else FlowBlock
 ElseFlow None
@@ -225,6 +228,7 @@ Id Id
 Id Id 
 None None Array
 None Array CallParams
+Id Property
 
 None None Expr
 Literal Literal
@@ -259,6 +263,8 @@ None None WhileFlow
 
 None If
 None For
+None For
+Id For
 None While
 None Else
 None Else

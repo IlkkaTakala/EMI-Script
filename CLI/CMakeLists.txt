@@ -16,7 +16,7 @@ file(
     "${_src_root_path}/*.h*"
 )
 
-add_executable(ErilCLI ${_source_list})
+add_executable(EMICLI ${_source_list})
 
-target_link_libraries(ErilCLI PUBLIC Script)
-#target_include_directories(ErilCLI PUBLIC Script_INCLUDE_DIRS)
+target_link_libraries(EMICLI PUBLIC EMI)
+#target_include_directories(EMICLI PUBLIC Script_INCLUDE_DIRS)
