@@ -24,13 +24,11 @@ public def insert(map : MapContainer, key, value) {
 		if (map.equality(item, key)) {
 			index = _index_;
 			itemFound = true;
-			println("found");
 			break;
 		}
 	}
 	if (!itemFound) {
 		index = Array.Size(map.keys);
-		println("not found " + index);
 		Array.Push(map.keys, key);
 	}
 	
@@ -46,11 +44,21 @@ public def Clear(map : MapContainer) {
 public def Erase(map : MapContainer, key) {
 	for (item in map.keys) {
 		if (map.equality(key, item)) {
-			Array.Remove(map.keys, _index_);
-			Array.Remove(map.keys, _index_);
+			println("Erased");
+			Array.RemoveIndex(map.keys, _index_);
+			Array.RemoveIndex(map.keys, _index_);
 			break;
 		}
 	}
+}
+
+public def Get(map : MapContainer, key) {
+	for (item in map.keys) {
+		if (map.equality(key, item)) {
+			return map.values[_index_];
+		}
+	}
+	return null;
 }
 
 extend Global:
@@ -98,7 +106,7 @@ def GetStateCost(state, id) {
 def GetCost(state, g) {
 	var x_dist = Target.x - state.x;
 	var y_dist = Target.y - state.y;
-	return g + 0.5 * Math.Sqrt(x_dist * x_dist + y_dist * y_dist);
+	return g;# + 0.5 * Math.Sqrt(x_dist * x_dist + y_dist * y_dist);
 }
 
 def Visit(state : Coord) {
@@ -123,7 +131,7 @@ def calculateCost (n : Node) {
 	n.Cost = GetCost(n.state, n.G);
 }
 
-def getNextLegalStates(n : Node, NodeList : array) {
+def getNextLegalStates(n : Node) {
 
 	var nextStates : array;
 	Array.Resize(nextStates, Array.Size(Actions));
@@ -133,7 +141,6 @@ def getNextLegalStates(n : Node, NodeList : array) {
 		var newState = transition(n, Actions[act], act);
 		if (newState != null && ValidPostCheck(newState.state)) {
 			Array.Push(nextStates, newState);
-			Array.Push(NodeList, newState);
 		}
 		else newState.prevNode = null;
 	}
@@ -156,48 +163,51 @@ def find(arr : array, value, equality : function) {
 }
 
 def findPath(begin : Coord, target : Coord) : array {
-	var NodeList : array;
+
 	var openList : MapContainer;
 	openList.equality = equal;
 	var closedList : array;
 
 	var currentNode = Node{0, null, begin};
 
-	Array.Push(NodeList, currentNode);
 	Array.PushUnique(closedList, currentNode.state);
 
 	while (currentNode != null) {
 		if (Visit(currentNode.state)) {
-			for (child in getNextLegalStates(currentNode, NodeList)) {
+			for (child in getNextLegalStates(currentNode)) {
+
 				if (child == null) continue;
-				println(_index_);
+
 				calculateCost(child);
 				
-				if (find(closedList, child.state, equal)) {
+				if (find(closedList, child.state, equal) != null) {
 					continue;
 				}
-				if (var s = find(openList.keys, child.state, equal)) {
+
+				var s = Map.Get(openList, child.state);
+				if (s != null) {
 					if (s.G > child.G) {
 						Map.insert(openList, child.state, child);
 					}
 				}
 				else Map.insert(openList, child.state, child);
 			}
-			println("loop done");
 		}
 		else {
 			break;
 		}
-
+		
+		delay(1000);
+		
 		if (Array.Size(openList.keys) == 0) {
 			break;
 		}
 	
-		println(openList.values);
 		currentNode = openList.values[0];
 		var maxValue = currentNode.Cost;
 		for (item in openList.values) {
 			var nVal = item.Cost;
+			println(nVal);
 			if (nVal < maxValue) {
 				maxValue = nVal;
 				currentNode = item;
@@ -205,7 +215,9 @@ def findPath(begin : Coord, target : Coord) : array {
 		}
 
 		Array.PushUnique(closedList, currentNode.state);
+		println(Array.Size(openList.values));
 		Map.Erase(openList, currentNode.state);
+		println(Array.Size(openList.values));
 	}
 
 	Array.Clear(closedList);
@@ -217,11 +229,6 @@ def findPath(begin : Coord, target : Coord) : array {
 		Array.PushFront(actionPath, currentNode.actionID);
 		currentNode = currentNode.prevNode;
 	}
-
-	for (n in NodeList) {
-		n.prevNode = null;
-	}
-	Array.Clear(NodeList);
 
 	return actionPath;
 }
@@ -244,7 +251,6 @@ public def game() {
 	];
 	
 	actions = findPath(charCoord, Target);
-	println(actions);
 	
 	return;
 	

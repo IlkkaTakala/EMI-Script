@@ -9,6 +9,13 @@ constexpr unsigned char print_first[] = { 195, 196, 196, 0 };
 constexpr unsigned char print_last[] = { 192, 196, 196, 0 };
 constexpr unsigned char print_add[] = { 179, 32, 32, 32, 0 };
 
+#ifdef DEBUG
+#define X(x) { OpCodes::x, #x },
+std::unordered_map<OpCodes, std::string> OpcodeNames = {
+#include "Opcodes.h"
+};
+#endif // DEBUG
+
 std::string VariantToStr(Node* n) {
 	switch (n->data.index())
 	{
@@ -536,7 +543,7 @@ void ASTWalker::Run()
 				symbol->needsLoading = true;
 				Function* function = new Function();
 				function->Name = data;
-				function->IsPublic = c->type == Token::PublicFunctionDef;
+				function->IsPublic = c->type == Token::PublicFunctionDef || currentNamespace->Name == "Global";
 				currentNamespace->functions.emplace(function->Name.c_str(), function).first->second;
 				c->sym = symbol;
 				function->Namespace = currentNamespace->Name;
@@ -672,6 +679,9 @@ void ASTWalker::Run()
 	}
 }
 
+void printInstruction(const Instruction& in) {
+	gLogger() << "Target: " << (int)in.target << ", In: " << (int)in.in1 << ", In2: " << (int)in.in2 << ", Param: " << (int)in.param << ", \t" << "Code: " << OpcodeNames[in.code] << '\n';
+}
 
 #define _Op(op) n->instruction = instructionList.size(); auto& instruction = instructionList.emplace_back(); instruction.code = OpCodes::op; 
 #define _Walk for(auto& child : n->children) WalkLoad(child);
@@ -679,14 +689,14 @@ void ASTWalker::Run()
 #define _In8 instruction.in1
 #define _In8_2 instruction.in2
 #define _Out n->regTarget = instruction.target = getFirstFree()
-#define _FreeChildren for (auto& c : n->children) { if (IsConstant(c->type) || IsOperator(c->type) || !c->sym  || (c->sym && c->sym->needsLoading) ) freeReg(c->regTarget); }
+#define _FreeChildren for (auto& c : n->children) { if (!c->sym  || (c->sym && c->sym->needsLoading) ) freeReg(c->regTarget); }
 #define _Type n->varType 
 #define _SetOut(n) n->regTarget = instructionList[n->instruction].target
 #define _First() first_child
 #define _Last() last_child
 #define _Error(text) gError() << "Line " << n->line << ": " << text << "\n"; HasError = true;
 #define _Warn(text) gWarn() << "Line " << n->line << ": " << text << "\n";
-#define _FreeConstant(n) if (IsConstant(n->type) || IsOperator(n->type) || (n->sym && n->sym->needsLoading) ) freeReg(n->regTarget);
+#define _FreeConstant(n) if (!n->sym || (n->sym && n->sym->needsLoading) ) freeReg(n->regTarget);
 #define _EnsureOperands if (n->children.size() != 2) { _Error("Invalid number of operands") break; }
 
 #define _Operator(varTy, op, op2) \
@@ -806,6 +816,11 @@ void ASTWalker::WalkLoad(Node* n)
 			_FreeConstant(c);
 		}
 		_FreeChildren;
+		{
+			_Op(Copy);
+			_In8 = n->regTarget;
+			_Out;
+		}
 		_Type = VariableType::Array;
 	}break;
 
@@ -1167,7 +1182,7 @@ void ASTWalker::WalkLoad(Node* n)
 		auto& lhs = _First();
 		auto& rhs = _Last();
 
-		if (IsConstant(rhs->type) || IsOperator(rhs->type)) {
+		if (!rhs->sym || (rhs->sym && rhs->sym->needsLoading)) {
 			WalkStore(lhs);
 			_FreeConstant(rhs);
 			n->regTarget = _SetOut(rhs) = lhs->regTarget;
@@ -1178,7 +1193,7 @@ void ASTWalker::WalkLoad(Node* n)
 			_In8 = rhs->regTarget;
 			_SetOut(n) = WalkStore(lhs);
 		}
-
+		n->sym = lhs->sym;
 		if (lhs->sym && !isAssignable(lhs->sym->flags)) {
 			_Error("Trying to assign to unassignable type");
 			HasError = true;
@@ -1202,6 +1217,7 @@ void ASTWalker::WalkLoad(Node* n)
 		sym->setType(n->type == Token::VarDeclare ? SymbolType::Variable : SymbolType::Static);
 		sym->resolved = true;
 		sym->needsLoading = false;
+		n->sym = sym;
 		if (n->children.size() > 0) {
 			_Walk;
 			sym->varType = _Type = _First()->varType;
@@ -1211,8 +1227,7 @@ void ASTWalker::WalkLoad(Node* n)
 			if (n->children.size() == 2) {
 				if (_Last()->varType == _Type || _Type == VariableType::Undefined || _Last()->varType == VariableType::Undefined) {
 					sym->varType = _Type = _Last()->varType;
-					auto type = _Last()->type;
-					if (IsConstant(type) || IsOperator(type)) {
+					if (!_Last()->sym) {
 						sym->reg = n->regTarget = _Last()->regTarget;
 					}
 					else {
@@ -1242,7 +1257,7 @@ void ASTWalker::WalkLoad(Node* n)
 		auto name = getFullId(_First());
 		for (auto& c : _Last()->children) {
 			WalkLoad(c);
-			if (IsConstant(c->type) || IsOperator(c->type) || c->regTarget == last + 1) {
+			if (!c->sym || c->regTarget == last + 1) {
 				freeReg(c->regTarget);
 				last = _SetOut(c) = getLastFree();
 			}
@@ -1417,7 +1432,6 @@ void ASTWalker::WalkLoad(Node* n)
 			auto regs = registers;
 
 			WalkLoad(_First());
-			_FreeConstant(_First());
 
 			auto sym = currentScope->addSymbol("_index_");
 			sym->reg = getFirstFree();
@@ -1426,7 +1440,7 @@ void ASTWalker::WalkLoad(Node* n)
 			{
 				_Op(LoadImmediate);
 				_In16 = (uint16)-1;
-				sym->reg = _Out;
+				n->regTarget = instruction.target = sym->reg;
 			}
 
 			auto& data = std::get<std::string>(n->data);
@@ -1547,7 +1561,7 @@ void ASTWalker::WalkLoad(Node* n)
 				Type = 2;
 				goto function;
 			}
-			Type = 4;
+			Type = 3; // @todo: This should be 4, fix 
 			goto function;
 		}
 		else if (_First()->sym->type != SymbolType::Function && _First()->sym->type == SymbolType::Variable) {
@@ -1803,8 +1817,7 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 			for (auto& stmt : c->children) {
 				try {
 					WalkLoad(stmt);
-					if (IsConstant(stmt->type) || IsOperator(stmt->type) || (stmt->sym && stmt->sym->needsLoading)) 
-						freeReg(stmt->regTarget);;
+					_FreeConstant(stmt);
 				}
 				catch (...) {
 					gError() << "Internal error occured!\n";
@@ -1826,6 +1839,15 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 	for (int i = 0; i < instructionList.size(); i++) {
 		f->Bytecode[i] = instructionList[i].data;
 	}
+//
+//#ifdef DEBUG
+//	gLogger() << "Function " << f->Name << '\n';
+//	gLogger() << "----------------------------------\n";
+//	for (auto& in : instructionList) {
+//		printInstruction(in);
+//	}
+//	gLogger() << "\n\n";
+//#endif // DEBUG
 
 	f->FunctionTable.resize(f->FunctionTableSymbols.size(), nullptr);
 	f->ExternalTable.resize(f->FunctionTableSymbols.size(), nullptr);
@@ -1863,9 +1885,11 @@ void ASTWalker::placeBreaks(Node* n, size_t start, size_t end)
 		case Token::Continue: {
 			instructionList[node->instruction].param = (uint16)start;
 		} break;
+		case Token::For:
+		case Token::While: break;
 		default:
+			placeBreaks(node, start, end);
 			break;
 		}
-		placeBreaks(node, start, end);
 	}
 }

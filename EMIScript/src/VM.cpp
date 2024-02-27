@@ -256,6 +256,8 @@ void VM::GarbageCollect()
 
 		String::GetAllocator()->Free();
 		Array::GetAllocator()->Free();
+		FunctionObject::GetAllocator()->Free();
+		UserObject::GetAllocator()->Free();
 
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 	}
@@ -663,13 +665,33 @@ void Runner::operator()()
 								goto start;
 							}
 
-							for (int i = 1; i < ptr->Types.size() && i < byte.in2; i++) {
-								if ((ptr->Types[i] != VariableType::Undefined
-									&& ptr->Types[i] != Registers[byte.in1 + (i - 1)].getType())
-									&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
 
-									gWarn() << "Invalid argument types when calling " << ptr->Name << " from " << current->FunctionPtr->Name << "\n";
-									goto start;
+							for (int i = 1; i < ptr->Types.size() && i < byte.in2; i++) {
+								if (ptr->Types[i] != VariableType::Undefined
+									&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
+									VariableType real = ptr->Types[i];
+
+									if (real >= VariableType::Object) {
+										size_t typeidx = static_cast<uint16>(real) - static_cast<uint16>(VariableType::Object);
+										if (typeidx < ptr->TypeTable.size()) {
+											real = ptr->TypeTable[typeidx];
+											if (real == VariableType::Undefined) {
+												auto& name = ptr->TypeTableSymbols[typeidx];
+												UserDefinedType* usertype = nullptr;
+												if (GetManager().GetType(usertype, name)) {
+													ptr->TypeTable[typeidx] = real = usertype->Type;
+												}
+											}
+										}
+										else {
+											gError() << "Invalid type while calling " << ptr->Name << "\n";
+										}
+									}
+
+									if (real != Registers[byte.in1 + (i - 1)].getType()) {
+										gWarn() << "Invalid argument types when calling " << ptr->Name << " from " << current->FunctionPtr->Name << "\n";
+										goto start;
+									}
 								}
 							}
 

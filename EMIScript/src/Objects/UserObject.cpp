@@ -24,7 +24,7 @@ Variable ObjectManager::Make(VariableType type) const
 {
 	if (auto it = BaseTypes.find(type); it != BaseTypes.end()) {
 
-		UserObject* object = UserObject::GetAllocator().Make(type, (uint16)it->second.DefaultFields.size());
+		UserObject* object = UserObject::GetAllocator()->Make(type, (uint16)it->second.DefaultFields.size());
 		object->RefCount++;
 
 		uint16 idx = 0;
@@ -111,10 +111,17 @@ UserObject::~UserObject()
 	DataCount = 0;
 }
 
-Allocator<UserObject>& UserObject::GetAllocator()
+void UserObject::Clear()
+{
+	for (int i = 0; i < DataCount; ++i) {
+		Data[i].setUndefined();
+	}
+}
+
+Allocator<UserObject>* UserObject::GetAllocator()
 {
 	static Allocator<UserObject> alloc;
-	return alloc;
+	return &alloc;
 }
 
 ObjectManager& GetManager()

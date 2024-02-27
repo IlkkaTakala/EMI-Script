@@ -13,6 +13,11 @@ void Array::Realloc(size_t s)
 	Data.reserve(s);
 }
 
+void Array::Clear()
+{
+	Data.clear();
+}
+
 Allocator<Array>* Array::GetAllocator()
 {
 	static Allocator<Array> alloc;

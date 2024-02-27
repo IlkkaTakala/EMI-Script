@@ -11,6 +11,7 @@ public:
 
 	void Realloc(size_t s);
 	void Realloc() { Realloc(0); }
+	void Clear();
 
 	std::vector<Variable>& data() { return Data; }
 	size_t size() const { return Data.size(); }

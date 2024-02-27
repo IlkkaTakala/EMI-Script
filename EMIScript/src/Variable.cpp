@@ -43,6 +43,14 @@ Variable::~Variable()
 	value = NIL_VAL;
 }
 
+void Variable::setUndefined()
+{
+	if (isObject()) {
+		as<Object>()->RefCount--;
+	}
+	value = NIL_VAL;
+}
+
 bool Variable::isString() const
 {
 	return isObject() && as<Object>()->Type == VariableType::String;

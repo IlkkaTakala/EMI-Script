@@ -52,9 +52,16 @@ public:
 	}
 
 	void Free() {
+		std::unique_lock lk(AllocLock);
 		for (int i = 1; i < PointerList.size(); i++) {
 			if (PointerList[i]->RefCount == 0) {
 				PointerList[i]->RefCount = -1;
+				constexpr bool hasClear = requires(T & t) {
+					t.Clear();
+				};
+				if constexpr (hasClear) {
+					PointerList[i]->Clear();
+				}
 				FreeList.push(i);
 			}
 		}

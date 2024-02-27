@@ -58,7 +58,7 @@ public:
 
 	~Variable();
 
-	inline void setUndefined() { value = NIL_VAL; }
+	void setUndefined();
 
 	inline bool isNumber() const {
 		return (((value)&QNAN) != QNAN);

@@ -16,10 +16,11 @@ public:
 	}
 
 	UserObject(VariableType type, uint16 count);
-
 	~UserObject();
 
-	static Allocator<UserObject>& GetAllocator();
+	void Clear();
+
+	static Allocator<UserObject>* GetAllocator();
 
 	uint16 size() const { return DataCount; }
 
