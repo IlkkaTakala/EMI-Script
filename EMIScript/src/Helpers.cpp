@@ -274,7 +274,7 @@ std::string toStdString(const Variable& in)
 	case VariableType::Number: {
 		double value = in.as<double>();
 		if (trunc(value) == value) {
-			return std::to_string((size_t)value).c_str();
+			return std::to_string((int64)value).c_str();
 		}
 		return std::to_string(value).c_str();
 	}

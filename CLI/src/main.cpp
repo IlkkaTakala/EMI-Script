@@ -56,6 +56,7 @@ int main()
 		}},
 		{"reinit", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
 		{"emi", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { return 2; }},
+		{"loglevel", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { if (params.size() > 1) EMI::SetLogLevel(std::atoi(params[1].c_str())); return 0; }},
 	};
 
 	auto vm = EMI::CreateEnvironment();

@@ -50,7 +50,7 @@ public:
 	bool HasError;
 private:
 	void WalkLoad(Node*);
-	void WalkStore(Node*, uint8 reg);
+	uint8 WalkStore(Node*);
 	Symbol* findSymbol(const std::string& name, const std::string& space, bool& isNamespace);
 
 	void handleFunction(Node* n, Function* f, Symbol* s);

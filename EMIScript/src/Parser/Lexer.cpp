@@ -27,6 +27,7 @@ ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
 	{"set", Token::Set },
 	{"static", Token::Static },
 	{"const", Token::Const },
+	{"null", Token::Null },
 
 	{"string", Token::TypeString},
 	{"bool", Token::TypeBoolean},

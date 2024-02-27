@@ -176,6 +176,9 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	if (!ast.HasError) {
 		vm->AddNamespace(fullPath, ast.namespaces);
 	}
+	else {
+		gError() << "Errors present, compile failed: " << fullPath << "\n";
+	}
 }
 
 Node* Parser::ConstructAST(CompileOptions& options)

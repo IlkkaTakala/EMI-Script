@@ -54,6 +54,11 @@ VMHandle EMI::CreateEnvironment()
 	return VMHandle(idx, GetVM(idx));
 }
 
+CORE_API void EMI::SetLogLevel(int level)
+{
+	gLogger().SetLogLevel(level);
+}
+
 EMI::VMHandle::VMHandle(unsigned int value, void* ptr) : Index(value), Vm(ptr)
 {
 

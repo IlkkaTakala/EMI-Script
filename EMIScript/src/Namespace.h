@@ -22,11 +22,13 @@ struct Namespace
 	inline void merge(Namespace& rhs) {
 		functions.insert(rhs.functions.begin(), rhs.functions.end());
 		objectTypes.insert(rhs.objectTypes.begin(), rhs.objectTypes.end());
+		objects.insert(rhs.objects.begin(), rhs.objects.end());
 		symbols.insert(rhs.symbols.begin(), rhs.symbols.end());
 		variables.insert(rhs.variables.begin(), rhs.variables.end());
 
 		rhs.functions.clear();
 		rhs.objects.clear();
+		rhs.objectTypes.clear();
 		rhs.symbols.clear();
 		rhs.variables.clear();
 

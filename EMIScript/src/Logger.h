@@ -8,13 +8,15 @@ enum class LogLevel : uint8_t
 	Debug,
 	Info,
 	Warning,
-	Error
+	Error,
+	None,
 };
 
 class Logger
 {
 public:
 	explicit Logger();
+	void SetLogLevel(int level);
 
 	Logger& operator<<(LogLevel level)
 	{

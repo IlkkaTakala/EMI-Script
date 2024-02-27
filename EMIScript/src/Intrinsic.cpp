@@ -45,7 +45,7 @@ void arraySize(Variable& out, Variable* args, size_t argc) {
 
 void arrayResize(Variable& out, Variable* args, size_t argc) {
 	if (argc >= 2 && args[0].getType() == VariableType::Array) {
-		size_t size = static_cast<size_t>(args[1].as<double>());
+		size_t size = static_cast<size_t>(toNumber(args[1]));
 		Variable fill;
 		if (argc == 3) {
 			fill = args[2];
@@ -59,7 +59,26 @@ void arrayPush(Variable&, Variable* args, size_t argc) {
 	if (argc == 2 && args[0].getType() == VariableType::Array) {
 		auto& data = args[0].as<Array>()->data();
 		data.push_back(args[1]);
+	}
+}
 
+void arrayPushFront(Variable&, Variable* args, size_t argc) {
+	if (argc == 2 && args[0].getType() == VariableType::Array) {
+		auto& data = args[0].as<Array>()->data();
+		data.insert(data.begin(), args[1]);
+	}
+}
+
+void arrayPushUnique(Variable& out, Variable* args, size_t argc) {
+	if (argc == 2 && args[0].getType() == VariableType::Array) {
+		auto& data = args[0].as<Array>()->data();
+		if (auto it = std::find(data.begin(), data.end(), args[1]); it == data.end()) {
+			data.push_back(args[1]);
+			out = static_cast<int>(data.size() - 1);
+		}
+		else {
+			out = static_cast<int>(it - data.begin());
+		}
 	}
 }
 
@@ -88,6 +107,18 @@ void arrayClear(Variable&, Variable* args, size_t argc) {
 	if (argc == 1 && args[0].getType() == VariableType::Array) {
 		auto& data = args[0].as<Array>()->data();
 		data.clear();
+	}
+}
+
+void arrayFind(Variable& out, Variable* args, size_t argc) {
+	if (argc == 1 && args[0].getType() == VariableType::Array) {
+		auto& data = args[0].as<Array>()->data();
+		if (auto it = std::find(data.begin(), data.end(), args[1]); it != data.end()) {
+			out = static_cast<int>(it - data.begin());
+		}
+		else {
+			out = static_cast<int>(data.size());
+		}
 	}
 }
 
@@ -128,7 +159,11 @@ void copy(Variable& out, Variable* args, size_t argc) {
 	}
 }
 
-
+void mathsqrt(Variable& out, Variable* args, size_t argc) {
+	if (argc == 1) {
+		out = sqrt(args[0].as<double>());
+	}
+}
 
 
 
@@ -142,10 +177,14 @@ ankerl::unordered_dense::map<std::string, IntrinsicPtr> IntrinsicFunctions {
 	{ "Array.Size", arraySize },
 	{ "Array.Resize", arrayResize },
 	{ "Array.Push", arrayPush },
+	{ "Array.PushFront", arrayPushFront },
+	{ "Array.PushUnique", arrayPushUnique },
 	{ "Array.Pop", arrayPop },
 	{ "Array.Remove", arrayRemove },
 	{ "Array.RemoveIndex", arrayRemoveIdx },
 	{ "Array.Clear", arrayClear },
+	{ "Array.Find", arrayFind },
+	{ "Math.Sqrt", mathsqrt },
 	{ "Copy", copy },
 
 };
@@ -157,10 +196,14 @@ ankerl::unordered_dense::map<std::string, std::vector<VariableType>> IntrinsicFu
 	{ "Array.Size", { VariableType::Number, VariableType::Array } },
 	{ "Array.Resize", { VariableType::Number, VariableType::Array, VariableType::Number, VariableType::Undefined } },
 	{ "Array.Push", { VariableType::Undefined, VariableType::Array, VariableType::Undefined } },
+	{ "Array.PushFront", { VariableType::Undefined, VariableType::Array, VariableType::Undefined } },
+	{ "Array.PushUnique", { VariableType::Number, VariableType::Array, VariableType::Undefined } },
 	{ "Array.Pop", { VariableType::Undefined, VariableType::Array} },
 	{ "Array.Remove", { VariableType::Undefined, VariableType::Array, VariableType::Undefined } },
 	{ "Array.RemoveIndex", { VariableType::Undefined, VariableType::Array, VariableType::Number } },
 	{ "Array.Clear", { VariableType::Undefined, VariableType::Array } },
+	{ "Array.Find", { VariableType::Number, VariableType::Array } },
+	{ "Math.Sqrt", { VariableType::Number, VariableType::Number } },
 	{ "Copy", { VariableType::Undefined, VariableType::Undefined } },
 };
 
@@ -170,4 +213,5 @@ std::vector<std::string> DefaultNamespaces = {
 	"String",
 	"Function",
 	"Core",
+	"Math",
 };

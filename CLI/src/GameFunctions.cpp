@@ -179,9 +179,13 @@ void render_frame()
 	std::cout.write(FinalBuffer, BufferSize - 1);
 }
 
+int random_in_range(int low, int high) {
+	return rand() % (high - low) + low;
+}
 
 EMI_REGISTER(Global, setupconsole, setup_console);
 EMI_REGISTER(Global, writepixel, write_pixel);
 EMI_REGISTER(Global, writetext, write_text);
 EMI_REGISTER(Global, writetextCentered, write_text_centered);
 EMI_REGISTER(Global, render, render_frame);
+EMI_REGISTER(Global, random, random_in_range);

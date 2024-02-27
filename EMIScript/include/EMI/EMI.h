@@ -184,6 +184,7 @@ namespace EMI
 	};
 
 	CORE_API VMHandle CreateEnvironment();
+	CORE_API void SetLogLevel(int level);
 	CORE_API void ReleaseEnvironment(VMHandle handle);
 
 	template<typename T>

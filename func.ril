@@ -8,19 +8,270 @@ def makeArray(size : number, value) : array {
 	return out;
 }
 
-object Loc
+object MapContainer
 {
-	x = 2;
+	keys : array;
+	values : array;
+	equality : function;
+}
+
+extend Map:
+
+public def insert(map : MapContainer, key, value) {
+	var itemFound = false;
+	var index = 0;
+	for (item in map.keys) {
+		if (map.equality(item, key)) {
+			index = _index_;
+			itemFound = true;
+			println("found");
+			break;
+		}
+	}
+	if (!itemFound) {
+		index = Array.Size(map.keys);
+		println("not found " + index);
+		Array.Push(map.keys, key);
+	}
+	
+	Array.Resize(map.values, Array.Size(map.keys));
+	map.values[index] = value;
+}
+
+public def Clear(map : MapContainer) {
+	Array.Clear(map.keys);
+	Array.Clear(map.values);
+}
+
+public def Erase(map : MapContainer, key) {
+	for (item in map.keys) {
+		if (map.equality(key, item)) {
+			Array.Remove(map.keys, _index_);
+			Array.Remove(map.keys, _index_);
+			break;
+		}
+	}
+}
+
+extend Global:
+
+object Coord
+{
+	x = 0;
 	y = 0;
+}
+
+object Node{
+	actionID : number = -1;
+	prevNode : Node = null;
+	state : Coord;
+	Cost = 0;
+	G = 0;
+}
+
+var Field : array;
+var Actions : array;
+var Target : Coord;
+
+const wall = 219;
+const wall2 = 178;
+const wall3 = 177;
+const wall4 = 176;
+const shade = 111;
+const empty = 255;
+
+const x_size = 10;
+const y_size = 10;
+
+def ValidPostCheck(loc : Coord) {
+	return true;
+}
+
+def ValidPreCheck(loc : Coord, act : Coord) {
+	return loc.x + act.x >= 0 && loc.x + act.x < x_size && loc.y + act.y >= 0 && loc.y + act.y < y_size;
+}
+
+def GetStateCost(state, id) {
+	return 1.0;
+}
+
+def GetCost(state, g) {
+	var x_dist = Target.x - state.x;
+	var y_dist = Target.y - state.y;
+	return g + 0.5 * Math.Sqrt(x_dist * x_dist + y_dist * y_dist);
+}
+
+def Visit(state : Coord) {
+	return !equal(Target, state);
+}
+
+def Act(state, action) {
+	return Coord{state.x + action.x, state.y + action.y};
+}
+
+def equal(l : Coord, r : Coord) : bool {
+	return l.x == r.x && l.y == r.y;
+}
+
+def calculateCost (n : Node) {
+	var current = n;
+	n.G = 0.0;
+	while (current != null) {
+		n.G += GetStateCost(current.state, current.actionID);
+		current = current.prevNode; # does not work
+	}
+	n.Cost = GetCost(n.state, n.G);
+}
+
+def getNextLegalStates(n : Node, NodeList : array) {
+
+	var nextStates : array;
+	Array.Resize(nextStates, Array.Size(Actions));
+	var size = Array.Size(Actions);
+	for (var act = 0; act < size; act++) {
+		if (!ValidPreCheck(n.state, Actions[act])) continue;
+		var newState = transition(n, Actions[act], act);
+		if (newState != null && ValidPostCheck(newState.state)) {
+			Array.Push(nextStates, newState);
+			Array.Push(NodeList, newState);
+		}
+		else newState.prevNode = null;
+	}
+	return nextStates;
+}
+
+def transition(currentState : Node, act : Coord, actionID : number) {
+	var newState = Act(currentState.state, act);
+	var node = Node{actionID, currentState, newState};
+	return node;
+}
+
+def find(arr : array, value, equality : function) {
+	for (item in arr) {
+		if (equality(item, value)) {
+			return item;
+		}
+	}
+	return null;
+}
+
+def findPath(begin : Coord, target : Coord) : array {
+	var NodeList : array;
+	var openList : MapContainer;
+	openList.equality = equal;
+	var closedList : array;
+
+	var currentNode = Node{0, null, begin};
+
+	Array.Push(NodeList, currentNode);
+	Array.PushUnique(closedList, currentNode.state);
+
+	while (currentNode != null) {
+		if (Visit(currentNode.state)) {
+			for (child in getNextLegalStates(currentNode, NodeList)) {
+				if (child == null) continue;
+				println(_index_);
+				calculateCost(child);
+				
+				if (find(closedList, child.state, equal)) {
+					continue;
+				}
+				if (var s = find(openList.keys, child.state, equal)) {
+					if (s.G > child.G) {
+						Map.insert(openList, child.state, child);
+					}
+				}
+				else Map.insert(openList, child.state, child);
+			}
+			println("loop done");
+		}
+		else {
+			break;
+		}
+
+		if (Array.Size(openList.keys) == 0) {
+			break;
+		}
+	
+		println(openList.values);
+		currentNode = openList.values[0];
+		var maxValue = currentNode.Cost;
+		for (item in openList.values) {
+			var nVal = item.Cost;
+			if (nVal < maxValue) {
+				maxValue = nVal;
+				currentNode = item;
+			}
+		}
+
+		Array.PushUnique(closedList, currentNode.state);
+		Map.Erase(openList, currentNode.state);
+	}
+
+	Array.Clear(closedList);
+	Map.Clear(openList);
+
+	var actionPath : array;
+
+	while (currentNode.prevNode != null) {
+		Array.PushFront(actionPath, currentNode.actionID);
+		currentNode = currentNode.prevNode;
+	}
+
+	for (n in NodeList) {
+		n.prevNode = null;
+	}
+	Array.Clear(NodeList);
+
+	return actionPath;
 }
 
 public def game() {
 	
-	var test = false;
-	var l : Loc;
-	var Field : array = makeArray(3, test == true ? 2 : 4);
+	var l : Coord;
+	Field = makeArray(y_size, makeArray(x_size, l));
 	
-	for (item in Field) println(item);
+	var charCoord : Coord;
+	var actions : array;
+	var actionIdx = 0;
+	Target = Coord{10, 10};
+	
+	Actions = [ 
+		Coord{-1,  0}, 
+		Coord{ 1,  0}, 
+		Coord{ 0, -1}, 
+		Coord{ 0,  1}, 
+	];
+	
+	actions = findPath(charCoord, Target);
+	println(actions);
+	
+	return;
+	
+	while(true) {
+		
+		if (Array.Size(actions) <= actionIdx) {
+			Target.x = random(0, x_size);
+			Target.y = random(0, y_size);
+			writepixel(Target.x, Target.y, wall2, 2);
+			actions = findPath(charCoord, Target);
+			actionIdx = 0;
+		}
+		if (Array.Size(actions) != 0) {	
+			writepixel(charCoord.x, charCoord.y, empty, 0);
+			
+			var act = Actions[actions[actionIdx]];
+			charCoord.x += act.x;
+			charCoord.y += act.y;
+			
+			++actionIdx;
+			writepixel(charCoord.x, charCoord.y, wall, 1);
+		} else {
+			println("Path search failed");
+		}
+		render();
+		delay(1000);
+	}
 	
 	println(Field);
 }

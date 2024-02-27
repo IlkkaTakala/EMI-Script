@@ -23,5 +23,6 @@ Scripting stage is used to call functions defined in the script files using synt
 | -- |-- | -- | 
 | compile | Filepaths separated by spaces | Compiles the given files and enters |scripting stage |
 | emi | | Enters the scripting stage |
+|loglevel| integer(0-4) | Sets the current log level (0=Debug, 3=Error, 4=None) |
 | reinit | | Reinitializes the grammar if EMI_PARSE_GRAMMAR is defined |
 | exit | | Exits the program |

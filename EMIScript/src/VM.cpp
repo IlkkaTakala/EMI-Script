@@ -506,7 +506,8 @@ void Runner::operator()()
 						uint16 idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
-							gError() << "Property not found: " << name << '\n';
+							gError() << "Property not found: " << name << ", in function " << current->FunctionPtr->Name << '\n';
+							Registers[byte.target].setUndefined();
 							goto start;
 						}
 						propertyIdx = idx;
@@ -516,6 +517,7 @@ void Runner::operator()()
 						UserObject* ptr = prop.as<UserObject>();
 						if (ptr->size() <= propertyIdx) {
 							gError() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param] << '\n';
+							Registers[byte.target].setUndefined();
 							goto start;
 						}
 						Registers[byte.target] = (*ptr)[static_cast<uint16>(propertyIdx)];
@@ -533,7 +535,7 @@ void Runner::operator()()
 						uint16 idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
-							gError() << "Property not found: " << name << '\n';
+							gError() << "Property not found: " << name << ", in function " << current->FunctionPtr->Name << '\n';
 							goto start;
 						}
 						propertyIdx = idx;
@@ -605,12 +607,31 @@ void Runner::operator()()
 					}
 
 					for (int i = 1; i < fn->Types.size() && i < byte.in2; i++) {
-						if ((fn->Types[i] != VariableType::Undefined 
-							&& fn->Types[i] != Registers[byte.in1 + (i - 1)].getType())
+						if (fn->Types[i] != VariableType::Undefined 
 							&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
+							VariableType real = fn->Types[i];
 
-							gWarn() << "Invalid argument types\n";
-							goto start;
+							if (real >= VariableType::Object) {
+								size_t typeidx = static_cast<uint16>(real) - static_cast<uint16>(VariableType::Object);
+								if (typeidx < fn->TypeTable.size()) {
+									real = fn->TypeTable[typeidx];
+									if (real == VariableType::Undefined) {
+										auto& name = fn->TypeTableSymbols[typeidx];
+										UserDefinedType* usertype = nullptr;
+										if (GetManager().GetType(usertype, name)) {
+											fn->TypeTable[typeidx] = real = usertype->Type;
+										}
+									}
+								}
+								else {
+									gError() << "Invalid type while calling " << fn->Name << "\n";
+								}
+							}
+
+							if (real != Registers[byte.in1 + (i - 1)].getType()) {
+								gWarn() << "Invalid argument types when calling " << fn->Name << " from " << current->FunctionPtr->Name << "\n";
+								goto start;
+							}
 						}
 					}
 					
@@ -647,7 +668,7 @@ void Runner::operator()()
 									&& ptr->Types[i] != Registers[byte.in1 + (i - 1)].getType())
 									&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
 
-									gWarn() << "Invalid argument types\n";
+									gWarn() << "Invalid argument types when calling " << ptr->Name << " from " << current->FunctionPtr->Name << "\n";
 									goto start;
 								}
 							}
@@ -775,6 +796,34 @@ void Runner::operator()()
 					}
 
 					Registers[byte.target] = GetManager().Make(type);
+				} goto start;
+
+				TARGET(InitObject) {
+					const Instruction& data = *(Instruction*)current->Ptr++;
+
+					Registers[byte.in1];
+					Registers[byte.in2];
+
+					auto& type = current->FunctionPtr->TypeTable[data.param];
+					if (type == VariableType::Undefined) {
+						auto& name = current->FunctionPtr->TypeTableSymbols[data.param];
+						UserDefinedType* usertype = nullptr;
+						if (GetManager().GetType(usertype, name)) {
+							type = usertype->Type;
+						}
+						else {
+							gError() << "Type not defined: " << name << "\n";
+							goto start;
+						}
+					}
+					auto obj = GetManager().Make(type);
+
+					for (uint16 i = 0; i < byte.in2 && i < obj.as<UserObject>()->size(); ++i) {
+						(*obj.as<UserObject>())[i] = Registers[byte.in1 + i];
+					}
+
+					Registers[byte.target] = obj;
+
 				} goto start;
 
 				TARGET(Copy) {

@@ -93,7 +93,7 @@ inline bool IsConstant(Token t) {
 }
 
 inline bool IsOperator(Token t) {
-	return t >= Token::Equal && t <= Token::Div || t == Token::FunctionCall;
+	return (t >= Token::Equal && t <= Token::Div) || (t >= Token::FunctionCall && t <= Token::Property);
 }
 
 void OpAdd(Node* n, Node* l, Node* r) {
@@ -296,7 +296,7 @@ bool Optimize(Node*& n)
 		{
 			if (IsConstant((*i)->type))
 			{
-				n->children.erase(i++);
+				i = n->children.erase(i);
 			}
 			++i;
 		}
@@ -336,6 +336,9 @@ bool Optimize(Node*& n)
 			case Token::Div: OpDiv(n, l, r); break;
 			case Token::Equal: OpEqual(n, l, r); break;
 			case Token::NotEqual: OpNotEqual(n, l, r); break;
+			case Token::FunctionCall: return true;
+			case Token::Indexer: return true;
+			case Token::Property: return true;
 			default:
 				break;
 			}
@@ -501,11 +504,8 @@ void ASTWalker::Run()
 								gError() << "Trying to initialize with wrong type: In object " << data << ", field " << std::get<0>(field->data) << '\n';
 							}
 						}
-						else if (field->children.back()->type == Token::OExpr) {
-							var = GetTypeDefault(type);
-						}
 						else {
-							gError() << "Trying to initialize to non-static: In object " << data << ", field " << std::get<0>(field->data) << ", line " << field->line << '\n';
+							var = GetTypeDefault(type);
 						}
 					} 
 					else {
@@ -609,12 +609,14 @@ void ASTWalker::Run()
 				{
 				case Token::TypeNumber:
 					symbol->varType = VariableType::Number;
-					variable = VariantToFloat(c->children[1]);
+					if (c->children.size() == 2) variable = VariantToFloat(c->children[1]);
+					else variable = 0.0;
 					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
 				case Token::TypeString:
 					symbol->varType = VariableType::String;
-					variable = String::GetAllocator()->Make(VariantToStr(c->children[1]).c_str());
+					if (c->children.size() == 2) variable = String::GetAllocator()->Make(VariantToStr(c->children[1]).c_str());
+					else String::GetAllocator()->Make("");
 					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
 				case Token::Typename:
@@ -624,28 +626,34 @@ void ASTWalker::Run()
 					break;
 				case Token::TypeArray:
 					symbol->varType = VariableType::Array;
-					variable = Array::GetAllocator()->Make(c->children[1]->children.size());
+					if (c->children.size() == 2) variable = Array::GetAllocator()->Make(c->children[1]->children.size());
+					else Array::GetAllocator()->Make(0);
 					// @todo: Initialize global array
 					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
 				case Token::AnyType:
-					switch (c->children[1]->type)
-					{
-					case Token::Number:
-						symbol->varType = VariableType::Number;
-						variable = VariantToFloat(c->children[1]);
-						break;
-					case Token::Literal:
-						symbol->varType = VariableType::String;
-						variable = String::GetAllocator()->Make(VariantToStr(c->children[1]).c_str());
-						break;
-					case Token::Array:
-						symbol->varType = VariableType::Array;
-						variable = Array::GetAllocator()->Make(c->children[1]->children.size());
-						break;
-					default:
-						symbol->varType = VariableType::Undefined;
-						break;
+					if (c->children.size() == 2) {
+						switch (c->children[1]->type)
+						{
+						case Token::Number:
+							symbol->varType = VariableType::Number;
+							if (c->children.size() == 2) variable = VariantToFloat(c->children[1]);
+							else variable = 0.0;
+							break;
+						case Token::Literal:
+							symbol->varType = VariableType::String;
+							if (c->children.size() == 2) variable = String::GetAllocator()->Make(VariantToStr(c->children[1]).c_str());
+							else variable = String::GetAllocator()->Make("");
+							break;
+						case Token::Array:
+							symbol->varType = VariableType::Array;
+							if (c->children.size() == 2) variable = Array::GetAllocator()->Make(c->children[1]->children.size());
+							else variable = Array::GetAllocator()->Make(0);
+							break;
+						default:
+							symbol->varType = VariableType::Undefined;
+							break;
+						}
 					}
 					break;
 				}
@@ -671,7 +679,7 @@ void ASTWalker::Run()
 #define _In8 instruction.in1
 #define _In8_2 instruction.in2
 #define _Out n->regTarget = instruction.target = getFirstFree()
-#define _FreeChildren for (auto& c : n->children) { if (IsConstant(c->type) || IsOperator(c->type) || (c->sym && c->sym->needsLoading) ) freeReg(c->regTarget); }
+#define _FreeChildren for (auto& c : n->children) { if (IsConstant(c->type) || IsOperator(c->type) || !c->sym  || (c->sym && c->sym->needsLoading) ) freeReg(c->regTarget); }
 #define _Type n->varType 
 #define _SetOut(n) n->regTarget = instructionList[n->instruction].target
 #define _First() first_child
@@ -779,6 +787,11 @@ void ASTWalker::WalkLoad(Node* n)
 		_Type = VariableType::String;
 	}break;
 
+	case Token::Null: {
+		_Op(PushUndefined);
+		_Out;
+	} break;
+
 	case Token::Array: {
 		{
 			_Op(PushArray);
@@ -802,7 +815,7 @@ void ASTWalker::WalkLoad(Node* n)
 		//n->sym = _First()->sym;
 		_In8 = _First()->regTarget;
 		_In8_2 = _Last()->regTarget;
-		_FreeConstant(_Last());
+		_FreeChildren;
 		_Out;
 	}break;
 
@@ -1068,8 +1081,8 @@ void ASTWalker::WalkLoad(Node* n)
 	}break;
 
 	case Token::Not: {
-		_Op(Not);
 		_Walk;
+		_Op(Not);
 		_In8 = _First()->regTarget;
 		_FreeChildren;
 		_Out;
@@ -1130,7 +1143,7 @@ void ASTWalker::WalkLoad(Node* n)
 		_In8_2 = n->type == Token::Increment ? 0 : 1;
 		_Out;
 		_FreeChildren;
-		WalkStore(_First(), _In8);
+		_In8 = WalkStore(_First()); // @todo: this is unsafe
 		_FreeChildren;
 
 	}break;
@@ -1144,7 +1157,7 @@ void ASTWalker::WalkLoad(Node* n)
 		_Op(PreMod);
 		_In8 = _First()->regTarget;
 		_In8_2 = n->type == Token::PreIncrement ? 0 : 1;
-		n->regTarget = instruction.target = _First()->regTarget;
+		n->regTarget = instruction.target = WalkStore(_First());
 	}break;
 
 	case Token::Assign: {
@@ -1155,16 +1168,15 @@ void ASTWalker::WalkLoad(Node* n)
 		auto& rhs = _Last();
 
 		if (IsConstant(rhs->type) || IsOperator(rhs->type)) {
-			WalkStore(_First(), rhs->regTarget);
-			n->regTarget = _SetOut(rhs) = lhs->regTarget;
+			WalkStore(lhs);
 			_FreeConstant(rhs);
+			n->regTarget = _SetOut(rhs) = lhs->regTarget;
 		}
 		else {
 			if (rhs->sym && rhs->sym->needsLoading) freeReg(rhs->regTarget);
 			_Op(Copy);
 			_In8 = rhs->regTarget;
-			n->regTarget = instruction.target = lhs->regTarget;
-			WalkStore(_First(), rhs->regTarget);
+			_SetOut(n) = WalkStore(lhs);
 		}
 
 		if (lhs->sym && !isAssignable(lhs->sym->flags)) {
@@ -1182,11 +1194,12 @@ void ASTWalker::WalkLoad(Node* n)
 		}
 	}break;
 
+	case Token::Const:
 	case Token::VarDeclare: {
 		auto sym = currentScope->addSymbol(std::get<std::string>(n->data));
 		sym->startLife = instructionList.size();
 		sym->endLife = instructionList.size();
-		sym->setType(SymbolType::Variable);
+		sym->setType(n->type == Token::VarDeclare ? SymbolType::Variable : SymbolType::Static);
 		sym->resolved = true;
 		sym->needsLoading = false;
 		if (n->children.size() > 0) {
@@ -1223,6 +1236,54 @@ void ASTWalker::WalkLoad(Node* n)
 			sym->reg = _Out;
 		}
 	}break;
+
+	case Token::ObjectInit: {
+		uint8 last = 255;
+		auto name = getFullId(_First());
+		for (auto& c : _Last()->children) {
+			WalkLoad(c);
+			if (IsConstant(c->type) || IsOperator(c->type) || c->regTarget == last + 1) {
+				freeReg(c->regTarget);
+				last = _SetOut(c) = getLastFree();
+			}
+			else {
+				_Op(Copy);
+				instruction.target = getLastFree();
+				_In8 = c->regTarget;
+				last = c->regTarget = instruction.target;
+			}
+		}
+
+		for (auto& c : _Last()->children) {
+			freeReg(c->regTarget);
+		}
+
+		auto it = std::find(currentFunction->TypeTableSymbols.begin(), currentFunction->TypeTableSymbols.end(), name);
+		size_t index = 0;
+
+		if (it != currentFunction->TypeTableSymbols.end()) {
+			index = it - currentFunction->TypeTableSymbols.begin();
+		}
+		else {
+			index = currentFunction->TypeTableSymbols.size();
+			currentFunction->TypeTableSymbols.push_back(name);
+		}
+		_Op(InitObject);
+
+		if (_Last()->children.size() != 0) {
+			_In8 = (uint8)_Last()->children.front()->regTarget;
+		}
+		else {
+			_In8 = getLastFree();
+		}
+		_In8_2 = _Last()->children.size();
+		_Out;
+
+		auto& arg = instructionList.emplace_back();
+		arg.code = OpCodes::Noop;
+		arg.param = (uint16)index;
+
+	} break;
 
 	case Token::Return: {
 		_Walk;
@@ -1292,16 +1353,17 @@ void ASTWalker::WalkLoad(Node* n)
 		WalkLoad(it);
 		_FreeConstant(it);
 
+		size_t elseloc = instructionList.size();
 		auto& elseinst = instructionList.emplace_back();
 		elseinst.code = OpCodes::JumpForward;
 
-		_In16 = instructionList.size() - oldSize;
+		instructionList[n->instruction].param = instructionList.size() - oldSize;
 		oldSize = instructionList.size();
 
 		WalkLoad(_Last());
 		_FreeConstant(_Last());
 
-		elseinst.param = instructionList.size() - oldSize;
+		instructionList[elseloc].param = instructionList.size() - oldSize;
 
 		currentScope = currentScope->parent;
 		registers = regs;
@@ -1504,7 +1566,7 @@ void ASTWalker::WalkLoad(Node* n)
 		auto& params = _Last();
 		for (auto& c : params->children) {
 			WalkLoad(c);
-			if (IsConstant(c->type) || IsOperator(c->type) || c->regTarget == last + 1) {
+			if (!c->sym || c->regTarget == last + 1) {
 				freeReg(c->regTarget);
 				last = _SetOut(c) = getLastFree();
 			}
@@ -1571,7 +1633,7 @@ void ASTWalker::WalkLoad(Node* n)
 	}
 }
 
-void ASTWalker::WalkStore(Node* n, uint8 reg) {
+uint8 ASTWalker::WalkStore(Node* n) {
 	Function* f = currentFunction;
 	if (HasDebug) f->DebugLines[(int)n->line] = (int)instructionList.size();
 	auto first_child = n->children.size() ? n->children.front() : nullptr;
@@ -1608,7 +1670,7 @@ void ASTWalker::WalkStore(Node* n, uint8 reg) {
 
 					_Op(StoreProperty);
 					_In8 = _First()->regTarget;
-					_SetOut(n) = reg;
+					_Out;
 					size_t index = 0;
 					auto it = std::find(currentFunction->PropertyTableSymbols.begin(), currentFunction->PropertyTableSymbols.end(), data);
 					if (it != currentFunction->PropertyTableSymbols.end()) {
@@ -1623,7 +1685,7 @@ void ASTWalker::WalkStore(Node* n, uint8 reg) {
 					arg.code = OpCodes::Noop;
 					arg.param = static_cast<uint16>(index);
 
-					break;
+					return n->regTarget;
 				}
 				else {
 					_Error("Unknown symbol: " + data);
@@ -1654,13 +1716,15 @@ void ASTWalker::WalkStore(Node* n, uint8 reg) {
 
 			_Op(StoreSymbol);
 			_In16 = index;
-			_SetOut(n) = reg;
+			_Out;
+			return n->regTarget;
 		}
 		else if (symbol) {
 			n->regTarget = symbol->reg;
 			symbol->endLife = instructionList.size();
 			_Type = symbol->varType;
 			n->sym = symbol;
+			return n->regTarget;
 		}
 	} break;
 
@@ -1671,7 +1735,8 @@ void ASTWalker::WalkStore(Node* n, uint8 reg) {
 		_In8 = _First()->regTarget;
 		_In8_2 = _Last()->regTarget;
 		_FreeConstant(_Last());
-		_SetOut(n) = reg;
+		_Out;
+		return n->regTarget;
 	}break;
 
 	case Token::Number:
@@ -1687,8 +1752,10 @@ void ASTWalker::WalkStore(Node* n, uint8 reg) {
 
 	default: {
 		WalkLoad(n);
+		return n->regTarget;
 	}
 	}
+	return n->regTarget;
 }
 
 Symbol* ASTWalker::findSymbol(const std::string& name, const std::string& space, bool& isNamespace)
