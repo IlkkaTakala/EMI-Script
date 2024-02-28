@@ -23,7 +23,7 @@ VM::VM()
 	VMRunning = true;
 	for (uint i = 0; i < counter / 2; i++) {
 		ParserPool.emplace_back(Parser::ThreadedParse, this);
-		RunnerPool.emplace_back(Runner(this));
+		RunnerPool.emplace_back(new Runner(this));
 	}
 
 	GarbageCollector = new std::thread(&VM::GarbageCollect, this);
@@ -39,7 +39,8 @@ VM::~VM()
 		t.join();
 	}
 	for (auto& t : RunnerPool) {
-		t.join();
+		t->Join();
+		delete t;
 	}
 	GarbageCollector->join();
 	delete GarbageCollector;
@@ -267,6 +268,8 @@ Runner::Runner(VM* vm) : Owner(vm)
 {
 	Registers.reserve(64);
 	CallStack.reserve(128);
+
+	RunThread = std::thread{ &Runner::Run, this };
 }
 
 Runner::~Runner()
@@ -274,9 +277,14 @@ Runner::~Runner()
 
 }
 
+void Runner::Join()
+{
+	RunThread.join();
+}
+
 #define TARGET(Op) Op: 
 
-void Runner::operator()()
+void Runner::Run()
 {
 	while (Owner->IsRunning()) {
 
@@ -920,7 +928,13 @@ void Runner::operator()()
 				} goto start;
 
 				TARGET(NumDiv) {
-					Registers[byte.target] = Registers[byte.in1].as<double>() / toNumber(Registers[byte.in2]);
+					auto val = Registers[byte.in1].as<double>() / toNumber(Registers[byte.in2]);
+					if (!isnan(val)) {
+						Registers[byte.target] = val;
+					}
+					else {
+						Registers[byte.target].setUndefined();
+					}
 				} goto start;
 
 				TARGET(NumMul) {

@@ -74,11 +74,13 @@ class Runner
 public:
 	Runner(VM* vm);
 	~Runner();
+	void Join();
 
-	void operator()();
 
 private:
+	void Run();
 	VM* Owner;
+	std::thread RunThread;
 	std::vector<CallObject> CallStack;
 	RegisterStack<Variable> Registers;
 };
@@ -146,7 +148,7 @@ private:
 
 	std::condition_variable CallQueueNotify;
 	std::queue<CallObject> CallQueue;
-	std::vector<std::thread> RunnerPool;
+	std::vector<Runner*> RunnerPool;
 	std::vector<std::future<Variable>> ReturnValues;
 	std::vector<std::promise<Variable>> ReturnPromiseValues;
 	std::vector<size_t> ReturnFreeList;

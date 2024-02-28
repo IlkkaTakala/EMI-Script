@@ -181,7 +181,7 @@ void add(Variable& out, const Variable& lhs, const Variable& rhs)
 {
 	switch (lhs.getType())
 	{
-	case VariableType::Number: out = lhs.as<double>() + toNumber(rhs.as<double>()); return;
+	case VariableType::Number: out = lhs.as<double>() + toNumber(rhs); return;
 	case VariableType::String: stradd(out, lhs, rhs); return;
 
 	default:
@@ -191,10 +191,9 @@ void add(Variable& out, const Variable& lhs, const Variable& rhs)
 
 void sub(Variable& out, const Variable& lhs, const Variable& rhs)
 {
-	if (lhs.getType() != rhs.getType()) return;
 	switch (lhs.getType())
 	{
-	case VariableType::Number: out = lhs.as<double>() - rhs.as<double>(); return;
+	case VariableType::Number: out = lhs.as<double>() - toNumber(rhs); return;
 
 	default:
 		return;
@@ -218,7 +217,16 @@ void div(Variable& out, const Variable& lhs, const Variable& rhs)
 	if (lhs.getType() != rhs.getType()) return;
 	switch (lhs.getType())
 	{
-	case VariableType::Number: out = lhs.as<double>() / rhs.as<double>(); return;
+	case VariableType::Number: {
+		auto val = lhs.as<double>() / rhs.as<double>();
+		if (!isnan(val)) {
+			out = val;
+		}
+		else {
+			out.setUndefined();
+		}
+		return;
+	}
 
 	default:
 		return;

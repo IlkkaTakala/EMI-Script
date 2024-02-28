@@ -2,7 +2,7 @@
 #include "Defines.h"
 #include <stack>
 #include <filesystem>
-
+#ifdef EMI_PARSE_GRAMMAR
 /*
 	Translated and optimized to C++ from https://jsmachines.sourceforge.net/machines/lalr1.html
 */
@@ -490,3 +490,5 @@ std::vector<RuleData> Data = {
 	outcpp << "};\n";
 
 }
+
+#endif

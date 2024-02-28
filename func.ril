@@ -87,8 +87,8 @@ const wall4 = 176;
 const shade = 111;
 const empty = 255;
 
-const x_size = 20;
-const y_size = 20;
+const x_size = 80;
+const y_size = 80;
 
 def ValidPostCheck(loc : Coord) {
 	return true;

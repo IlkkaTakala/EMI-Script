@@ -141,7 +141,7 @@ void copy(Variable& out, Variable* args, size_t argc) {
 		{
 		case VariableType::Array: {
 			auto& old = args[0].as<Array>()->data();
-			auto next = Array::GetAllocator()->Make(old.size());
+			auto next = Array::GetAllocator()->Make();
 			next->data() = old;
 			out = next;
 		} break;

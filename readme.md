@@ -3,7 +3,7 @@
 ## Build instructions
 1. Clone the repository
 1. Run Cmake in the root directory and select parameters
-1. Build with c++20+ compatible compiler 
+1. Build with c++2x compatible compiler 
 1. Run EMICLI project
 
 #### Cmake options

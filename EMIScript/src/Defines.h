@@ -3,6 +3,8 @@
 
 #ifdef _DEBUG
 #define DEBUG
+#else
+#undef EMI_PARSE_GRAMMAR
 #endif
 
 inline Logger& gLogger()

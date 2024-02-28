@@ -679,9 +679,11 @@ void ASTWalker::Run()
 	}
 }
 
+#ifdef DEBUG
 void printInstruction(const Instruction& in) {
 	gLogger() << "Target: " << (int)in.target << ", In: " << (int)in.in1 << ", In2: " << (int)in.in2 << ", Param: " << (int)in.param << ", \t" << "Code: " << OpcodeNames[in.code] << '\n';
 }
+#endif // DEBUG
 
 #define _Op(op) n->instruction = instructionList.size(); auto& instruction = instructionList.emplace_back(); instruction.code = OpCodes::op; 
 #define _Walk for(auto& child : n->children) WalkLoad(child);
