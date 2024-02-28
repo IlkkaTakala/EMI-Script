@@ -33,6 +33,7 @@ EMI_REGISTER(Global, printStr, print);
 
 int main()
 {
+	srand(time(0));
 	std::unordered_map<std::string, std::function<int(EMI::VMHandle&, const std::vector<std::string>&)>> commandTable = {
 		{"exit", [](EMI::VMHandle& vm, const std::vector<std::string>&) { exit(0); return 0; }},
 		{"compile", [](EMI::VMHandle& vm, const std::vector<std::string>& params) {

@@ -2,6 +2,7 @@
 #include "Objects/StringObject.h"
 #include "Objects/ArrayObject.h"
 #include "Objects/FunctionObject.h"
+#include "Objects/UserObject.h"
 #include <string>
 #include <numeric>
 
@@ -294,7 +295,15 @@ std::string toStdString(const Variable& in)
 	default:
 
 		if (in.getType() > VariableType::Object) {
-			return "object type";
+			auto obj = in.as<UserObject>();
+			std::string out = "{ ";
+
+			for (uint16 i = 0; i < obj->size(); i++) {
+				out += toStdString((*obj)[i]) + (i + 1 < obj->size() ? ", " : "");
+			}
+
+			out += " }";
+			return out;
 		}
 		return "Undefined";
 	}

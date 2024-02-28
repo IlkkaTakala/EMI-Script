@@ -41,6 +41,9 @@ void arraySize(Variable& out, Variable* args, size_t argc) {
 	if (argc == 1 && args[0].getType() == VariableType::Array) {
 		out = static_cast<double>(args[0].as<Array>()->size());
 	}
+	else {
+		out.setUndefined();
+	}
 }
 
 void arrayResize(Variable& out, Variable* args, size_t argc) {
@@ -52,6 +55,9 @@ void arrayResize(Variable& out, Variable* args, size_t argc) {
 		}
 		args[0].as<Array>()->data().resize(size, fill);
 		out = static_cast<double>(size);
+	}
+	else {
+		out.setUndefined();
 	}
 }
 
@@ -79,6 +85,9 @@ void arrayPushUnique(Variable& out, Variable* args, size_t argc) {
 		else {
 			out = static_cast<int>(it - data.begin());
 		}
+	}
+	else {
+		out.setUndefined();
 	}
 }
 
@@ -120,6 +129,9 @@ void arrayFind(Variable& out, Variable* args, size_t argc) {
 			out = static_cast<int>(data.size());
 		}
 	}
+	else {
+		out.setUndefined();
+	}
 }
 
 
@@ -156,6 +168,9 @@ void copy(Variable& out, Variable* args, size_t argc) {
 			}
 			break;
 		}
+	}
+	else {
+		out.setUndefined();
 	}
 }
 

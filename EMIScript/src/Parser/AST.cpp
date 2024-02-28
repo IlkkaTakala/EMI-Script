@@ -965,6 +965,7 @@ void ASTWalker::WalkLoad(Node* n)
 				else if (_First()->sym->type == SymbolType::Variable) {
 					_Op(LoadProperty);
 					_In8 = _First()->regTarget;
+					_FreeChildren;
 					_Out;
 					size_t index = 0;
 					auto it = std::find(currentFunction->PropertyTableSymbols.begin(), currentFunction->PropertyTableSymbols.end(), data);
@@ -1160,7 +1161,7 @@ void ASTWalker::WalkLoad(Node* n)
 		_FreeChildren;
 		_In8 = WalkStore(_First()); // @todo: this is unsafe
 		_FreeChildren;
-
+		n->sym = _First()->sym;
 	}break;
 
 	case Token::PreDecrement:
@@ -1173,6 +1174,8 @@ void ASTWalker::WalkLoad(Node* n)
 		_In8 = _First()->regTarget;
 		_In8_2 = n->type == Token::PreIncrement ? 0 : 1;
 		n->regTarget = instruction.target = WalkStore(_First());
+		_FreeChildren;
+		n->sym = _First()->sym;
 	}break;
 
 	case Token::Assign: {
@@ -1839,15 +1842,15 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 	for (int i = 0; i < instructionList.size(); i++) {
 		f->Bytecode[i] = instructionList[i].data;
 	}
-//
-//#ifdef DEBUG
-//	gLogger() << "Function " << f->Name << '\n';
-//	gLogger() << "----------------------------------\n";
-//	for (auto& in : instructionList) {
-//		printInstruction(in);
-//	}
-//	gLogger() << "\n\n";
-//#endif // DEBUG
+
+#ifdef DEBUG
+	gLogger() << "Function " << f->Name << '\n';
+	gLogger() << "----------------------------------\n";
+	for (auto& in : instructionList) {
+		printInstruction(in);
+	}
+	gLogger() << "\n\n";
+#endif // DEBUG
 
 	f->FunctionTable.resize(f->FunctionTableSymbols.size(), nullptr);
 	f->ExternalTable.resize(f->FunctionTableSymbols.size(), nullptr);

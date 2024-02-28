@@ -44,9 +44,8 @@ public def Clear(map : MapContainer) {
 public def Erase(map : MapContainer, key) {
 	for (item in map.keys) {
 		if (map.equality(key, item)) {
-			println("Erased");
 			Array.RemoveIndex(map.keys, _index_);
-			Array.RemoveIndex(map.keys, _index_);
+			Array.RemoveIndex(map.values, _index_);
 			break;
 		}
 	}
@@ -88,8 +87,8 @@ const wall4 = 176;
 const shade = 111;
 const empty = 255;
 
-const x_size = 10;
-const y_size = 10;
+const x_size = 20;
+const y_size = 20;
 
 def ValidPostCheck(loc : Coord) {
 	return true;
@@ -106,7 +105,7 @@ def GetStateCost(state, id) {
 def GetCost(state, g) {
 	var x_dist = Target.x - state.x;
 	var y_dist = Target.y - state.y;
-	return g;# + 0.5 * Math.Sqrt(x_dist * x_dist + y_dist * y_dist);
+	return g + 0.5 * Math.Sqrt(x_dist * x_dist + y_dist * y_dist);
 }
 
 def Visit(state : Coord) {
@@ -167,6 +166,9 @@ def findPath(begin : Coord, target : Coord) : array {
 	var openList : MapContainer;
 	openList.equality = equal;
 	var closedList : array;
+	Array.Clear(closedList);
+	Array.Clear(openList.keys);
+	Array.Clear(openList.values);
 
 	var currentNode = Node{0, null, begin};
 
@@ -197,17 +199,13 @@ def findPath(begin : Coord, target : Coord) : array {
 			break;
 		}
 		
-		delay(1000);
-		
 		if (Array.Size(openList.keys) == 0) {
 			break;
 		}
-	
-		currentNode = openList.values[0];
-		var maxValue = currentNode.Cost;
+		
+		var maxValue = 10000000;
 		for (item in openList.values) {
 			var nVal = item.Cost;
-			println(nVal);
 			if (nVal < maxValue) {
 				maxValue = nVal;
 				currentNode = item;
@@ -215,13 +213,8 @@ def findPath(begin : Coord, target : Coord) : array {
 		}
 
 		Array.PushUnique(closedList, currentNode.state);
-		println(Array.Size(openList.values));
 		Map.Erase(openList, currentNode.state);
-		println(Array.Size(openList.values));
 	}
-
-	Array.Clear(closedList);
-	Map.Clear(openList);
 
 	var actionPath : array;
 
@@ -229,7 +222,7 @@ def findPath(begin : Coord, target : Coord) : array {
 		Array.PushFront(actionPath, currentNode.actionID);
 		currentNode = currentNode.prevNode;
 	}
-
+	
 	return actionPath;
 }
 
@@ -241,7 +234,7 @@ public def game() {
 	var charCoord : Coord;
 	var actions : array;
 	var actionIdx = 0;
-	Target = Coord{10, 10};
+	Target = Coord{5, 5};
 	
 	Actions = [ 
 		Coord{-1,  0}, 
@@ -250,33 +243,53 @@ public def game() {
 		Coord{ 0,  1}, 
 	];
 	
-	actions = findPath(charCoord, Target);
+	var topOffset = 10;
+	var leftOffset = 10;
 	
-	return;
+	setupconsole(2 * leftOffset + x_size, 2 * topOffset + y_size);
+	
+	for (x_size + 2) {
+		writepixel(leftOffset - 1 + _index_	, topOffset - 1				, wall, 0);
+		writepixel(leftOffset - 1 + _index_	, topOffset + y_size + 1	, wall, 0);
+	}
+	for (y_size + 2) {
+		writepixel(leftOffset - 1			, topOffset - 1 + _index_	, wall, 0);
+		writepixel(leftOffset + x_size	, topOffset - 1 + _index_	, wall, 0);
+	}
 	
 	while(true) {
-		
-		if (Array.Size(actions) <= actionIdx) {
-			Target.x = random(0, x_size);
-			Target.y = random(0, y_size);
-			writepixel(Target.x, Target.y, wall2, 2);
-			actions = findPath(charCoord, Target);
-			actionIdx = 0;
-		}
-		if (Array.Size(actions) != 0) {	
-			writepixel(charCoord.x, charCoord.y, empty, 0);
+		var size : number = Array.Size(actions);
+		if (actionIdx < size) {
+			writepixel(leftOffset + charCoord.x, topOffset + charCoord.y, empty, 0);
 			
 			var act = Actions[actions[actionIdx]];
 			charCoord.x += act.x;
 			charCoord.y += act.y;
 			
 			++actionIdx;
-			writepixel(charCoord.x, charCoord.y, wall, 1);
+			writepixel(leftOffset + charCoord.x, topOffset + charCoord.y, wall, 1);
+			
+			render();
+		} 
+		if (actionIdx >= size) {
+			writepixel(leftOffset + Target.x, topOffset + Target.y, empty, 2);
+			Target.x = random(0, x_size);
+			Target.y = random(0, y_size);
+			actions = findPath(charCoord, Target);
+			actionIdx = 0;
+			
+			var location = Copy(charCoord);
+			for (item in actions) {
+				var act = Actions[item];
+				location.x += act.x;
+				location.y += act.y;
+				writepixel(leftOffset + location.x, topOffset + location.y, wall2, 4);
+			}
+			
+			writepixel(leftOffset + Target.x, topOffset + Target.y, wall2, 2);
 		} else {
-			println("Path search failed");
+			delay(50);
 		}
-		render();
-		delay(1000);
 	}
 	
 	println(Field);

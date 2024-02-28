@@ -17,8 +17,8 @@ struct Pixel
 	Pixel(int x, int y, int c, int co) : x(x), y(y), type(c), color(co) {}
 };
 
-constexpr int size_x = 100;
-constexpr int size_y = 100;
+int size_x = 100;
+int size_y = 100;
 
 
 int win_x = 100;
@@ -66,8 +66,11 @@ const char* get_color(int c)
 HANDLE hOut;
 HANDLE hIn;
 
-int setup_console()
+int setup_console(int x, int y)
 {
+	size_x = x;
+	size_y = y;
+
 	HWND consoleWindow = GetConsoleWindow();
 	SetWindowLong(consoleWindow, GWL_STYLE, GetWindowLong(consoleWindow, GWL_STYLE) & ~WS_MAXIMIZEBOX & ~WS_SIZEBOX);
 
@@ -132,6 +135,7 @@ int setup_console()
 
 void write_pixel(int x, int y, unsigned char c, int color = 0)
 {
+	if (!OverlayBuffer) return;
 	int index = (size_x * y + x) * 6;
 	if (index >= 0 && index < BufferSize) {
 		strncpy_s(&OverlayBuffer[index], 6, get_color(color), 6);
@@ -141,6 +145,7 @@ void write_pixel(int x, int y, unsigned char c, int color = 0)
 
 void write_text(int x, int y, const char* text, int color = 0)
 {
+	if (!OverlayBuffer) return;
 	int dx = x;
 	int dy = y;
 	const char* ptr = text;
@@ -154,6 +159,7 @@ void write_text(int x, int y, const char* text, int color = 0)
 
 void write_text_centered(int x, int y, const char* text, int color = 0)
 {
+	if (!OverlayBuffer) return;
 	int dx = x - strlen(text) / 2;
 	int dy = y;
 	const char* ptr = text;
@@ -167,6 +173,7 @@ void write_text_centered(int x, int y, const char* text, int color = 0)
 
 void render_frame()
 {
+	if (!OverlayBuffer) return;
 	SetConsoleCursorPosition(hOut, COORD());
 	for (int i = 0; i < BufferSize; i += 6)
 	{
