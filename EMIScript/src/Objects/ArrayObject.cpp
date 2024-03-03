@@ -7,6 +7,11 @@ Array::Array(size_t s)
 	Data.reserve(s);
 }
 
+Array::~Array()
+{
+	Data.clear();
+}
+
 void Array::Realloc(size_t s)
 {
 	Data.clear();

@@ -35,7 +35,7 @@ int main()
 {
 	srand(time(0));
 	std::unordered_map<std::string, std::function<int(EMI::VMHandle&, const std::vector<std::string>&)>> commandTable = {
-		{"exit", [](EMI::VMHandle& vm, const std::vector<std::string>&) { exit(0); return 0; }},
+		{"exit", [](EMI::VMHandle& , const std::vector<std::string>&) { exit(0); return 0; }},
 		{"compile", [](EMI::VMHandle& vm, const std::vector<std::string>& params) {
 			static std::unordered_map<std::string, std::function<void(EMI::Options&)>> optionMap = {
 				//{"-s", [](EMI::Options& options) { options.Simplify = true; }}
@@ -55,9 +55,9 @@ int main()
 				result += vm.CompileScript(p.c_str(), options); 
 			return result > 0 ? 1 : 0;
 		}},
-		{"reinit", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
-		{"emi", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { return 2; }},
-		{"loglevel", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { if (params.size() > 1) EMI::SetLogLevel(std::atoi(params[1].c_str())); return 0; }},
+		{"reinit", [](EMI::VMHandle& vm, const std::vector<std::string>&) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
+		{"emi", [](EMI::VMHandle&, const std::vector<std::string>&) { return 2; }},
+		{"loglevel", [](EMI::VMHandle&, const std::vector<std::string>& params) { if (params.size() > 1) EMI::SetLogLevel(std::atoi(params[1].c_str())); return 0; }},
 	};
 
 	auto vm = EMI::CreateEnvironment();
@@ -92,7 +92,7 @@ int main()
 					runScriptMode = false;
 					break;
 				}
-				auto res = split(input, ' ');
+				res = split(input, ' ');
 				if (res.size() > 0) {
 					EMI::FunctionHandle h = vm.GetFunctionHandle(res[0].c_str());
 					auto handle = h(res.size() > 1 ? res[1].c_str() : "10");

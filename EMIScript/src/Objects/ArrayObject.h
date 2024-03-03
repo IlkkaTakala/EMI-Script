@@ -8,6 +8,7 @@ class Array : public Object
 public:
 	Array() : Array(0) {}
 	Array(size_t s);
+	~Array();
 
 	void Realloc(size_t s);
 	void Realloc() { Realloc(0); }

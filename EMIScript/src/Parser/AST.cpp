@@ -620,6 +620,12 @@ void ASTWalker::Run()
 					else variable = 0.0;
 					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
+				case Token::TypeBoolean:
+					symbol->varType = VariableType::Boolean;
+					if (c->children.size() == 2) variable = VariantToBool(c->children[1]);
+					else variable = false;
+					symbol->flags = symbol->flags | SymbolFlags::Typed;
+					break;
 				case Token::TypeString:
 					symbol->varType = VariableType::String;
 					if (c->children.size() == 2) variable = String::GetAllocator()->Make(VariantToStr(c->children[1]).c_str());
@@ -634,7 +640,7 @@ void ASTWalker::Run()
 				case Token::TypeArray:
 					symbol->varType = VariableType::Array;
 					if (c->children.size() == 2) variable = Array::GetAllocator()->Make(c->children[1]->children.size());
-					else Array::GetAllocator()->Make(0);
+					else variable = Array::GetAllocator()->Make(0);
 					// @todo: Initialize global array
 					symbol->flags = symbol->flags | SymbolFlags::Typed;
 					break;
@@ -646,6 +652,12 @@ void ASTWalker::Run()
 							symbol->varType = VariableType::Number;
 							if (c->children.size() == 2) variable = VariantToFloat(c->children[1]);
 							else variable = 0.0;
+							break;
+						case Token::True:
+						case Token::False:
+							symbol->varType = VariableType::Boolean;
+							if (c->children.size() == 2) variable = VariantToBool(c->children[1]);
+							else variable = c->children[1]->type == Token::True;
 							break;
 						case Token::Literal:
 							symbol->varType = VariableType::String;

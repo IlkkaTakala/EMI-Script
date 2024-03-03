@@ -13,6 +13,7 @@ public:
 	UserObject() {
 		Data = nullptr;
 		DataCount = 0;
+		Type = VariableType::Object;
 	}
 
 	UserObject(VariableType type, uint16 count);
@@ -25,7 +26,9 @@ public:
 	uint16 size() const { return DataCount; }
 
 	Variable& operator[](uint16 index) {
-		return Data[index];
+		if (index < DataCount)
+			return Data[index];
+		return Data[0];
 	}
 
 private:
@@ -35,7 +38,7 @@ private:
 };
 
 
-class UserDefinedType : public Object
+class UserDefinedType
 {
 public:
 	UserDefinedType() {
@@ -44,6 +47,7 @@ public:
 	void AddField(const std::string& name, Variable var, const Symbol& flags);
 	VariableType GetFieldType(const std::string& name) const;
 
+	VariableType Type;
 private:
 	friend class ObjectManager;
 
@@ -60,7 +64,6 @@ public:
 	void RemoveType(const std::string& name);
 
 	Variable Make(VariableType type) const ;
-	Variable Make(const std::string& type) const;
 
 	bool GetType(UserDefinedType*& type, const std::string& name);
 

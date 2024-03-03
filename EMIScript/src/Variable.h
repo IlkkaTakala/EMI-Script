@@ -39,24 +39,27 @@ class Object;
 class Variable
 {
 	uint64_t value;
+	VariableType Type;
 
 public:
-	Variable() : value(NIL_VAL) {}
+	Variable() : value(NIL_VAL), Type(VariableType::Undefined) {}
 	Variable(const Variable&);
 	Variable(Variable&&) noexcept;
 	Variable(int v) {
+		Type = VariableType::Number;
 		double val = static_cast<double>(v);
 		value = *(uint64_t*)&val;
 	}
-	Variable(double v) {
-		value = *(uint64_t*)&v;
-	}
+	Variable(double v);
 	Variable(Object* ptr);
 	Variable(bool v) {
+		Type = VariableType::Boolean;
 		value = BOOL_VAL(v);
 	}
 
 	~Variable();
+
+	uint64_t get() const { return value; }
 
 	void setUndefined();
 

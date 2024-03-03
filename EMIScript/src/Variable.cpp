@@ -8,6 +8,7 @@ Variable::Variable(const Variable& rhs)
 		as<Object>()->RefCount--;
 	}
 	value = rhs.value;
+	Type = rhs.Type;
 
 	if (isObject()) {
 		as<Object>()->RefCount++;
@@ -20,16 +21,28 @@ Variable::Variable(Variable&& rhs) noexcept
 		as<Object>()->RefCount--;
 	}
 	value = rhs.value;
+	Type = rhs.Type;
 
 	if (isObject()) {
 		as<Object>()->RefCount++;
 	}
 }
 
+Variable::Variable(double v)
+{
+	Type = VariableType::Number;
+	if (isnan(v)) {
+		printf("This was nan\n");
+	}
+	value = *(uint64_t*)&v;
+}
+
 Variable::Variable(Object* ptr)
 {
+	Type = VariableType::Undefined;
 	if (ptr == nullptr) value = NIL_VAL;
 	else {
+		Type = ptr->Type;
 		value = OBJ_VAL(ptr);
 		as<Object>()->RefCount++;
 	}
@@ -41,6 +54,7 @@ Variable::~Variable()
 		as<Object>()->RefCount--;
 	}
 	value = NIL_VAL;
+	Type = VariableType::Undefined;
 }
 
 void Variable::setUndefined()
@@ -48,6 +62,7 @@ void Variable::setUndefined()
 	if (isObject()) {
 		as<Object>()->RefCount--;
 	}
+	Type = VariableType::Undefined;
 	value = NIL_VAL;
 }
 
@@ -73,6 +88,7 @@ Variable& Variable::operator=(const Variable& rhs)
 
 	value = rhs.value;
 
+	Type = rhs.Type;
 	if (isObject()) {
 		as<Object>()->RefCount++;
 	}
@@ -86,6 +102,7 @@ Variable& Variable::operator=(Variable&& rhs) noexcept
 		as<Object>()->RefCount--;
 	}
 	value = rhs.value;
+	Type = rhs.Type;
 
 	if (isObject()) {
 		as<Object>()->RefCount++;

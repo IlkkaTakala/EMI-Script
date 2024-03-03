@@ -100,7 +100,7 @@ VariableType UserDefinedType::GetFieldType(const std::string& name) const
 UserObject::UserObject(VariableType type, uint16 count)
 {
 	Type = type;
-	Data = new Variable[count]();
+	Data = new Variable[count];
 	DataCount = count;
 }
 

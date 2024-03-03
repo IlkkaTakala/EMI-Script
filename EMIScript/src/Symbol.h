@@ -31,10 +31,10 @@ struct Symbol
 	SymbolFlags flags = SymbolFlags::None;
 	VariableType varType = VariableType::Undefined;
 	bool resolved = false;
-	size_t startLife = 0;
-	size_t endLife = 0;
 	uint8 reg = 0;
 	bool needsLoading = false;
+	size_t startLife = 0;
+	size_t endLife = 0;
 
 	void setType(SymbolType t);
 };

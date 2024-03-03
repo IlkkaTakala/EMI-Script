@@ -117,13 +117,13 @@ namespace EMI
 
 	template<class V, class F, typename ...Args, size_t... S> 
 	constexpr auto __make_caller(std::index_sequence<S...>) {
-		return +[](void* ptr, size_t s, InternalValue* args)->InternalValue {
+		return +[](void* ptr, size_t, InternalValue* args)->InternalValue {
 			return (*(F*)(ptr))((args[S].as<Args>())...); };
 	}
 
 	template<class V, class F, typename ...Args, size_t... S> requires std::is_void_v<V>
 	constexpr auto __make_caller(std::index_sequence<S...>) {
-		return +[](void* ptr, size_t s, InternalValue* args)->InternalValue {
+		return +[](void* ptr, size_t, InternalValue* args)->InternalValue {
 			(*(F*)(ptr))((args[S].as<Args>())...); return {}; };
 	}
 

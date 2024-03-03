@@ -78,7 +78,6 @@ struct Function
 	std::string Name;
 	std::string Namespace;
 	size_t NamespaceHash;
-	bool IsPublic;
 
 	std::vector<Variable> StringTable;
 	ankerl::unordered_dense::set<double> NumberTable;
@@ -104,6 +103,7 @@ struct Function
 
 	uint8 ArgCount;
 	uint8 RegisterCount;
+	bool IsPublic;
 
 	std::vector<uint32> Bytecode;
 

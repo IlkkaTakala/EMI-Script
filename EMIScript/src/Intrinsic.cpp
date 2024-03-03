@@ -108,7 +108,9 @@ void arrayRemove(Variable&, Variable* args, size_t argc) {
 void arrayRemoveIdx(Variable&, Variable* args, size_t argc) {
 	if (argc == 2 && args[0].getType() == VariableType::Array) {
 		auto& data = args[0].as<Array>()->data();
-		data.erase(data.begin() + static_cast<size_t>(toNumber(args[1])));
+		auto idx = toNumber(args[1]);
+		if (idx < data.size())
+			data.erase(data.begin() + static_cast<size_t>(idx));
 	}
 }
 

@@ -87,8 +87,8 @@ const wall4 = 176;
 const shade = 111;
 const empty = 255;
 
-const x_size = 80;
-const y_size = 80;
+const x_size = 20;
+const y_size = 20;
 
 def ValidPostCheck(loc : Coord) {
 	return true;
@@ -246,7 +246,7 @@ public def game() {
 	var topOffset = 10;
 	var leftOffset = 10;
 	
-	setupconsole(2 * leftOffset + x_size, 2 * topOffset + y_size);
+	#setupconsole(2 * leftOffset + x_size, 2 * topOffset + y_size);
 	
 	for (x_size + 2) {
 		writepixel(leftOffset - 1 + _index_	, topOffset - 1				, wall, 0);
