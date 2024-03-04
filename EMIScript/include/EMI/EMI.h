@@ -28,7 +28,15 @@ inline void strcpy_s(char* dest, size_t size, const char* source) {
 namespace EMI
 {
 	class VMHandle;
-	typedef unsigned long ScriptHandle; // @todo: fix type
+	class ScriptHandle {
+	public:
+		ScriptHandle() {}
+		ScriptHandle(void* in, VMHandle* owner) : ptr(in), vm(owner) {}
+		bool wait();
+	private:
+		void* ptr = nullptr;
+		VMHandle* vm = nullptr;
+	};
 	
 	class ValueHandle
 	{
@@ -177,6 +185,7 @@ namespace EMI
 		FunctionHandle GetFunctionHandle(const char* name);
 
 		ValueHandle _internal_call(FunctionHandle handle, size_t count, InternalValue* args);
+		bool __internal_wait(void*);
 
 		InternalValue GetReturn(ValueHandle handle);
 
@@ -214,6 +223,15 @@ namespace EMI
 	template<typename ...Args> requires (std::is_convertible_v<Args, InternalValue> && ...)
 		ValueHandle FunctionHandle::operator()(Args... args) {
 		return CallFunction(vm, *this, args...);
+	}
+
+	inline bool ScriptHandle::wait() {
+		if (ptr) {
+			auto res = vm->__internal_wait(ptr);
+			ptr = nullptr;
+			return res;
+		} 
+		return false;
 	}
 
 }

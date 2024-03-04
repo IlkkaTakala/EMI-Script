@@ -76,7 +76,6 @@ object Node{
 	G = 0;
 }
 
-var Field : array;
 var Actions : array;
 var Target : Coord;
 
@@ -87,15 +86,22 @@ const wall4 = 176;
 const shade = 111;
 const empty = 255;
 
-const x_size = 20;
-const y_size = 20;
+const x_size = 40;
+const y_size = 40;
+const Top = 10;
+const Left = 10;
 
 def ValidPostCheck(loc : Coord) {
 	return true;
 }
 
 def ValidPreCheck(loc : Coord, act : Coord) {
-	return loc.x + act.x >= 0 && loc.x + act.x < x_size && loc.y + act.y >= 0 && loc.y + act.y < y_size;
+	var x : number = loc.x + act.x;
+	var y : number = loc.y + act.y;
+	if (x >= 0 && x < x_size && y >= 0 && y < y_size) {
+		return Game.GetPixel(x + Left, y + Top) == empty;
+	}
+	return false;
 }
 
 def GetStateCost(state, id) {
@@ -226,10 +232,34 @@ def findPath(begin : Coord, target : Coord) : array {
 	return actionPath;
 }
 
-public def game() {
+public def input() {
 	
-	var l : Coord;
-	Field = makeArray(y_size, makeArray(x_size, l));
+	var topOffset = Top;
+	var leftOffset = Left;
+	
+	while (true) {
+		var inp : number = Input.WaitInput();
+		if (inp == -1) continue;
+		if (inp == 1) {
+			var in_x : number = Input.GetMouseX();
+			var in_y : number = Input.GetMouseY();
+			writepixel(in_x, in_y, wall, 0);
+		} else if (inp == 2) {
+			var in_x : number = Input.GetMouseX();
+			var in_y : number = Input.GetMouseY();
+			writepixel(in_x, in_y, empty, 0);
+		}
+	}
+}
+
+public def renderFrame() {
+	while(true) {
+		render();
+		delay(50);
+	}
+}
+
+public def game() {
 	
 	var charCoord : Coord;
 	var actions : array;
@@ -243,10 +273,10 @@ public def game() {
 		Coord{ 0,  1}, 
 	];
 	
-	var topOffset = 10;
-	var leftOffset = 10;
+	var topOffset = Top;
+	var leftOffset = Left;
 	
-	#setupconsole(2 * leftOffset + x_size, 2 * topOffset + y_size);
+	setupconsole(2 * leftOffset + x_size, 2 * topOffset + y_size);
 	
 	for (x_size + 2) {
 		writepixel(leftOffset - 1 + _index_	, topOffset - 1				, wall, 0);
@@ -269,10 +299,9 @@ public def game() {
 			++actionIdx;
 			writepixel(leftOffset + charCoord.x, topOffset + charCoord.y, wall, 1);
 			
-			render();
 		} 
 		if (actionIdx >= size) {
-			writepixel(leftOffset + Target.x, topOffset + Target.y, empty, 2);
+			#writepixel(leftOffset + Target.x, topOffset + Target.y, empty, 2);
 			Target.x = random(0, x_size);
 			Target.y = random(0, y_size);
 			actions = findPath(charCoord, Target);
@@ -286,11 +315,10 @@ public def game() {
 				writepixel(leftOffset + location.x, topOffset + location.y, wall2, 4);
 			}
 			
+			delay(50);
 			writepixel(leftOffset + Target.x, topOffset + Target.y, wall2, 2);
 		} else {
 			delay(50);
 		}
 	}
-	
-	println(Field);
 }

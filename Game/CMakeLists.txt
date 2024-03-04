@@ -18,5 +18,12 @@ file(
 
 add_executable(EMIGame ${_source_list})
 
-add_dependencies(EMIGame EMICLI)
-#target_include_directories(EMIGame PUBLIC Script_INCLUDE_DIRS)
+add_custom_command(
+    TARGET EMIGame 
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${Game_SOURCE_DIR}/../Scripts"
+        "${Game_BINARY_DIR}/Scripts"
+)
+
+target_link_libraries(EMIGame PUBLIC EMI)

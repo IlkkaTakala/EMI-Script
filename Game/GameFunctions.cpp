@@ -5,29 +5,16 @@
 #include <iostream>
 #include <functional>
 
-struct Pixel
-{
-	short x;
-	short y;
-	short type;
-	short color;
-
-	Pixel()
-	{
-
-	}
-
-	Pixel(int x, int y, int c, int co) : x(x), y(y), type(c), color(co) {}
-};
+int mouse_x = 0;
+int mouse_y = 0;
 
 int size_x = 100;
 int size_y = 100;
 
-
 int win_x = 100;
 int win_y = 100;
 
-int BufferSize = size_x * size_y * 6;
+int BufferSize = 0;
 
 char* FinalBuffer = nullptr;
 char* OverlayBuffer = nullptr;
@@ -70,6 +57,7 @@ int setup_console(int x, int y)
 {
 	size_x = x;
 	size_y = y;
+	BufferSize = size_x * size_y * 6;
 
 	HWND consoleWindow = GetConsoleWindow();
 	SetWindowLong(consoleWindow, GWL_STYLE, GetWindowLong(consoleWindow, GWL_STYLE) & ~WS_MAXIMIZEBOX & ~WS_SIZEBOX);
@@ -122,7 +110,6 @@ int setup_console(int x, int y)
 
 	FinalBuffer = new char[BufferSize + 1]();
 	OverlayBuffer = new char[BufferSize + 1]();
-	NetworkBuffer = new Pixel[win_x * win_y]();
 	memset(FinalBuffer, 0, BufferSize + 1);
 	for (int i = 0; i < BufferSize; i += 6) {
 		strncpy_s(&FinalBuffer[i], 6, WHT, 6);
@@ -148,12 +135,78 @@ void render_frame()
 	std::cout.write(FinalBuffer, BufferSize - 1);
 }
 
-EMI_REGISTER(Global, setupconsole, setup_console);
+int wait_for_input() {
+	INPUT_RECORD InputRecord; 
+	DWORD Events;
+	ReadConsoleInput(hIn, &InputRecord, 1, &Events);
+
+	switch (InputRecord.EventType) {
+	case KEY_EVENT: return InputRecord.Event.KeyEvent.wVirtualKeyCode;
+	case MOUSE_EVENT: {
+		mouse_x = InputRecord.Event.MouseEvent.dwMousePosition.X;
+		mouse_y = InputRecord.Event.MouseEvent.dwMousePosition.Y;
+		if (InputRecord.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED) return 1;
+		if (InputRecord.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED) return 2;
+		
+	} break;
+	default: return -1;
+	}
+	return -1;
+}
+
+bool is_key_down(int keycode) {
+	return false;
+}
+
+bool is_mouse_key_down(int keycode) {
+	return false;
+}
+
+int get_mouse_x() {
+	return mouse_x;
+}
+
+int get_mouse_y() {
+	return mouse_y;
+}
+
 #else 
 void render_frame() {
 
 }
+void setup_console() {
+
+}
+
+int wait_for_input() {
+	return -1;
+}
+
+bool is_key_down(int keycode) {
+	return false;
+}
+
+bool is_mouse_key_down(int keycode) {
+	return false;
+}
+
+int get_mouse_x() {
+	return 0;
+}
+
+int get_mouse_y() {
+	return 0;
+}
 #endif
+
+int getPixel(int x, int y) {
+	if (!FinalBuffer) return wall;
+	int index = (size_x * y + x) * 6;
+	if (index >= 0 && index < BufferSize) {
+		return FinalBuffer[index + 5];
+	}
+	return wall;
+}
 
 void write_pixel(int x, int y, unsigned char c, int color = 0)
 {
@@ -182,7 +235,7 @@ void write_text(int x, int y, const char* text, int color = 0)
 void write_text_centered(int x, int y, const char* text, int color = 0)
 {
 	if (!OverlayBuffer) return;
-	int dx = x - strlen(text) / 2;
+	int dx = x - (int)strlen(text) / 2;
 	int dy = y;
 	const char* ptr = text;
 	while (*ptr != '\0') {
@@ -193,6 +246,13 @@ void write_text_centered(int x, int y, const char* text, int color = 0)
 
 }
 
+EMI_REGISTER(Game, GetPixel, getPixel);
+EMI_REGISTER(Input, WaitInput, wait_for_input);
+EMI_REGISTER(Input, IsKeyDown, is_key_down);
+EMI_REGISTER(Input, IsMouseButtonDown, is_mouse_key_down);
+EMI_REGISTER(Input, GetMouseX, get_mouse_x);
+EMI_REGISTER(Input, GetMouseY, get_mouse_y);
+EMI_REGISTER(Global, setupconsole, setup_console);
 EMI_REGISTER(Global, writepixel, write_pixel);
 EMI_REGISTER(Global, writetext, write_text);
 EMI_REGISTER(Global, writetextCentered, write_text_centered);

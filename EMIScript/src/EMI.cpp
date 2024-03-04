@@ -67,7 +67,7 @@ EMI::VMHandle::VMHandle(unsigned int value, void* ptr) : Index(value), Vm(ptr)
 ScriptHandle EMI::VMHandle::CompileScript(const char* file, const Options& options)
 {
 	auto vm = GetVM(Index);
-	return vm->Compile(file, options);
+	return { vm->Compile(file, options), this };
 }
 
 void EMI::VMHandle::CompileTemporary(const char* data)
@@ -86,6 +86,11 @@ ValueHandle EMI::VMHandle::_internal_call(FunctionHandle handle, size_t count, I
 	const std::span<InternalValue> s(args, count);
 	size_t out = ((VM*)Vm)->CallFunction(handle, s);
 	return ValueHandle{ out, this };
+}
+
+bool EMI::VMHandle::__internal_wait(void* ptr)
+{
+	return ((VM*)Vm)->WaitForResult(ptr);
 }
 
 InternalValue EMI::VMHandle::GetReturn(ValueHandle handle)

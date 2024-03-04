@@ -52,9 +52,6 @@ typedef int32_t int32;
 typedef int64_t int64;
 #endif
 
-typedef unsigned long ScriptHandle;
-
-
 #define X(x) x,
 enum class OpCodes : uint8
 {

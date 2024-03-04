@@ -20,6 +20,20 @@ VM::VM()
 		sym->resolved = true;
 		it->second.Sym = sym;
 	}
+	
+	// @todo: Fix this to be more dynamic
+	for (auto& [name, fn]: HostFunctions()) {
+		if (fn->space == nullptr) continue;
+		std::string nsname = fn->space;
+		auto it = Namespaces.find(nsname);
+		if (it == Namespaces.end()) {
+			auto [ns, success] = Namespaces.emplace(nsname, Namespace{});
+			auto sym = new Symbol();
+			sym->setType(SymbolType::Namespace);
+			sym->resolved = true;
+			ns->second.Sym = sym;
+		}
+	}
 
 	VMRunning = true;
 	for (uint i = 0; i < counter / 2; i++) {
@@ -27,7 +41,7 @@ VM::VM()
 		RunnerPool.emplace_back(new Runner(this));
 	}
 
-	//GarbageCollector = new std::thread(&VM::GarbageCollect, this);
+	GarbageCollector = new std::thread(&VM::GarbageCollect, this);
 }
 
 VM::~VM()
@@ -53,22 +67,19 @@ void VM::ReinitializeGrammar(const char* grammar)
 	Parser::InitializeGrammar(grammar);
 }
 
-ScriptHandle VM::Compile(const char* path, const Options& options)
+void* VM::Compile(const char* path, const Options& options)
 {
-	ScriptHandle handle;
-	{
-		std::lock_guard lock(HandleMutex);
-		handle = (ScriptHandle)++HandleCounter;
-	}
+	void* handle = nullptr;
 
 	CompileOptions fulloptions{};
-	fulloptions.Handle = handle;
 	fulloptions.Path = path;
 	fulloptions.UserOptions = options;
 
 	{
 		std::lock_guard lock(CompileMutex);
-		CompileQueue.push(fulloptions);
+		auto& future = CompileRequests.emplace_back(fulloptions.CompileResult.get_future());
+		handle = &future;
+		CompileQueue.push(std::move(fulloptions));
 	}
 	QueueNotify.notify_one();
 
@@ -78,11 +89,10 @@ ScriptHandle VM::Compile(const char* path, const Options& options)
 void VM::CompileTemporary(const char* data)
 {
 	CompileOptions fulloptions{};
-	fulloptions.Handle = 0;
 	fulloptions.Data = data;
 	{
 		std::lock_guard lock(CompileMutex);
-		CompileQueue.push(fulloptions);
+		CompileQueue.push(std::move(fulloptions));
 	}
 	QueueNotify.notify_one();
 }
@@ -158,6 +168,20 @@ InternalValue VM::GetReturnValue(size_t index)
 	ReturnFreeList.push_back(index);
 	auto val = moveOwnershipToHost(var);
 	return val;
+}
+
+bool VM::WaitForResult(void* ptr)
+{
+	std::unique_lock lk(CompileMutex);
+	auto it = std::find_if(CompileRequests.begin(), CompileRequests.end(), [ptr](const std::future<bool>& item) { return ptr == &item; });
+	if (it != CompileRequests.end()) {
+		lk.unlock();
+		auto res = it->get();
+		std::unique_lock outlk(CompileMutex);
+		CompileRequests.remove_if([ptr](const std::future<bool>& item) { return ptr == &item; });
+		return res;
+	}
+	return false;
 }
 
 Symbol* VM::FindSymbol(const std::string& name, const std::string& space, bool& isNamespace)

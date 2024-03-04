@@ -397,8 +397,8 @@ void TypeConverter(NodeDataType& n, const TokenHolder& h)
 	case Token::Number: {
 		n = 0.f;
 		auto& var = std::get<double>(n);
-		char* end;
 		#ifndef _MSC_VER
+		char* end;
 		double value = std::strtod(h.data.data(), &end);
 		if (end != h.data.data() + h.data.size()) {
 			var = 0.0;
@@ -1243,6 +1243,11 @@ void ASTWalker::WalkLoad(Node* n)
 
 	case Token::Const:
 	case Token::VarDeclare: {
+		bool isNamespace;
+		if (findSymbol(std::get<std::string>(n->data), "", isNamespace)) {
+			_Error("Symbol already defined: " + std::get<std::string>(n->data));
+			break;
+		}
 		auto sym = currentScope->addSymbol(std::get<std::string>(n->data));
 		sym->startLife = instructionList.size();
 		sym->endLife = instructionList.size();

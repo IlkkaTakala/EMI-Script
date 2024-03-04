@@ -40,7 +40,7 @@ class Object;
 
 class Variable
 {
-	uint64_t value = 0;
+	uint64_t value = NIL_VAL;
 
 public:
 	Variable() : value(NIL_VAL) {}

@@ -131,10 +131,10 @@ void Parser::ThreadedParse(VM* vm)
 			vm->QueueNotify.wait(lk, [vm] {return !vm->CompileQueue.empty() || !vm->CompileRunning; });
 			if (!vm->CompileRunning) return;
 
-			options = vm->CompileQueue.front();
+			options = std::move(vm->CompileQueue.front());
 			vm->CompileQueue.pop();
 		}
-		if (options.Path != "" || options.Handle == 0)
+		if (options.Path != "")
 			Parse(vm, options);
 	}
 }
@@ -142,17 +142,19 @@ void Parser::ThreadedParse(VM* vm)
 void Parser::Parse(VM* vm, CompileOptions& options)
 {
 	auto fullPath = MakePath(options.Path);
-	if (options.Handle != 0) {
+	if (options.Data.size() == 0) {
 		gDebug() << "Parsing file " << fullPath << '\n';
 		if (!std::filesystem::exists(options.Path)) {
 			gLogger() << LogLevel::Warning << fullPath << ": File not found\n";
+			options.CompileResult.set_value(false);
 			return;
 		}
 		vm->RemoveUnit(fullPath);
 	}
 	else {
-		if (Data.size() == 00) {
+		if (options.Data.size() == 0) {
 			gError() << "No data given\n";
+			options.CompileResult.set_value(false);
 			return;
 		}
 	}
@@ -161,6 +163,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	auto root = ConstructAST(options);
 	if (!root) {
 		gLogger() << LogLevel::Error << fullPath << ": Parse failed\n";
+		options.CompileResult.set_value(false);
 		return;
 	}
 
@@ -175,15 +178,17 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 
 	if (!ast.HasError) {
 		vm->AddNamespace(fullPath, ast.namespaces);
+		options.CompileResult.set_value(true);
 	}
 	else {
 		gError() << "Errors present, compile failed: " << fullPath << "\n";
+		options.CompileResult.set_value(false);
 	}
 }
 
 Node* Parser::ConstructAST(CompileOptions& options)
 {
-	if (options.Handle != 0) {
+	if (options.Data.size() == 0) {
 		std::fstream data(options.Path, std::ios::in);
 
 		if (data.is_open()) {

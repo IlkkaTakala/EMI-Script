@@ -22,8 +22,24 @@ struct CompileOptions
 {
 	std::string Path;
 	std::string Data;
-	ScriptHandle Handle = 0;
 	Options UserOptions;
+	std::promise<bool> CompileResult;
+
+	CompileOptions() {}
+	CompileOptions& operator=(CompileOptions&& in) noexcept {
+		Path = in.Path;
+		Data = in.Data;
+		UserOptions = in.UserOptions;
+		CompileResult = std::move(in.CompileResult);
+
+		return *this;
+	}
+	CompileOptions(CompileOptions&& in) noexcept {
+		Path = in.Path;
+		Data = in.Data;
+		UserOptions = in.UserOptions;
+		CompileResult = std::move(in.CompileResult);
+	}
 };
 
 struct CallObject 
@@ -107,7 +123,7 @@ public:
 	~VM();
 
 	void ReinitializeGrammar(const char* grammar);
-	ScriptHandle Compile(const char* path, const Options& options);
+	void* Compile(const char* path, const Options& options);
 	void CompileTemporary(const char* data);
 	void Interrupt();
 
@@ -115,6 +131,7 @@ public:
 
 	size_t CallFunction(FunctionHandle handle, const std::span<InternalValue>& args);
 	InternalValue GetReturnValue(size_t index);
+	bool WaitForResult(void* ptr);
 
 	Symbol* FindSymbol(const std::string& name, const std::string& space, bool& isNamespace);
 	void AddNamespace(const std::string& path, ankerl::unordered_dense::map<std::string, Namespace>& space);
@@ -133,15 +150,14 @@ private:
 	std::mutex CompileMutex;
 	// When merging compile results to VM
 	std::mutex MergeMutex;
-	// When getting new handles
-	std::mutex HandleMutex;
 	// When editing call queue
 	std::mutex CallMutex;
+
+	std::list<std::future<bool>> CompileRequests;
 
 	std::condition_variable QueueNotify;
 	std::queue<CompileOptions> CompileQueue;
 	std::vector<std::thread> ParserPool;
-	size_t HandleCounter = 0;
 	std::thread* GarbageCollector;
 	bool CompileRunning;
 	bool VMRunning;
