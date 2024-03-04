@@ -57,8 +57,10 @@ Expr Expr And Expr
 Expr Expr Or Expr
 Expr Expr Less Expr
 Expr Expr Larger Expr
-Expr Expr Less Assign Expr
-Expr Expr Larger Assign Expr
+Expr Expr LessEqual Expr
+LessEqual Less Assign
+Expr Expr LargerEqual Expr
+LargerEqual Larger Assign
 
 Expr Conditional
 Conditional Expr Opt Expr Colon Expr 
@@ -205,7 +207,9 @@ None And
 None Or 
 None Less 
 None Larger 
+None None LessEqual
 None LessEqual 
+None None LargerEqual
 None LargerEqual 
  
 None None Conditional 

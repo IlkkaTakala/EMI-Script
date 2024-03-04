@@ -92,9 +92,11 @@ public:
 	~Runner();
 	void Join();
 
+	void SetRunning(bool value) { Running = value; }
 
 private:
 	void Run();
+	bool Running;
 	VM* Owner;
 	std::thread RunThread;
 	std::vector<CallObject> CallStack;

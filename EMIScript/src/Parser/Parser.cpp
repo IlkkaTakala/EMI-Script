@@ -28,10 +28,15 @@ void Parser::InitializeParser()
 	TokenParseData[TOKEN(Div)] = { 60, Association::Left };
 	TokenParseData[TOKEN(Assign)] = { 5, Association::Right };
 	TokenParseData[TOKEN(Equal)] = { 19, Association::Left };
+	TokenParseData[TOKEN(NotEqual)] = { 19, Association::Left };
+	TokenParseData[TOKEN(Less)] = { 19, Association::Left };
+	TokenParseData[TOKEN(LessEqual)] = { 19, Association::Left };
+	TokenParseData[TOKEN(Larger)] = { 19, Association::Left };
+	TokenParseData[TOKEN(LargerEqual)] = { 19, Association::Left };
 	TokenParseData[TOKEN(Conditional)] = { 15, Association::Left };
 	TokenParseData[TOKEN(Opt)] = { 15, Association::Left };
 	TokenParseData[TOKEN(Not)] = { 50, Association::Left };
-	TokenParseData[TOKEN(And)] = { 18, Association::Left };
+	TokenParseData[TOKEN(And)] = { 17, Association::Left };
 	TokenParseData[TOKEN(Or)] = { 17, Association::Left };
 	TokenParseData[TOKEN(Literal)] = { 20, Association::Left };
 	TokenParseData[TOKEN(StrDelimiterL)] = { 20, Association::Left };

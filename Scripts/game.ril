@@ -111,7 +111,7 @@ def GetStateCost(state, id) {
 def GetCost(state, g) {
 	var x_dist = Target.x - state.x;
 	var y_dist = Target.y - state.y;
-	return g + 0.5 * Math.Sqrt(x_dist * x_dist + y_dist * y_dist);
+	return g + 2 * Math.Sqrt(x_dist * x_dist + y_dist * y_dist);
 }
 
 def Visit(state : Coord) {
@@ -240,14 +240,18 @@ public def input() {
 	while (true) {
 		var inp : number = Input.WaitInput();
 		if (inp == -1) continue;
+		var in_x : number = Input.GetMouseX();
+		var in_y : number = Input.GetMouseY();
+		var x = in_x - leftOffset;
+		var y = in_y - topOffset;
 		if (inp == 1) {
-			var in_x : number = Input.GetMouseX();
-			var in_y : number = Input.GetMouseY();
-			writepixel(in_x, in_y, wall, 0);
+			if (x >= 0 && x < x_size && y >= 0 && y < y_size) {
+				writepixel(in_x, in_y, wall, 0);
+			}
 		} else if (inp == 2) {
-			var in_x : number = Input.GetMouseX();
-			var in_y : number = Input.GetMouseY();
-			writepixel(in_x, in_y, empty, 0);
+			if (x >= 0 && x < x_size && y >= 0 && y < y_size) {
+				writepixel(in_x, in_y, empty, 0);
+			}
 		}
 	}
 }
@@ -280,11 +284,11 @@ public def game() {
 	
 	for (x_size + 2) {
 		writepixel(leftOffset - 1 + _index_	, topOffset - 1				, wall, 0);
-		writepixel(leftOffset - 1 + _index_	, topOffset + y_size + 1	, wall, 0);
+		writepixel(leftOffset - 1 + _index_	, topOffset + y_size		, wall, 0);
 	}
 	for (y_size + 2) {
 		writepixel(leftOffset - 1			, topOffset - 1 + _index_	, wall, 0);
-		writepixel(leftOffset + x_size	, topOffset - 1 + _index_	, wall, 0);
+		writepixel(leftOffset + x_size		, topOffset - 1 + _index_	, wall, 0);
 	}
 	
 	while(true) {
@@ -304,6 +308,17 @@ public def game() {
 			#writepixel(leftOffset + Target.x, topOffset + Target.y, empty, 2);
 			Target.x = random(0, x_size);
 			Target.y = random(0, y_size);
+			
+			var x_dist = Target.x - charCoord.x;
+			var y_dist = Target.y - charCoord.y;
+			while (Game.GetPixel(Target.x + Left, Target.y + Top) != empty && 
+			Math.Sqrt(x_dist * x_dist + y_dist * y_dist) < x_size * 0.4) {
+				Target.x = random(0, x_size);
+				Target.y = random(0, y_size);
+				x_dist = Target.x - charCoord.x;
+				y_dist = Target.y - charCoord.y;
+			}
+			
 			actions = findPath(charCoord, Target);
 			actionIdx = 0;
 			

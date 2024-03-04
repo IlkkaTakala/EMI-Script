@@ -203,7 +203,8 @@ int getPixel(int x, int y) {
 	if (!FinalBuffer) return wall;
 	int index = (size_x * y + x) * 6;
 	if (index >= 0 && index < BufferSize) {
-		return FinalBuffer[index + 5];
+		int out = (unsigned char)FinalBuffer[index + 5];
+		return out;
 	}
 	return wall;
 }

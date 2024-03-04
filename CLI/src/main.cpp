@@ -51,10 +51,12 @@ int main()
 					path.push_back(params[i]);
 				}
 			}
-			int result = 0;
-			for (const auto& p : path) 
-				result += vm.CompileScript(p.c_str(), options); 
-			return result > 0 ? 1 : 0;
+			bool result = false;
+			for (const auto& p : path) {
+				auto handle = vm.CompileScript(p.c_str(), options);
+				result |= handle.wait();
+			}
+			return result ? 1 : 0;
 		}},
 		{"reinit", [](EMI::VMHandle& vm, const std::vector<std::string>&) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
 		{"emi", [](EMI::VMHandle&, const std::vector<std::string>&) { return 2; }},

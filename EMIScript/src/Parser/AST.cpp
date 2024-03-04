@@ -1878,7 +1878,7 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 	}
 
 #ifdef DEBUG
-	gLogger() << "Function " << f->Name << '\n';
+	gDebug() << "Function " << f->Name << '\n';
 	gLogger() << "----------------------------------\n";
 	for (auto& in : instructionList) {
 		printInstruction(in);

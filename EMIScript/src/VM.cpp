@@ -54,6 +54,9 @@ VM::~VM()
 		t.join();
 	}
 	for (auto& t : RunnerPool) {
+		t->SetRunning(false);
+	}
+	for (auto& t : RunnerPool) {
 		t->Join();
 		delete t;
 	}
@@ -311,12 +314,13 @@ void Runner::Join()
 
 void Runner::Run()
 {
-	while (Owner->IsRunning()) {
+	Running = true;
+	while (Running) {
 
 		{
 			std::unique_lock lk(Owner->CallMutex);
-			Owner->CallQueueNotify.wait(lk, [&]() {return !Owner->CallQueue.empty() || !Owner->IsRunning(); });
-			if (!Owner->IsRunning()) return;
+			Owner->CallQueueNotify.wait(lk, [&]() {return !Owner->CallQueue.empty() || !Running; });
+			if (!Running) return;
 
 			CallStack.push_back(Owner->CallQueue.front());
 			Owner->CallQueue.pop();
@@ -341,10 +345,10 @@ void Runner::Run()
 #define STRS current->FunctionPtr->StringTable
 #define JUMPS current->FunctionPtr->JumpTable.values()
 		out:
-		while (interrupt && Owner->IsRunning()) {
+		while (interrupt && Running) {
 
 		start: // @todo: maybe something better so we can exit whenever?
-			if (!Owner->IsRunning()) goto out;
+			if (!Running) goto out;
 			const Instruction& byte = *(Instruction*)current->Ptr++;
 
 #define X(x) case OpCodes::x: goto x;
@@ -992,11 +996,35 @@ void Runner::Run()
 				} goto start;
 				
 				TARGET(Equal) {
-					Registers[byte.target] = equal(Registers[byte.in1], Registers[byte.in2]); // @todo: fix this
+					auto& lhs = Registers[byte.in1];
+					auto& rhs = Registers[byte.in2];
+					if (lhs.getType() != rhs.getType()) { Registers[byte.target] = false; goto start; }
+					switch (lhs.getType())
+					{
+					case VariableType::String: Registers[byte.target] = strcmp(lhs.as<String>()->data(), rhs.as<String>()->data()) == 0; goto start;
+					case VariableType::Number: Registers[byte.target] = fabs(lhs.as<double>() - rhs.as<double>()) < 0.00001; goto start;
+					case VariableType::Boolean: Registers[byte.target] = lhs.as<bool>() == rhs.as<bool>(); goto start;
+					case VariableType::Undefined: Registers[byte.target] = false; goto start;
+					default:
+						Registers[byte.target] = lhs.operator==(rhs);
+						goto start;
+					}
 				} goto start;
 
 				TARGET(NotEqual) {
-					Registers[byte.target] = !equal(Registers[byte.in1], Registers[byte.in2]); // @todo: fix this
+					auto& lhs = Registers[byte.in1];
+					auto& rhs = Registers[byte.in2];
+					if (lhs.getType() != rhs.getType()) { Registers[byte.target] = true; goto start; }
+					switch (lhs.getType())
+					{
+					case VariableType::String: Registers[byte.target] = strcmp(lhs.as<String>()->data(), rhs.as<String>()->data()) != 0; goto start;
+					case VariableType::Number: Registers[byte.target] = fabs(lhs.as<double>() - rhs.as<double>()) > 0.00001; goto start;
+					case VariableType::Boolean: Registers[byte.target] = lhs.as<bool>() != rhs.as<bool>(); goto start;
+					case VariableType::Undefined: Registers[byte.target] = false; goto start;
+					default:
+						Registers[byte.target] = !lhs.operator==(rhs);
+						goto start;
+					}
 				} goto start;
 
 				TARGET(Not) {
