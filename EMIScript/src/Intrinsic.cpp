@@ -5,20 +5,22 @@
 #include "Objects/UserObject.h"
 #include "Helpers.h"
 #include <numeric>
+#include <math.h>
+#include <thread>
 
 void print(Variable&, Variable* args, size_t argc) {
 	if (argc > 0) {
 		std::string format = toStdString(args[0]);
 		std::vector<std::string> out_args(argc - 1);
-
-		for (int i = 1; i < argc; ++i) {
+		/*
+		for (size_t i = 1; i < argc; ++i) {
 			try {
 				format = std::vformat(format, std::make_format_args(toStdString(args[i])));
 			}
-			catch (std::exception e) {
+			catch (const std::exception& e) {
 				gError() << "Exception: " << e.what() << "\n";
 			}
-		}
+		}*/
 
 		gLogger() << format;
 	}

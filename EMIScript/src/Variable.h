@@ -2,6 +2,8 @@
 #define _VARIABLE_INC_GUARD_H_
 #pragma once
 #include <type_traits>
+#include <cstdint>
+#include <cstring>
 
 /**
  
@@ -38,22 +40,19 @@ class Object;
 
 class Variable
 {
-	uint64_t value;
-	VariableType Type;
+	uint64_t value = 0;
 
 public:
-	Variable() : value(NIL_VAL), Type(VariableType::Undefined) {}
+	Variable() : value(NIL_VAL) {}
 	Variable(const Variable&);
 	Variable(Variable&&) noexcept;
 	Variable(int v) {
-		Type = VariableType::Number;
 		double val = static_cast<double>(v);
-		value = *(uint64_t*)&val;
+		memcpy(&value, &val, sizeof(value));
 	}
 	Variable(double v);
 	Variable(Object* ptr);
 	Variable(bool v) {
-		Type = VariableType::Boolean;
 		value = BOOL_VAL(v);
 	}
 
@@ -82,13 +81,8 @@ public:
 	template<typename T> requires (std::is_convertible_v<T, double>)
 	T as() const {
 		double num;
-		num = *(double*)&value;
+		memcpy(&num, &value, sizeof(num));
 		return static_cast<T>(num);
-	}
-
-	template<>
-	bool as() const {
-		return value == TRUE_VAL;
 	}
 
 	template<typename T> requires std::is_class_v<T>
@@ -104,4 +98,8 @@ public:
 	Variable& operator=(Variable&& rhs) noexcept;
 };
 
+	template<>
+	inline bool Variable::as<bool>() const {
+		return value == TRUE_VAL;
+	}
 #endif //_VARIABLE_INC_GUARD_H_

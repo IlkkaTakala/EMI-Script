@@ -48,8 +48,8 @@ public:
 				obj->Realloc(args...);
 			}
 			else {
-				delete obj;
-				obj = new T(args...);
+				obj->~T();
+				obj = new (obj) T(args...);
 			}
 
 			return obj;
@@ -58,7 +58,7 @@ public:
 
 	void Free() {
 		std::unique_lock lk(AllocLock);
-		for (int i = 1; i < PointerList.size(); i++) {
+		for (size_t i = 1; i < PointerList.size(); i++) {
 			if (PointerList[i]->RefCount == 0) {
 				PointerList[i]->RefCount = -1;
 				constexpr bool hasClear = requires(T & t) {

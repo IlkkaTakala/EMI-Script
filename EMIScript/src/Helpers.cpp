@@ -5,6 +5,8 @@
 #include "Objects/UserObject.h"
 #include <string>
 #include <numeric>
+#include <cmath>
+#include <math.h>
 
 Variable moveOwnershipToVM(const InternalValue& var)
 {

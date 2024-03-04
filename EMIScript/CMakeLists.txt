@@ -14,7 +14,7 @@ option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 if (MSVC)
     add_compile_options(/W4 /WX)
 else()
-    add_compile_options(-Wall -Wextra -pedantic -Werror)
+    add_compile_options(-Wall -Wextra -Werror -fms-extensions)
 endif()
 
 macro(add_dependency)
@@ -81,6 +81,8 @@ target_include_directories(EMI PUBLIC ${_header_path})
 target_include_directories(EMI PRIVATE ${_src_root_path})
 target_include_directories(EMI INTERFACE ${_header_path})
 
+find_package (Threads)
+target_link_libraries (EMI PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(EMI PUBLIC unordered_dense)
 
 

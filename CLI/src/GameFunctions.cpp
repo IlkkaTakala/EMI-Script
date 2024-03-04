@@ -1,6 +1,9 @@
-#include <Windows.h>
 #include "EMI/EMI.h"
+#ifdef _WIN64
+#include <Windows.h>
+#endif
 #include <iostream>
+#include <functional>
 
 struct Pixel
 {
@@ -28,9 +31,6 @@ int BufferSize = size_x * size_y * 6;
 
 char* FinalBuffer = nullptr;
 char* OverlayBuffer = nullptr;
-
-int NetworkSize = 0;
-Pixel* NetworkBuffer = nullptr;
 
 const unsigned char wall = 219;
 const unsigned char wall2 = 178;
@@ -62,7 +62,7 @@ const char* get_color(int c)
 		return WHT;
 	}
 }
-
+#ifdef _WIN64
 HANDLE hOut;
 HANDLE hIn;
 
@@ -133,12 +133,34 @@ int setup_console(int x, int y)
 	return 0;
 }
 
+void render_frame()
+{
+	if (!OverlayBuffer) return;
+	SetConsoleCursorPosition(hOut, COORD());
+	for (int i = 0; i < BufferSize; i += 6)
+	{
+		if (OverlayBuffer[i])
+			for (int f = 0; f < 6; f++)
+				FinalBuffer[i + f] = OverlayBuffer[i + f];
+		else
+			FinalBuffer[i + 5] = empty;
+	}
+	std::cout.write(FinalBuffer, BufferSize - 1);
+}
+
+EMI_REGISTER(Global, setupconsole, setup_console);
+#else 
+void render_frame() {
+
+}
+#endif
+
 void write_pixel(int x, int y, unsigned char c, int color = 0)
 {
 	if (!OverlayBuffer) return;
 	int index = (size_x * y + x) * 6;
 	if (index >= 0 && index < BufferSize) {
-		strncpy_s(&OverlayBuffer[index], 6, get_color(color), 6);
+		strncpy(&OverlayBuffer[index], get_color(color), 6);
 		OverlayBuffer[index + 5] = c;
 	}
 }
@@ -171,28 +193,13 @@ void write_text_centered(int x, int y, const char* text, int color = 0)
 
 }
 
-void render_frame()
-{
-	if (!OverlayBuffer) return;
-	SetConsoleCursorPosition(hOut, COORD());
-	for (int i = 0; i < BufferSize; i += 6)
-	{
-		if (OverlayBuffer[i])
-			for (int f = 0; f < 6; f++)
-				FinalBuffer[i + f] = OverlayBuffer[i + f];
-		else
-			FinalBuffer[i + 5] = empty;
-	}
-	std::cout.write(FinalBuffer, BufferSize - 1);
-}
+EMI_REGISTER(Global, writepixel, write_pixel);
+EMI_REGISTER(Global, writetext, write_text);
+EMI_REGISTER(Global, writetextCentered, write_text_centered);
+EMI_REGISTER(Global, render, render_frame);
 
 int random_in_range(int low, int high) {
 	return rand() % (high - low) + low;
 }
 
-EMI_REGISTER(Global, setupconsole, setup_console);
-EMI_REGISTER(Global, writepixel, write_pixel);
-EMI_REGISTER(Global, writetext, write_text);
-EMI_REGISTER(Global, writetextCentered, write_text_centered);
-EMI_REGISTER(Global, render, render_frame);
 EMI_REGISTER(Global, random, random_in_range);

@@ -261,7 +261,7 @@ Node* Parser::ConstructAST(CompileOptions& options)
 			NodeDataType nodeData;
 			bool hasData = false;
 
-			for (int i = 0; i < rule.development.size(); ++i) {
+			for (size_t i = 0; i < rule.development.size(); ++i) {
 				if (rule.development[i] == Token::None) break;
 				if (!operatorStack.empty() && symbolStack.top().token == operatorStack.top()) operatorStack.pop();
 
@@ -338,10 +338,12 @@ Node* Parser::ConstructAST(CompileOptions& options)
 
 		ERRORCASE:
 		default: {
+			#ifdef _MSC_VER
 			const auto& c = lex.GetContext();
 			gError() << MakePath(options.Path) 
 				<< std::format(" ({}, {})", c.Row, c.Column) 
 				<< ": Critical error found '" << holder.data << "'. Expected one of: ";
+			#endif
 #ifdef DEBUG
 			int idx = 0;
 			for (auto& state : ParseTable[currentState]) {

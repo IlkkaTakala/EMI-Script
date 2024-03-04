@@ -1,5 +1,6 @@
 #pragma once
 #include "BaseObject.h"
+#include <cstring>
 
 class String : public Object
 {

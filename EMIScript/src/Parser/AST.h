@@ -9,11 +9,11 @@ class Node
 {
 public:
 	Node() :
+		varType(VariableType::Undefined),
+		regTarget(254),
 		line(0),
 		depth(0),
-		regTarget(254),
 		sym(nullptr),
-		varType(VariableType::Undefined),
 		instruction(0)
 	{}
 	~Node() {

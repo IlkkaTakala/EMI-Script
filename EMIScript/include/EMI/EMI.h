@@ -2,7 +2,7 @@
 #define _EMI_INC_GUARD_HPP
 #pragma once
 
-#ifdef BUILD_SHARED_LIBS
+#if defined(BUILD_SHARED_LIBS) && defined(_WIN64)
 #ifdef SCRIPTEXPORT
 #define CORE_API __declspec(dllexport)
 #else
@@ -14,8 +14,16 @@
 
 #include <vector>
 #include <string>
+#include <cstring>
 #include <functional>
 #include "Value.h"
+
+#ifndef _MSC_VER
+inline void strcpy_s(char* dest, size_t size, const char* source) {
+	strncpy(dest, source, size);
+	dest[size - 1] = '\0';
+}
+#endif
 
 namespace EMI
 {

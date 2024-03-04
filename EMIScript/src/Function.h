@@ -2,6 +2,7 @@
 #include "Defines.h"
 #include <string>
 #include <vector>
+#include <list>
 #include <ankerl/unordered_dense.h>
 #include "Symbol.h"
 #include "EMI/EMI.h"

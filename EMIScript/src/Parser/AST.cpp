@@ -4,6 +4,7 @@
 #include "Objects/StringObject.h"
 #include "Objects/ArrayObject.h"
 #include "VM.h"
+#include <charconv>
 
 constexpr unsigned char print_first[] = { 195, 196, 196, 0 };
 constexpr unsigned char print_last[] = { 192, 196, 196, 0 };
@@ -393,10 +394,21 @@ void TypeConverter(NodeDataType& n, const TokenHolder& h)
 {
 	switch (h.token)
 	{
-	case Token::Number:
+	case Token::Number: {
 		n = 0.f;
-		std::from_chars(h.data.data(), h.data.data() + h.data.size(), std::get<double>(n));
-		break;
+		auto& var = std::get<double>(n);
+		char* end;
+		#ifndef _MSC_VER
+		double value = std::strtod(h.data.data(), &end);
+		if (end != h.data.data() + h.data.size()) {
+			var = 0.0;
+		} else {
+			var = value;
+		}
+		#else 
+		std::from_chars(h.data.data(), h.data.data() + h.data.size(), var);
+		#endif
+	} break;
 	case Token::True:
 		n = true;
 		break;
@@ -501,6 +513,7 @@ void ASTWalker::Run()
 							case Token::Typename: {
 								type = VariableType::Object;
 							}break;
+							default: break;
 						}
 						flags.varType = type;
 						if (IsConstant(field->children.back()->type)) {
@@ -606,6 +619,7 @@ void ASTWalker::Run()
 				case Token::Static: symbol->setType(SymbolType::Static); break;
 				case Token::Const: symbol->setType(SymbolType::Static); break;
 				case Token::VarDeclare: symbol->setType(SymbolType::Variable); break;
+				default: break;
 				}
 				auto& variable = currentNamespace->variables.emplace(data, Variable{}).first->second;
 
@@ -675,6 +689,7 @@ void ASTWalker::Run()
 						}
 					}
 					break;
+				default: break;
 				}
 			}
 		} break;
@@ -996,8 +1011,8 @@ void ASTWalker::WalkLoad(Node* n)
 					arg.param = static_cast<uint16>(index);
 
 					UserDefinedType* typeProperty = nullptr;
-					int typeIndex = (int)_First()->varType - (int)VariableType::Object;
-					if (typeIndex >= 0 && typeIndex < currentFunction->TypeTableSymbols.size()) {
+					size_t typeIndex = (size_t)_First()->varType - (size_t)VariableType::Object;
+					if (typeIndex < currentFunction->TypeTableSymbols.size()) {
 						auto& objectName = currentFunction->TypeTableSymbols[typeIndex];
 						if (GetManager().GetType(typeProperty, objectName)) {
 							n->varType = typeProperty->GetFieldType(data);
@@ -1073,8 +1088,8 @@ void ASTWalker::WalkLoad(Node* n)
 			arg.param = static_cast<uint16>(index);
 
 			UserDefinedType* typeProperty = nullptr;
-			int typeIndex = (int)_First()->varType - (int)VariableType::Object;
-			if (typeIndex >= 0 && typeIndex < currentFunction->TypeTableSymbols.size()) {
+			size_t typeIndex = (size_t)_First()->varType - (size_t)VariableType::Object;
+			if (typeIndex < currentFunction->TypeTableSymbols.size()) {
 				auto& objectName = currentFunction->TypeTableSymbols[typeIndex];
 				if (GetManager().GetType(typeProperty, objectName)) {
 					n->varType = typeProperty->GetFieldType(data);
@@ -1686,8 +1701,8 @@ uint8 ASTWalker::WalkStore(Node* n) {
 				else if (_First()->sym->type == SymbolType::Variable) {
 
 					UserDefinedType* typeProperty = nullptr;
-					int typeIndex = (int)_First()->varType - (int)VariableType::Object;
-					if (typeIndex >= 0 && typeIndex < currentFunction->TypeTableSymbols.size()) {
+					size_t typeIndex = (size_t)_First()->varType - (size_t)VariableType::Object;
+					if (typeIndex < currentFunction->TypeTableSymbols.size()) {
 						auto& objectName = currentFunction->TypeTableSymbols[typeIndex];
 						if (GetManager().GetType(typeProperty, objectName)) {
 							n->varType = typeProperty->GetFieldType(data);
@@ -1853,7 +1868,7 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 	}
 
 	f->Bytecode.resize(instructionList.size());
-	for (int i = 0; i < instructionList.size(); i++) {
+	for (size_t i = 0; i < instructionList.size(); i++) {
 		f->Bytecode[i] = instructionList[i].data;
 	}
 

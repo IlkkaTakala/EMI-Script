@@ -2,6 +2,7 @@
 #define _VALUE_INC_GUARD_H_
 #pragma once
 #include <cstdint>
+#include <cstring>
 #include <type_traits>
 /**
 
@@ -39,10 +40,10 @@ public:
 	InternalValue() : value(NIL_VAL) {}
 	InternalValue(int v) {
 		double val = static_cast<double>(v);
-		value = *(uint64_t*)&val;
+		memcpy(&value, &val, sizeof(value));
 	}
 	InternalValue(double v) {
-		value = *(uint64_t*)&v;
+		memcpy(&value, &v, sizeof(value));
 	}
 	InternalValue(bool v) {
 		value = BOOL_VAL(v);
@@ -91,13 +92,8 @@ public:
 	template<typename T> requires (std::is_convertible_v<T, double>)
 		T as() const {
 		double num;
-		num = *(double*)&value;
+		memcpy(&num, &value, sizeof(num));
 		return static_cast<T>(num);
-	}
-
-	template<>
-	bool as() const {
-		return value == TRUE_VAL;
 	}
 
 	template<typename T> requires std::is_pointer_v<T>
@@ -109,6 +105,11 @@ public:
 		return value == rhs.value;
 	}
 };
+
+template<>
+inline bool InternalValue::as() const {
+	return value == TRUE_VAL;
+}
 
 template <typename T>
 inline ValueType type() {

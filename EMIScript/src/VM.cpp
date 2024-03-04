@@ -5,6 +5,7 @@
 #include "Objects/StringObject.h"
 #include "Objects/ArrayObject.h"
 #include "Objects/FunctionObject.h"
+#include <math.h>
 
 VM::VM()
 {
@@ -26,7 +27,7 @@ VM::VM()
 		RunnerPool.emplace_back(new Runner(this));
 	}
 
-	GarbageCollector = new std::thread(&VM::GarbageCollect, this);
+	//GarbageCollector = new std::thread(&VM::GarbageCollect, this);
 }
 
 VM::~VM()
@@ -122,7 +123,7 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& a
 	CallObject& call = CallQueue.emplace(fn);
 
 	call.Arguments.reserve(args.size());
-	for (int i = 0; i < call.FunctionPtr->ArgCount && i < args.size(); i++) {
+	for (size_t i = 0; i < call.FunctionPtr->ArgCount && i < args.size(); i++) {
 		auto val = moveOwnershipToVM(args[i]);
 		if (call.FunctionPtr->Types[i + 1] == val.getType()) {
 			call.Arguments.push_back(val);
@@ -307,7 +308,7 @@ void Runner::Run()
 		Registers.reserve(current->FunctionPtr->RegisterCount);
 		Registers.to(0);
 
-		for (int i = 0; i < current->FunctionPtr->ArgCount && i < current->Arguments.size(); i++) {
+		for (size_t i = 0; i < current->FunctionPtr->ArgCount && i < current->Arguments.size(); i++) {
 			Registers[i] = current->Arguments[i];
 		}
 		current->Arguments.clear();
@@ -326,7 +327,11 @@ void Runner::Run()
 			switch (byte.code)
 			{
 #include "Opcodes.h"
-			default: __assume(0);
+			default: 
+			#ifdef _MSC_VER
+			__assume(0);
+			#endif
+			break;
 			}
 #undef X
 				TARGET(Noop) goto start;
@@ -616,7 +621,7 @@ void Runner::Run()
 						goto start;
 					}
 
-					for (int i = 1; i < fn->Types.size() && i < byte.in2; i++) {
+					for (size_t i = 1; i < fn->Types.size() && i < byte.in2; i++) {
 						if (fn->Types[i] != VariableType::Undefined 
 							&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
 							VariableType real = fn->Types[i];
@@ -674,7 +679,7 @@ void Runner::Run()
 							}
 
 
-							for (int i = 1; i < ptr->Types.size() && i < byte.in2; i++) {
+							for (size_t i = 1; i < ptr->Types.size() && i < byte.in2; i++) {
 								if (ptr->Types[i] != VariableType::Undefined
 									&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
 									VariableType real = ptr->Types[i];
@@ -735,7 +740,11 @@ void Runner::Run()
 						goto start;
 					} break;
 
-					default: __assume(0);
+					default: 
+					#ifdef _MSC_VER
+					__assume(0);
+					#endif
+					break;
 					}
 				} goto start;
 

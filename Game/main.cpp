@@ -1,3 +1,4 @@
+#ifdef _WIN64
 #include <Windows.h>
 #include <filesystem>
 
@@ -34,4 +35,8 @@ int main()
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
 }
-
+#else
+int main() {
+    return 0;
+}
+#endif
