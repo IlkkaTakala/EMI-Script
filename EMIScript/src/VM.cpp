@@ -868,9 +868,6 @@ void Runner::Run()
 				TARGET(InitObject) {
 					const Instruction& data = *(Instruction*)current->Ptr++;
 
-					Registers[byte.in1];
-					Registers[byte.in2];
-
 					auto& type = current->FunctionPtr->TypeTable[data.param];
 					if (type == VariableType::Undefined) {
 						auto& name = current->FunctionPtr->TypeTableSymbols[data.param];
