@@ -10,7 +10,7 @@ int main()
     std::filesystem::path fpath(path);
 
     fpath = fpath.remove_filename();
-    std::string spath = "conhost.exe -- " + fpath.string() + "EMICLI.exe";
+    std::string spath = "conhost.exe -- " + fpath.string() + "EMIGame.exe";
 
     STARTUPINFO si;
     PROCESS_INFORMATION pi;

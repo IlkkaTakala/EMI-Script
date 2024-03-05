@@ -99,7 +99,7 @@ def ValidPreCheck(loc : Coord, act : Coord) {
 	var x : number = loc.x + act.x;
 	var y : number = loc.y + act.y;
 	if (x >= 0 && x < x_size && y >= 0 && y < y_size) {
-		return Game.GetPixel(x + Left, y + Top) == empty;
+		return Game.GetPixel(x + Left, y + Top) != wall;
 	}
 	return false;
 }
@@ -297,8 +297,23 @@ public def game() {
 			writepixel(leftOffset + charCoord.x, topOffset + charCoord.y, empty, 0);
 			
 			var act = Actions[actions[actionIdx]];
-			charCoord.x += act.x;
-			charCoord.y += act.y;
+			if (ValidPreCheck(charCoord, act)) {
+				charCoord.x += act.x;
+				charCoord.y += act.y;
+			} else {
+				var cc = Copy(charCoord);
+				while (actionIdx < Array.Size(actions)) {
+					var acti = Actions[actions[actionIdx]];
+					++actionIdx;
+					cc.x += acti.x;
+					cc.y += acti.y;
+					if (Game.GetPixel(leftOffset + cc.x, topOffset + cc.y) == wall2)
+						writepixel(leftOffset + cc.x, topOffset + cc.y, empty, 0);
+				}
+				writepixel(leftOffset + Target.x, topOffset + Target.y, empty, 2);
+				Array.Clear(actions);
+				size = 0;
+			}
 			
 			++actionIdx;
 			writepixel(leftOffset + charCoord.x, topOffset + charCoord.y, wall, 1);
@@ -311,8 +326,7 @@ public def game() {
 			
 			var x_dist = Target.x - charCoord.x;
 			var y_dist = Target.y - charCoord.y;
-			while (Game.GetPixel(Target.x + Left, Target.y + Top) != empty && 
-			Math.Sqrt(x_dist * x_dist + y_dist * y_dist) < x_size * 0.4) {
+			while (Game.GetPixel(Target.x + Left, Target.y + Top) != empty) {
 				Target.x = random(0, x_size);
 				Target.y = random(0, y_size);
 				x_dist = Target.x - charCoord.x;
