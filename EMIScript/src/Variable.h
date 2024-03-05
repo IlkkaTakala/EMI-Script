@@ -76,7 +76,14 @@ public:
 	}
 	bool isString() const;
 
-	VariableType getType() const;
+	inline VariableType getType() const
+	{
+		if (isUndefined()) return VariableType::Undefined;
+		if (isNumber()) return VariableType::Number;
+		if (isBool()) return VariableType::Boolean;
+		if (isObject()) return getObjectType();
+		return VariableType::Undefined;
+	}
 
 	template<typename T> requires (std::is_convertible_v<T, double>)
 	T as() const {
@@ -96,6 +103,9 @@ public:
 
 	Variable& operator=(const Variable& rhs);
 	Variable& operator=(Variable&& rhs) noexcept;
+
+private:
+	VariableType getObjectType() const;
 };
 
 	template<>

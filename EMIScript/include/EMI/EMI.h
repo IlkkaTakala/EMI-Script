@@ -143,7 +143,8 @@ namespace EMI
 			(*(F*)(ptr))((args[S].as<Args>())...); return {}; };
 	}
 
-	template<class F, class...Args> requires (std::is_convertible_v<F, InternalValue> || std::is_void_v<F>) && ((std::is_convertible_v<Args, InternalValue>) && ...)
+	template<class F, class...Args> requires (std::is_convertible_v<F, InternalValue> || 
+		std::is_void_v<F>) && ((std::is_convertible_v<Args, InternalValue>) && ...)
 	bool RegisterFunction(const std::string& space, const std::string& name, std::function<F(Args...)>&& f) {
 		auto retval = new __internal_function();
 		constexpr size_t size = sizeof...(Args);

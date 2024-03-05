@@ -62,15 +62,6 @@ bool Variable::isString() const
 	return isObject() && as<Object>()->Type == VariableType::String;
 }
 
-VariableType Variable::getType() const
-{
-	if (isUndefined()) return VariableType::Undefined;
-	if (isNumber()) return VariableType::Number;
-	if (isBool()) return VariableType::Boolean;
-	if (isObject()) return as<Object>()->Type;
-	return VariableType::Undefined;
-}
-
 Variable& Variable::operator=(const Variable& rhs)
 {
 	if (isObject()) {
@@ -97,4 +88,9 @@ Variable& Variable::operator=(Variable&& rhs) noexcept
 		as<Object>()->RefCount++;
 	}
 	return *this;
+}
+
+VariableType Variable::getObjectType() const
+{
+	return as<Object>()->Type;
 }
