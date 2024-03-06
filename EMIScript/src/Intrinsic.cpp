@@ -162,7 +162,7 @@ void copy(Variable& out, Variable* args, size_t argc) {
 				auto next = GetManager().Make(obj->Type);
 				auto nextObj = next.as<UserObject>();
 
-				for (uint16 i = 0; i < obj->size(); i++) {
+				for (uint16_t i = 0; i < obj->size(); i++) {
 					copy((*nextObj)[i], &(*obj)[i], 1);
 				}
 				out = next;

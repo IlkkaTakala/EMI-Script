@@ -285,7 +285,7 @@ std::string toStdString(const Variable& in)
 	case VariableType::Number: {
 		double value = in.as<double>();
 		if (trunc(value) == value) {
-			return std::to_string((int64)value).c_str();
+			return std::to_string((int64_t)value).c_str();
 		}
 		return std::to_string(value).c_str();
 	}
@@ -308,7 +308,7 @@ std::string toStdString(const Variable& in)
 			auto obj = in.as<UserObject>();
 			std::string out = "{ ";
 
-			for (uint16 i = 0; i < obj->size(); i++) {
+			for (uint16_t i = 0; i < obj->size(); i++) {
 				out += toStdString((*obj)[i]) + (i + 1 < obj->size() ? ", " : "");
 			}
 

@@ -27,6 +27,6 @@ public:
 	FunctionType InternalType;
 	std::string Name;
 
-	std::variant<Function*, EMI::__internal_function*, IntrinsicPtr> Callee;
+	std::variant<Function*, EMI::_internal_function*, IntrinsicPtr> Callee;
 
 };

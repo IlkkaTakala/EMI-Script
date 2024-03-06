@@ -1,8 +1,8 @@
 #pragma once
 #include "Defines.h"
 
-uint CreateVM();
+uint32_t CreateVM();
 
-void ReleaseVM(uint handle);
+void ReleaseVM(uint32_t handle);
 
-class VM* GetVM(uint handle);
+class VM* GetVM(uint32_t handle);

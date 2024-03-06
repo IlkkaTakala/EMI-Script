@@ -45,8 +45,8 @@ struct CompileOptions
 struct CallObject 
 {
 	Function* FunctionPtr;
-	const uint32* Ptr;
-	const uint32* End;
+	const uint32_t* Ptr;
+	const uint32_t* End;
 	size_t StackOffset;
 	size_t PromiseIndex;
 	std::vector<Variable> Arguments;
@@ -104,7 +104,7 @@ private:
 };
 
 inline auto& HostFunctions() {
-	static ankerl::unordered_dense::map<std::string, __internal_function*> f;
+	static ankerl::unordered_dense::map<std::string, _internal_function*> f;
 	return f;
 }
 

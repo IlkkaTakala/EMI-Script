@@ -6,7 +6,7 @@
 #include "Defines.h"
 
 #define X(name) name,
-enum class Token : uint16
+enum class Token : uint16_t
 {
 #include "Lexemes.h"
 };

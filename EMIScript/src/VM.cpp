@@ -36,7 +36,7 @@ VM::VM()
 	}
 
 	VMRunning = true;
-	for (uint i = 0; i < counter / 2; i++) {
+	for (uint32_t i = 0; i < counter / 2; i++) {
 		ParserPool.emplace_back(Parser::ThreadedParse, this);
 		RunnerPool.emplace_back(new Runner(this));
 	}
@@ -450,7 +450,7 @@ void Runner::Run()
 				} goto start;
 
 				TARGET(LoadImmediate) {
-					Registers[byte.target] = (int8)byte.param;
+					Registers[byte.target] = (int8_t)byte.param;
 				} goto start;
 
 				TARGET(LoadString) {
@@ -542,11 +542,11 @@ void Runner::Run()
 					const Instruction& data = *(Instruction*)current->Ptr++;
 
 					Variable& prop = Registers[byte.in1];
-					int32& propertyIdx = current->FunctionPtr->PropertyTable[data.param];
+					int32_t& propertyIdx = current->FunctionPtr->PropertyTable[data.param];
 					if (propertyIdx == -1) {
 						auto& name = current->FunctionPtr->PropertyTableSymbols[data.param];
 
-						uint16 idx;
+						uint16_t idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
 							gError() << "Property not found: " << name << ", in function " << current->FunctionPtr->Name << '\n';
@@ -563,7 +563,7 @@ void Runner::Run()
 							Registers[byte.target].setUndefined();
 							goto start;
 						}
-						Registers[byte.target] = (*ptr)[static_cast<uint16>(propertyIdx)];
+						Registers[byte.target] = (*ptr)[static_cast<uint16_t>(propertyIdx)];
 					}
 				} goto start;
 
@@ -571,11 +571,11 @@ void Runner::Run()
 					const Instruction& data = *(Instruction*)current->Ptr++;
 
 					Variable& prop = Registers[byte.in1];
-					int32& propertyIdx = current->FunctionPtr->PropertyTable[data.param];
+					int32_t& propertyIdx = current->FunctionPtr->PropertyTable[data.param];
 					if (propertyIdx == -1) {
 						auto& name = current->FunctionPtr->PropertyTableSymbols[data.param];
 
-						uint16 idx;
+						uint16_t idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
 							gError() << "Property not found: " << name << ", in function " << current->FunctionPtr->Name << '\n';
@@ -590,7 +590,7 @@ void Runner::Run()
 							gError() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param] << '\n';
 							goto start;
 						}
-						(*ptr)[static_cast<uint16>(propertyIdx)] = Registers[byte.target];
+						(*ptr)[static_cast<uint16_t>(propertyIdx)] = Registers[byte.target];
 					}
 				} goto start;
 
@@ -655,7 +655,7 @@ void Runner::Run()
 							VariableType real = fn->Types[i];
 
 							if (real >= VariableType::Object) {
-								size_t typeidx = static_cast<uint16>(real) - static_cast<uint16>(VariableType::Object);
+								size_t typeidx = static_cast<uint16_t>(real) - static_cast<uint16_t>(VariableType::Object);
 								if (typeidx < fn->TypeTable.size()) {
 									real = fn->TypeTable[typeidx];
 									if (real == VariableType::Undefined) {
@@ -713,7 +713,7 @@ void Runner::Run()
 									VariableType real = ptr->Types[i];
 
 									if (real >= VariableType::Object) {
-										size_t typeidx = static_cast<uint16>(real) - static_cast<uint16>(VariableType::Object);
+										size_t typeidx = static_cast<uint16_t>(real) - static_cast<uint16_t>(VariableType::Object);
 										if (typeidx < ptr->TypeTable.size()) {
 											real = ptr->TypeTable[typeidx];
 											if (real == VariableType::Undefined) {
@@ -746,7 +746,7 @@ void Runner::Run()
 					} break;
 
 					case FunctionType::Host: {
-						if (auto ptr = std::get<EMI::__internal_function*>(f->Callee)) {
+						if (auto ptr = std::get<EMI::_internal_function*>(f->Callee)) {
 
 							thread_local static std::vector<InternalValue> args;
 							args.resize(byte.in2);
@@ -882,7 +882,7 @@ void Runner::Run()
 					}
 					auto obj = GetManager().Make(type);
 
-					for (uint16 i = 0; i < byte.in2 && i < obj.as<UserObject>()->size(); ++i) {
+					for (uint16_t i = 0; i < byte.in2 && i < obj.as<UserObject>()->size(); ++i) {
 						(*obj.as<UserObject>())[i] = Registers[byte.in1 + i];
 					}
 

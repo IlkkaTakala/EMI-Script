@@ -571,7 +571,7 @@ void ASTWalker::Run()
 					{
 					case Token::Scope: break;
 					case Token::CallParams: {
-						function->ArgCount = (uint8)node->children.size();
+						function->ArgCount = (uint8_t)node->children.size();
 						for (auto& v : node->children) {
 							auto symParam = findSymbol(std::get<0>(v->data), "", isNameSpace);
 							if (symParam || isNameSpace) {
@@ -712,49 +712,49 @@ void printInstruction(const Instruction& in) {
 }
 #endif // DEBUG
 
-#define _Op(op) n->instruction = instructionList.size(); auto& instruction = instructionList.emplace_back(); instruction.code = OpCodes::op; 
-#define _Walk for(auto& child : n->children) WalkLoad(child);
-#define _In16 instruction.param
-#define _In8 instruction.in1
-#define _In8_2 instruction.in2
-#define _Out n->regTarget = instruction.target = getFirstFree()
-#define _FreeChildren for (auto& c : n->children) { if (!c->sym  || (c->sym && c->sym->needsLoading) ) freeReg(c->regTarget); }
-#define _Type n->varType 
-#define _SetOut(n) n->regTarget = instructionList[n->instruction].target
-#define _First() first_child
-#define _Last() last_child
-#define _Error(text) gError() << "Line " << n->line << ": " << text << "\n"; HasError = true;
-#define _Warn(text) gWarn() << "Line " << n->line << ": " << text << "\n";
-#define _FreeConstant(n) if (!n->sym || (n->sym && n->sym->needsLoading) ) freeReg(n->regTarget);
-#define _EnsureOperands if (n->children.size() != 2) { _Error("Invalid number of operands") break; }
+#define Op(op) n->instruction = instructionList.size(); auto& instruction = instructionList.emplace_back(); instruction.code = OpCodes::op; 
+#define Walk for(auto& child : n->children) WalkLoad(child);
+#define In16 instruction.param
+#define In8 instruction.in1
+#define In8_2 instruction.in2
+#define Out n->regTarget = instruction.target = getFirstFree()
+#define FreeChildren for (auto& c : n->children) { if (!c->sym  || (c->sym && c->sym->needsLoading) ) freeReg(c->regTarget); }
+#define Type n->varType 
+#define SetOut(n) n->regTarget = instructionList[n->instruction].target
+#define First() first_child
+#define Last() last_child
+#define Error(text) gError() << "Line " << n->line << ": " << text << "\n"; HasError = true;
+#define Warn(text) gWarn() << "Line " << n->line << ": " << text << "\n";
+#define FreeConstant(n) if (!n->sym || (n->sym && n->sym->needsLoading) ) freeReg(n->regTarget);
+#define EnsureOperands if (n->children.size() != 2) { Error("Invalid number of operands") break; }
 
-#define _Operator(varTy, op, op2) \
+#define Operator(varTy, op, op2) \
 case VariableType::varTy: {\
-	if (_Last()->varType != VariableType::Undefined && _Last()->varType != VariableType::varTy) {\
+	if (Last()->varType != VariableType::Undefined && Last()->varType != VariableType::varTy) {\
 		instruction.code = OpCodes::op2; \
 	}\
 	else { \
 		instruction.code = OpCodes::op; \
 	} \
-	_Type = VariableType::varTy;\
-	_In8 = _First()->regTarget;\
-	_In8_2 = _Last()->regTarget;\
-	_FreeChildren;\
+	Type = VariableType::varTy;\
+	In8 = First()->regTarget;\
+	In8_2 = Last()->regTarget;\
+	FreeChildren;\
 } break;
 
-#define _OperatorAssign _Out;
+#define OperatorAssign Out;
 
-#define _Compare(op) \
-_Walk;\
-if (_First()->varType != _Last()->varType && _First()->varType != VariableType::Undefined && _Last()->varType != VariableType::Undefined) {\
-	_Error("Can only compare similar types");\
+#define Compare(op) \
+Walk;\
+if (First()->varType != Last()->varType && First()->varType != VariableType::Undefined && Last()->varType != VariableType::Undefined) {\
+	Error("Can only compare similar types");\
 }\
-_Type = VariableType::Boolean;\
-_Op(op);\
-_In8 = _First()->regTarget;\
-_In8_2 = _Last()->regTarget;\
-_FreeChildren;\
-_Out;\
+Type = VariableType::Boolean;\
+Op(op);\
+In8 = First()->regTarget;\
+In8_2 = Last()->regTarget;\
+FreeChildren;\
+Out;\
 
 void ASTWalker::WalkLoad(Node* n)
 {
@@ -770,29 +770,29 @@ void ASTWalker::WalkLoad(Node* n)
 		auto regs = registers;
 		for (auto& c : n->children) {
 			WalkLoad(c);
-			_FreeConstant(c);
+			FreeConstant(c);
 		}
 		currentScope = currentScope->parent;
 		registers = regs;
 	} break;
 
 	case Token::TypeNumber: {
-		_Type = VariableType::Number;
+		Type = VariableType::Number;
 	}break;
 	case Token::TypeBoolean: {
-		_Type = VariableType::Boolean;
+		Type = VariableType::Boolean;
 	}break;
 	case Token::TypeString: {
-		_Type = VariableType::String;
+		Type = VariableType::String;
 	}break;
 	case Token::TypeArray: {
-		_Type = VariableType::Array;
+		Type = VariableType::Array;
 	}break;
 	case Token::TypeFunction: {
-		_Type = VariableType::Function;
+		Type = VariableType::Function;
 	}break;
 	case Token::AnyType: {
-		_Type = VariableType::Undefined;
+		Type = VariableType::Undefined;
 	}break;
 	case Token::Typename: {
 		auto& name = std::get<std::string>(n->data);
@@ -805,181 +805,181 @@ void ASTWalker::WalkLoad(Node* n)
 		else {
 			index = it - currentFunction->TypeTableSymbols.begin();
 		}
-		_Type = static_cast<VariableType>(static_cast<size_t>(VariableType::Object) + index);
+		Type = static_cast<VariableType>(static_cast<size_t>(VariableType::Object) + index);
 	}break;
 
 	case Token::Number: {
-		_Op(LoadNumber);
+		Op(LoadNumber);
 		auto res = f->NumberTable.emplace(std::get<double>(n->data));
-		uint16 idx = (uint16)std::distance(f->NumberTable.begin(), res.first);
-		_In16 = idx;
-		_Out;
-		_Type = VariableType::Number;
+		uint16_t idx = (uint16_t)std::distance(f->NumberTable.begin(), res.first);
+		In16 = idx;
+		Out;
+		Type = VariableType::Number;
 	}break;
 
 	case Token::Literal: {
-		_Op(LoadString);
+		Op(LoadString);
 		auto res = stringList.emplace(std::get<std::string>(n->data));
-		uint16 idx = (uint16)std::distance(stringList.begin(), res.first);
-		_In16 = idx;
-		_Out;
-		_Type = VariableType::String;
+		uint16_t idx = (uint16_t)std::distance(stringList.begin(), res.first);
+		In16 = idx;
+		Out;
+		Type = VariableType::String;
 	}break;
 
 	case Token::Null: {
-		_Op(PushUndefined);
-		_Out;
+		Op(PushUndefined);
+		Out;
 	} break;
 
 	case Token::Array: {
 		{
-			_Op(PushArray);
-			_In16 = n->children.size();
-			_Out;
+			Op(PushArray);
+			In16 = n->children.size();
+			Out;
 		}
 		for (auto& c : n->children) {
 			WalkLoad(c);
-			_Op(PushIndex);
+			Op(PushIndex);
 			instruction.target = n->regTarget;
-			_In8 = c->regTarget;
-			_FreeConstant(c);
+			In8 = c->regTarget;
+			FreeConstant(c);
 		}
-		_FreeChildren;
+		FreeChildren;
 		{
-			_Op(Copy);
-			_In8 = n->regTarget;
-			_Out;
+			Op(Copy);
+			In8 = n->regTarget;
+			Out;
 		}
-		_Type = VariableType::Array;
+		Type = VariableType::Array;
 	}break;
 
 	case Token::Indexer: {
-		_Walk;
-		_Op(LoadIndex);
-		//n->sym = _First()->sym;
-		_In8 = _First()->regTarget;
-		_In8_2 = _Last()->regTarget;
-		_FreeChildren;
-		_Out;
+		Walk;
+		Op(LoadIndex);
+		//n->sym = First()->sym;
+		In8 = First()->regTarget;
+		In8_2 = Last()->regTarget;
+		FreeChildren;
+		Out;
 	}break;
 
 	case Token::True: {
-		_Op(PushBoolean);
-		_Out;
-		_In8 = 1;
-		_Type = VariableType::Boolean;
+		Op(PushBoolean);
+		Out;
+		In8 = 1;
+		Type = VariableType::Boolean;
 	}break;
 	case Token::False: {
-		_Op(PushBoolean);
-		_Out;
-		_In8 = 0;
-		_Type = VariableType::Boolean;
+		Op(PushBoolean);
+		Out;
+		In8 = 0;
+		Type = VariableType::Boolean;
 	}break;
 
 	case Token::Add: {
-		_EnsureOperands;
-		_Walk;
-		_Op(NumAdd);
-		switch (_First()->varType)
+		EnsureOperands;
+		Walk;
+		Op(NumAdd);
+		switch (First()->varType)
 		{
-			_Operator(Number, NumAdd, Add)
-				_Operator(String, StrAdd, Add)
+			Operator(Number, NumAdd, Add)
+				Operator(String, StrAdd, Add)
 		default:
-			_Type = VariableType::Undefined;
+			Type = VariableType::Undefined;
 			instruction.code = OpCodes::Add;
-			_In8 = _First()->regTarget;
-			_In8_2 = _Last()->regTarget;
-			_FreeChildren;
+			In8 = First()->regTarget;
+			In8_2 = Last()->regTarget;
+			FreeChildren;
 			break;
 		}
-		_OperatorAssign;
+		OperatorAssign;
 	}break;
 	case Token::Sub: {
-		_EnsureOperands;
-		_Walk;
-		_Op(NumAdd);
-		switch (_First()->varType)
+		EnsureOperands;
+		Walk;
+		Op(NumAdd);
+		switch (First()->varType)
 		{
-			_Operator(Number, NumSub, Sub);
+			Operator(Number, NumSub, Sub);
 		default:
-			_Type = VariableType::Undefined;
+			Type = VariableType::Undefined;
 			instruction.code = OpCodes::Sub;
-			_In8 = _First()->regTarget;
-			_In8_2 = _Last()->regTarget;
-			_FreeChildren;
+			In8 = First()->regTarget;
+			In8_2 = Last()->regTarget;
+			FreeChildren;
 			break;
 		}
-		_OperatorAssign;
+		OperatorAssign;
 
 	}break;
 	case Token::Div: {
-		_EnsureOperands;
-		_Walk;
-		_Op(NumAdd);
-		switch (_First()->varType)
+		EnsureOperands;
+		Walk;
+		Op(NumAdd);
+		switch (First()->varType)
 		{
-			_Operator(Number, NumDiv, Div);
+			Operator(Number, NumDiv, Div);
 		default:
-			_Type = VariableType::Undefined;
+			Type = VariableType::Undefined;
 			instruction.code = OpCodes::Div;
-			_In8 = _First()->regTarget;
-			_In8_2 = _Last()->regTarget;
-			_FreeChildren;
+			In8 = First()->regTarget;
+			In8_2 = Last()->regTarget;
+			FreeChildren;
 			break;
 		}
-		_OperatorAssign;
+		OperatorAssign;
 
 	}break;
 	case Token::Mult: {
-		_EnsureOperands;
-		_Walk;
-		_Op(NumAdd);
-		switch (_First()->varType)
+		EnsureOperands;
+		Walk;
+		Op(NumAdd);
+		switch (First()->varType)
 		{
-			_Operator(Number, NumMul, Mul);
+			Operator(Number, NumMul, Mul);
 		default:
-			_Type = VariableType::Undefined;
+			Type = VariableType::Undefined;
 			instruction.code = OpCodes::Mul;
-			_In8 = _First()->regTarget;
-			_In8_2 = _Last()->regTarget;
-			_FreeChildren;
+			In8 = First()->regTarget;
+			In8_2 = Last()->regTarget;
+			FreeChildren;
 			break;
 		}
-		_OperatorAssign;
+		OperatorAssign;
 
 	}break;
 
 	case Token::AssignAdd: {
 		n->type = Token::Add;
 		WalkLoad(n);
-		_Last() = n;
+		Last() = n;
 		n->type = Token::Assign;
 		goto assign;
 	} break;
 	case Token::AssignSub: {
 		n->type = Token::Sub;
 		WalkLoad(n);
-		_Last() = n;
+		Last() = n;
 		n->type = Token::Assign;
 		goto assign;
 	} break;
 	case Token::AssignDiv: {
 		n->type = Token::Div;
 		WalkLoad(n);
-		_Last() = n;
+		Last() = n;
 		n->type = Token::Assign;
 		goto assign;
 	} break;
 	case Token::AssignMult: {
 		n->type = Token::Mult;
 		WalkLoad(n);
-		_Last() = n;
+		Last() = n;
 		n->type = Token::Assign;
 		goto assign;
 	} break;
 
 	case Token::Id: {
-		_Walk;
+		Walk;
 		bool isNameSpace = false;
 		Symbol* symbol = nullptr;
 		auto& data = std::get<std::string>(n->data);
@@ -987,15 +987,15 @@ void ASTWalker::WalkLoad(Node* n)
 			symbol = findSymbol(data, "", isNameSpace);
 		}
 		else {
-			if (_First()->sym) {
-				if (_First()->sym->type == SymbolType::Namespace) {
-					symbol = findSymbol(data, std::get<std::string>(_First()->data), isNameSpace);
+			if (First()->sym) {
+				if (First()->sym->type == SymbolType::Namespace) {
+					symbol = findSymbol(data, std::get<std::string>(First()->data), isNameSpace);
 				}
-				else if (_First()->sym->type == SymbolType::Variable) {
-					_Op(LoadProperty);
-					_In8 = _First()->regTarget;
-					_FreeChildren;
-					_Out;
+				else if (First()->sym->type == SymbolType::Variable) {
+					Op(LoadProperty);
+					In8 = First()->regTarget;
+					FreeChildren;
+					Out;
 					size_t index = 0;
 					auto it = std::find(currentFunction->PropertyTableSymbols.begin(), currentFunction->PropertyTableSymbols.end(), data);
 					if (it != currentFunction->PropertyTableSymbols.end()) {
@@ -1008,10 +1008,10 @@ void ASTWalker::WalkLoad(Node* n)
 
 					auto& arg = instructionList.emplace_back();
 					arg.code = OpCodes::Noop;
-					arg.param = static_cast<uint16>(index);
+					arg.param = static_cast<uint16_t>(index);
 
 					UserDefinedType* typeProperty = nullptr;
-					size_t typeIndex = (size_t)_First()->varType - (size_t)VariableType::Object;
+					size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
 					if (typeIndex < currentFunction->TypeTableSymbols.size()) {
 						auto& objectName = currentFunction->TypeTableSymbols[typeIndex];
 						if (GetManager().GetType(typeProperty, objectName)) {
@@ -1024,11 +1024,11 @@ void ASTWalker::WalkLoad(Node* n)
 					break;
 				}
 				else {
-					_Error("Unknown symbol: " + data);
+					Error("Unknown symbol: " + data);
 				}
 			}
 			else {
-				_Error("Unknown symbol: " + data);
+				Error("Unknown symbol: " + data);
 			}
 		}
 		if (!symbol || (symbol && symbol->needsLoading)) {
@@ -1046,18 +1046,18 @@ void ASTWalker::WalkLoad(Node* n)
 			}
 
 			if (symbol) {
-				_Type = symbol->varType;
+				Type = symbol->varType;
 				n->sym = symbol;
 			}
 
-			_Op(LoadSymbol);
-			_In16 = index;
-			_Out;
+			Op(LoadSymbol);
+			In16 = index;
+			Out;
 		}
 		else if (symbol) {
 			n->regTarget = symbol->reg;
 			symbol->endLife = instructionList.size();
-			_Type = symbol->varType;
+			Type = symbol->varType;
 			n->sym = symbol;
 		}
 	}break;
@@ -1065,14 +1065,14 @@ void ASTWalker::WalkLoad(Node* n)
 	case Token::Property: {
 		auto& data = std::get<std::string>(n->data);
 		if (n->children.size() != 1) {
-			_Error("Invalid property access: " + data);
+			Error("Invalid property access: " + data);
 			break;
 		}
-		_Walk;
-		if (_First()->varType > VariableType::Object || _First()->varType == VariableType::Undefined) {
-			_Op(LoadProperty);
-			_In8 = _First()->regTarget;
-			_Out;
+		Walk;
+		if (First()->varType > VariableType::Object || First()->varType == VariableType::Undefined) {
+			Op(LoadProperty);
+			In8 = First()->regTarget;
+			Out;
 			size_t index = 0;
 			auto it = std::find(currentFunction->PropertyTableSymbols.begin(), currentFunction->PropertyTableSymbols.end(), data);
 			if (it != currentFunction->PropertyTableSymbols.end()) {
@@ -1085,10 +1085,10 @@ void ASTWalker::WalkLoad(Node* n)
 
 			auto& arg = instructionList.emplace_back();
 			arg.code = OpCodes::Noop;
-			arg.param = static_cast<uint16>(index);
+			arg.param = static_cast<uint16_t>(index);
 
 			UserDefinedType* typeProperty = nullptr;
-			size_t typeIndex = (size_t)_First()->varType - (size_t)VariableType::Object;
+			size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
 			if (typeIndex < currentFunction->TypeTableSymbols.size()) {
 				auto& objectName = currentFunction->TypeTableSymbols[typeIndex];
 				if (GetManager().GetType(typeProperty, objectName)) {
@@ -1101,142 +1101,142 @@ void ASTWalker::WalkLoad(Node* n)
 			break;
 		}
 		else {
-			_Error("Unknown symbol: " + data);
+			Error("Unknown symbol: " + data);
 		}
 	} break;
 
 	case Token::Negate: {
-		auto& var = _First()->varType;
+		auto& var = First()->varType;
 		if (var != VariableType::Number && var != VariableType::Undefined) {
-			_Error("Cannot negate non number types");
+			Error("Cannot negate non number types");
 		}
 		auto& load = instructionList.emplace_back();
 		load.code = OpCodes::LoadImmediate;
 		load.target = getFirstFree();
 		load.param = 0;
 
-		_Op(NumSub);
-		_Walk;
-		_In8 = load.target;
-		_In8_2 = _First()->regTarget;
-		_FreeChildren;
+		Op(NumSub);
+		Walk;
+		In8 = load.target;
+		In8_2 = First()->regTarget;
+		FreeChildren;
 		freeReg(load.target);
-		_Out;
-		_Type = VariableType::Number;
+		Out;
+		Type = VariableType::Number;
 	}break;
 
 	case Token::Not: {
-		_Walk;
-		_Op(Not);
-		_In8 = _First()->regTarget;
-		_FreeChildren;
-		_Out;
-		_Type = VariableType::Boolean;
+		Walk;
+		Op(Not);
+		In8 = First()->regTarget;
+		FreeChildren;
+		Out;
+		Type = VariableType::Boolean;
 	}break;
 
 	case Token::Less: {
-		_Compare(Less)
+		Compare(Less)
 	}break;
 
 	case Token::LessEqual: {
-		_Compare(LessEqual)
+		Compare(LessEqual)
 	}break;
 
 	case Token::Larger: {
-		_Compare(Greater)
+		Compare(Greater)
 	}break;
 
 	case Token::LargerEqual: {
-		_Compare(GreaterEqual)
+		Compare(GreaterEqual)
 	}break;
 
 	case Token::Equal: {
-		_Compare(Equal)
+		Compare(Equal)
 	}break;
 
 	case Token::NotEqual: {
-		_Compare(NotEqual)
+		Compare(NotEqual)
 	}break;
 
 	case Token::And: {
-		_Walk;
-		_Type = VariableType::Boolean;
-		_Op(And);
-		_In8 = _First()->regTarget;
-		_In8_2 = _Last()->regTarget;
-		_FreeChildren;
-		_Out;
+		Walk;
+		Type = VariableType::Boolean;
+		Op(And);
+		In8 = First()->regTarget;
+		In8_2 = Last()->regTarget;
+		FreeChildren;
+		Out;
 	} break;
 	case Token::Or: {
-		_Walk;
-		_Type = VariableType::Boolean;
-		_Op(Or);
-		_In8 = _First()->regTarget;
-		_In8_2 = _Last()->regTarget;
-		_FreeChildren;
-		_Out;
+		Walk;
+		Type = VariableType::Boolean;
+		Op(Or);
+		In8 = First()->regTarget;
+		In8_2 = Last()->regTarget;
+		FreeChildren;
+		Out;
 	} break;
 
 	case Token::Decrement:
 	case Token::Increment: {
-		WalkLoad(_First());
-		if (_First()->varType != VariableType::Number) {
-			_Error("Cannot increment");
+		WalkLoad(First());
+		if (First()->varType != VariableType::Number) {
+			Error("Cannot increment");
 		}
-		_Op(PostMod);
-		_In8 = _First()->regTarget;
-		_In8_2 = n->type == Token::Increment ? 0 : 1;
-		_Out;
-		_FreeChildren;
-		_In8 = WalkStore(_First()); // @todo: this is unsafe
-		_FreeChildren;
-		n->sym = _First()->sym;
+		Op(PostMod);
+		In8 = First()->regTarget;
+		In8_2 = n->type == Token::Increment ? 0 : 1;
+		Out;
+		FreeChildren;
+		In8 = WalkStore(First()); // @todo: this is unsafe
+		FreeChildren;
+		n->sym = First()->sym;
 	}break;
 
 	case Token::PreDecrement:
 	case Token::PreIncrement: {
-		WalkLoad(_First());
-		if (_First()->varType != VariableType::Number) {
-			_Error("Cannot increment");
+		WalkLoad(First());
+		if (First()->varType != VariableType::Number) {
+			Error("Cannot increment");
 		}
-		_Op(PreMod);
-		_In8 = _First()->regTarget;
-		_In8_2 = n->type == Token::PreIncrement ? 0 : 1;
-		n->regTarget = instruction.target = WalkStore(_First());
-		_FreeChildren;
-		n->sym = _First()->sym;
+		Op(PreMod);
+		In8 = First()->regTarget;
+		In8_2 = n->type == Token::PreIncrement ? 0 : 1;
+		n->regTarget = instruction.target = WalkStore(First());
+		FreeChildren;
+		n->sym = First()->sym;
 	}break;
 
 	case Token::Assign: {
 		if (n->children.size() != 2) break;
-		WalkLoad(_Last());
+		WalkLoad(Last());
 	assign:
-		auto& lhs = _First();
-		auto& rhs = _Last();
+		auto& lhs = First();
+		auto& rhs = Last();
 
 		if (!rhs->sym || (rhs->sym && rhs->sym->needsLoading)) {
 			WalkStore(lhs);
-			_FreeConstant(rhs);
-			n->regTarget = _SetOut(rhs) = lhs->regTarget;
+			FreeConstant(rhs);
+			n->regTarget = SetOut(rhs) = lhs->regTarget;
 		}
 		else {
 			if (rhs->sym && rhs->sym->needsLoading) freeReg(rhs->regTarget);
-			_Op(Copy);
-			_In8 = rhs->regTarget;
-			_SetOut(n) = WalkStore(lhs);
+			Op(Copy);
+			In8 = rhs->regTarget;
+			SetOut(n) = WalkStore(lhs);
 		}
 		n->sym = lhs->sym;
 		if (lhs->sym && !isAssignable(lhs->sym->flags)) {
-			_Error("Trying to assign to unassignable type");
+			Error("Trying to assign to unassignable type");
 			HasError = true;
 		}
 		if (rhs->varType != VariableType::Undefined && lhs->varType != rhs->varType && lhs->sym) {
 			if (isTyped(lhs->sym->flags) || lhs->data.index() != 0) {
-				_Error("Trying to assign unrelated types");
+				Error("Trying to assign unrelated types");
 				HasError = true;
 			}
 			else if (lhs->varType == VariableType::Undefined) {
-				lhs->sym->varType = _Type = lhs->varType = rhs->varType;
+				lhs->sym->varType = Type = lhs->varType = rhs->varType;
 			}
 		}
 	}break;
@@ -1245,7 +1245,7 @@ void ASTWalker::WalkLoad(Node* n)
 	case Token::VarDeclare: {
 		bool isNamespace;
 		if (findSymbol(std::get<std::string>(n->data), "", isNamespace)) {
-			_Error("Symbol already defined: " + std::get<std::string>(n->data));
+			Error("Symbol already defined: " + std::get<std::string>(n->data));
 			break;
 		}
 		auto sym = currentScope->addSymbol(std::get<std::string>(n->data));
@@ -1256,57 +1256,57 @@ void ASTWalker::WalkLoad(Node* n)
 		sym->needsLoading = false;
 		n->sym = sym;
 		if (n->children.size() > 0) {
-			_Walk;
-			sym->varType = _Type = _First()->varType;
+			Walk;
+			sym->varType = Type = First()->varType;
 			if (sym->varType != VariableType::Undefined) {
 				sym->flags = sym->flags | SymbolFlags::Typed;
 			}
 			if (n->children.size() == 2) {
-				if (_Last()->varType == _Type || _Type == VariableType::Undefined || _Last()->varType == VariableType::Undefined) {
-					sym->varType = _Type = _Last()->varType;
-					if (!_Last()->sym) {
-						sym->reg = n->regTarget = _Last()->regTarget;
+				if (Last()->varType == Type || Type == VariableType::Undefined || Last()->varType == VariableType::Undefined) {
+					sym->varType = Type = Last()->varType;
+					if (!Last()->sym) {
+						sym->reg = n->regTarget = Last()->regTarget;
 					}
 					else {
-						_Op(Copy);
-						_In8 = _Last()->regTarget;
-						sym->reg = _Out;
+						Op(Copy);
+						In8 = Last()->regTarget;
+						sym->reg = Out;
 					}
 					break;
 				}
-				_Error("Cannot assign unrelated types");
+				Error("Cannot assign unrelated types");
 			}
 		}
 		if (sym->varType >= VariableType::Object) {
-			_Op(PushObjectDefault);
-			_In16 = (uint16)sym->varType - (uint16)VariableType::Object;
-			sym->reg = _Out;
+			Op(PushObjectDefault);
+			In16 = (uint16_t)sym->varType - (uint16_t)VariableType::Object;
+			sym->reg = Out;
 		}
 		else {
-			_Op(PushTypeDefault);
-			_In16 = (uint16)sym->varType;
-			sym->reg = _Out;
+			Op(PushTypeDefault);
+			In16 = (uint16_t)sym->varType;
+			sym->reg = Out;
 		}
 	}break;
 
 	case Token::ObjectInit: {
-		uint8 last = 255;
-		auto name = getFullId(_First());
-		for (auto& c : _Last()->children) {
+		uint8_t last = 255;
+		auto name = getFullId(First());
+		for (auto& c : Last()->children) {
 			WalkLoad(c);
 			if (!c->sym || c->regTarget == last + 1) {
 				freeReg(c->regTarget);
-				last = _SetOut(c) = getLastFree();
+				last = SetOut(c) = getLastFree();
 			}
 			else {
-				_Op(Copy);
+				Op(Copy);
 				instruction.target = getLastFree();
-				_In8 = c->regTarget;
+				In8 = c->regTarget;
 				last = c->regTarget = instruction.target;
 			}
 		}
 
-		for (auto& c : _Last()->children) {
+		for (auto& c : Last()->children) {
 			freeReg(c->regTarget);
 		}
 
@@ -1320,90 +1320,90 @@ void ASTWalker::WalkLoad(Node* n)
 			index = currentFunction->TypeTableSymbols.size();
 			currentFunction->TypeTableSymbols.push_back(name);
 		}
-		_Op(InitObject);
+		Op(InitObject);
 
-		if (_Last()->children.size() != 0) {
-			_In8 = (uint8)_Last()->children.front()->regTarget;
+		if (Last()->children.size() != 0) {
+			In8 = (uint8_t)Last()->children.front()->regTarget;
 		}
 		else {
-			_In8 = getLastFree();
+			In8 = getLastFree();
 		}
-		_In8_2 = _Last()->children.size();
-		_Out;
+		In8_2 = Last()->children.size();
+		Out;
 
 		auto& arg = instructionList.emplace_back();
 		arg.code = OpCodes::Noop;
-		arg.param = (uint16)index;
+		arg.param = (uint16_t)index;
 
 	} break;
 
 	case Token::Return: {
-		_Walk;
-		_Op(Return);
+		Walk;
+		Op(Return);
 		if (!n->children.empty()) {
-			instruction.target = _First()->regTarget;
-			_In8 = 1;
+			instruction.target = First()->regTarget;
+			In8 = 1;
 		}
 	} break;
 
 	case Token::Conditional: {
 		if (n->children.size() != 3) {
-			_Error("Invalid ternary operator");
+			Error("Invalid ternary operator");
 			break;
 		}
 		WalkLoad(n->children[0]);
-		_FreeConstant(_First());
+		FreeConstant(First());
 
 		auto& trueInst = instructionList.emplace_back(); 
 		trueInst.code = OpCodes::JumpNeg;;
-		trueInst.target = _First()->regTarget;
+		trueInst.target = First()->regTarget;
 		trueInst.param = 0;
 		auto falseStart = instructionList.size();
 
 		WalkLoad(n->children[1]);
-		_FreeConstant(n->children[1]);
+		FreeConstant(n->children[1]);
 
 		auto& falseInst = instructionList.emplace_back(); 
 		falseInst.code = OpCodes::JumpForward;;
-		falseInst.target = _First()->regTarget;
+		falseInst.target = First()->regTarget;
 		falseInst.param = 0;
 		auto trueStart = instructionList.size();
 
 
 		auto falseTarget = instructionList.size();
 		WalkLoad(n->children[2]);
-		_FreeConstant(n->children[2]);
+		FreeConstant(n->children[2]);
 		auto trueTarget = instructionList.size();
 
 		trueInst.param = falseTarget - falseStart;
 		falseInst.param = trueTarget - trueStart;
 
-		n->instruction = _SetOut(n->children[2]) = _SetOut(n->children[1]) = getFirstFree();
+		n->instruction = SetOut(n->children[2]) = SetOut(n->children[1]) = getFirstFree();
 
 		if (n->children[1]->varType == n->children[2]->varType) {
-			_Type = n->children[1]->varType;
+			Type = n->children[1]->varType;
 		}
 
 	} break;
 
 	case Token::If: {
 		if (n->children.size() != 3) {
-			_Error("Incorrect if-block");
+			Error("Incorrect if-block");
 		}
 
 		auto& next = currentScope->children.emplace_back();
 		next.parent = currentScope;
 		currentScope = &next;
 		auto regs = registers;
-		WalkLoad(_First());
-		_Op(JumpNeg);
-		n->regTarget = instruction.target = _First()->regTarget;
-		_FreeConstant(n);
+		WalkLoad(First());
+		Op(JumpNeg);
+		n->regTarget = instruction.target = First()->regTarget;
+		FreeConstant(n);
 
 		auto oldSize = instructionList.size();
 		auto it = n->children[1];
 		WalkLoad(it);
-		_FreeConstant(it);
+		FreeConstant(it);
 
 		size_t elseloc = instructionList.size();
 		auto& elseinst = instructionList.emplace_back();
@@ -1412,8 +1412,8 @@ void ASTWalker::WalkLoad(Node* n)
 		instructionList[n->instruction].param = instructionList.size() - oldSize;
 		oldSize = instructionList.size();
 
-		WalkLoad(_Last());
-		_FreeConstant(_Last());
+		WalkLoad(Last());
+		FreeConstant(Last());
 
 		instructionList[elseloc].param = instructionList.size() - oldSize;
 
@@ -1427,33 +1427,33 @@ void ASTWalker::WalkLoad(Node* n)
 			next.parent = currentScope;
 			currentScope = &next;
 			auto regs = registers;
-			WalkLoad(_First());
+			WalkLoad(First());
 
 			auto start = instructionList.size();
 			auto it = n->children[1];
 			WalkLoad(it);
-			_FreeConstant(it);
+			FreeConstant(it);
 
-			_Op(JumpNeg);
+			Op(JumpNeg);
 			n->regTarget = instruction.target = it->regTarget;
 			auto jumpStart = instructionList.size();
 
 			auto target = n->children[3];
 			WalkLoad(target);
-			_FreeConstant(target);
+			FreeConstant(target);
 
 			size_t loopend = instructionList.size();
 			it = n->children[2];
 			WalkLoad(it);
-			_FreeConstant(it);
+			FreeConstant(it);
 
 			auto& elseinst = instructionList.emplace_back();
 			elseinst.code = OpCodes::JumpBackward;
 			elseinst.param = instructionList.size() - start;
 
 			size_t elsestart = instructionList.size();
-			WalkLoad(_Last());
-			_FreeConstant(_Last());
+			WalkLoad(Last());
+			FreeConstant(Last());
 
 			instructionList[n->instruction].param = instructionList.size() - jumpStart;
 
@@ -1468,15 +1468,15 @@ void ASTWalker::WalkLoad(Node* n)
 			currentScope = &next;
 			auto regs = registers;
 
-			WalkLoad(_First());
+			WalkLoad(First());
 
 			auto sym = currentScope->addSymbol("_index_");
 			sym->reg = getFirstFree();
 			sym->setType(SymbolType::Static);
 			sym->varType = VariableType::Number;
 			{
-				_Op(LoadImmediate);
-				_In16 = (uint16)-1;
+				Op(LoadImmediate);
+				In16 = (uint16_t)-1;
 				n->regTarget = instruction.target = sym->reg;
 			}
 
@@ -1484,40 +1484,40 @@ void ASTWalker::WalkLoad(Node* n)
 			bool isVar = !data.empty();
 
 			auto start = instructionList.size();
-			uint8 regtarget = 0;
+			uint8_t regtarget = 0;
 			if (isVar) {
 				auto var = currentScope->addSymbol(data);
 				var->reg = getFirstFree();
 				var->setType(SymbolType::Variable);
-				if (_First()->varType == VariableType::Number) var->varType = VariableType::Number;
+				if (First()->varType == VariableType::Number) var->varType = VariableType::Number;
 				{
-					_Op(RangeForVar);
-					_In8 = sym->reg;
-					_In8_2 = _First()->regTarget;
-					_Out;
+					Op(RangeForVar);
+					In8 = sym->reg;
+					In8_2 = First()->regTarget;
+					Out;
 					regtarget = instruction.target;
 				}
 				{
-					_Op(Noop);
-					_In8 = var->reg;
+					Op(Noop);
+					In8 = var->reg;
 				}
 			} else {
 				{
-					_Op(RangeFor);
-					_In8 = sym->reg;
-					_In8_2 = _First()->regTarget;
-					_Out;
+					Op(RangeFor);
+					In8 = sym->reg;
+					In8_2 = First()->regTarget;
+					Out;
 					regtarget = instruction.target;
 				}
 			}
 
-			_Op(JumpNeg);
+			Op(JumpNeg);
 			n->regTarget = instruction.target = regtarget;
 			auto jumpStart = instructionList.size();
 
 			auto target = n->children[1];
 			WalkLoad(target);
-			_FreeConstant(target);
+			FreeConstant(target);
 
 			size_t loopend = instructionList.size();
 
@@ -1526,8 +1526,8 @@ void ASTWalker::WalkLoad(Node* n)
 			elseinst.param = instructionList.size() - start;
 
 			size_t elsestart = instructionList.size();
-			WalkLoad(_Last());
-			_FreeConstant(_Last());
+			WalkLoad(Last());
+			FreeConstant(Last());
 
 			instructionList[n->instruction].param = instructionList.size() - jumpStart;
 
@@ -1537,13 +1537,13 @@ void ASTWalker::WalkLoad(Node* n)
 			registers = regs;
 		}
 		else {
-			_Error("Incorrect for-block");
+			Error("Incorrect for-block");
 		}
 	}break;
 
 	case Token::While: {
 		if (n->children.size() != 2) {
-			_Error("Incorrect while-block");
+			Error("Incorrect while-block");
 		}
 
 		auto& next = currentScope->children.emplace_back();
@@ -1552,14 +1552,14 @@ void ASTWalker::WalkLoad(Node* n)
 		auto regs = registers;
 
 		auto start = instructionList.size();
-		WalkLoad(_First());
-		_Op(JumpNeg);
+		WalkLoad(First());
+		Op(JumpNeg);
 		auto jumpStart = instructionList.size();
-		n->regTarget = instruction.target = _First()->regTarget;
+		n->regTarget = instruction.target = First()->regTarget;
 
 		auto it = n->children[1];
 		WalkLoad(it);
-		_FreeConstant(it);
+		FreeConstant(it);
 
 		auto& elseinst = instructionList.emplace_back();
 		elseinst.code = OpCodes::JumpBackward;
@@ -1575,56 +1575,56 @@ void ASTWalker::WalkLoad(Node* n)
 
 	case Token::Continue: 
 	case Token::Break: {
-		_Op(Jump);
+		Op(Jump);
 	} break;
 
 	case Token::Else: {
-		_Walk;
+		Walk;
 	}break;
 
 	case Token::FunctionCall: {
-		int Type = 0;
-		WalkLoad(_First());
-		auto name = getFullId(_First());
-		if (!_First()->sym) {
+		int type = 0;
+		WalkLoad(First());
+		auto name = getFullId(First());
+		if (!First()->sym) {
 
 			if (auto it = HostFunctions().find(name); it != HostFunctions().end()) {
-				_Type = TypeFromValue(it->second->return_type);
-				Type = 1;
+				Type = TypeFromValue(it->second->return_type);
+				type = 1;
 				goto function;
 			}
 			if (IntrinsicFunctions.find(name) != IntrinsicFunctions.end()) {
-				_Type = IntrinsicFunctionTypes[name][0];
-				Type = 2;
+				Type = IntrinsicFunctionTypes[name][0];
+				type = 2;
 				goto function;
 			}
-			Type = 3; // @todo: This should be 4, fix 
+			type = 3; // @todo: This should be 4, fix 
 			goto function;
 		}
-		else if (_First()->sym->type != SymbolType::Function && _First()->sym->type == SymbolType::Variable) {
-			Type = 3;
+		else if (First()->sym->type != SymbolType::Function && First()->sym->type == SymbolType::Variable) {
+			type = 3;
 			goto function;
 		}
 		else {
-			if (_First()->sym->type == SymbolType::Function) {
+			if (First()->sym->type == SymbolType::Function) {
 			// @todo: Get return type for user functions
 
 			}
 		}
 		function:
 
-		uint8 last = 255;
-		auto& params = _Last();
+		uint8_t last = 255;
+		auto& params = Last();
 		for (auto& c : params->children) {
 			WalkLoad(c);
 			if (!c->sym || c->regTarget == last + 1) {
 				freeReg(c->regTarget);
-				last = _SetOut(c) = getLastFree();
+				last = SetOut(c) = getLastFree();
 			}
 			else {
-				_Op(Copy);
+				Op(Copy);
 				instruction.target = getLastFree();
-				_In8 = c->regTarget;
+				In8 = c->regTarget;
 				last = c->regTarget = instruction.target;
 			}
 		}
@@ -1632,7 +1632,7 @@ void ASTWalker::WalkLoad(Node* n)
 		for (auto& c : params->children) {
 			freeReg(c->regTarget);
 		}
-		_FreeConstant(_First());
+		FreeConstant(First());
 
 		auto it = std::find(currentFunction->FunctionTableSymbols.begin(), currentFunction->FunctionTableSymbols.end(), name);
 		size_t index = 0;
@@ -1645,9 +1645,9 @@ void ASTWalker::WalkLoad(Node* n)
 			currentFunction->FunctionTableSymbols.push_back(name);
 		}
 
-		_Op(CallFunction);
+		Op(CallFunction);
 		
-		switch (Type)
+		switch (type)
 		{
 		case 0: instruction.code = OpCodes::CallFunction; break;
 		case 1: instruction.code = OpCodes::CallExternal; break;
@@ -1657,41 +1657,41 @@ void ASTWalker::WalkLoad(Node* n)
 		}
 
 		if (params->children.size() != 0) {
-			_In8 = (uint8)params->children.front()->regTarget;
+			In8 = (uint8_t)params->children.front()->regTarget;
 		}
 		else {
-			_In8 = getLastFree();
+			In8 = getLastFree();
 		}
-		_In8_2 = params->children.size();
-		_Out;
+		In8_2 = params->children.size();
+		Out;
 
 		auto& arg = instructionList.emplace_back();
 		arg.code = OpCodes::Noop;
 
-		switch (Type)
+		switch (type)
 		{
-		case 0: arg.data = (uint32)index; break;
-		case 1: arg.data = (uint32)index; break;
-		case 2: arg.data = (uint32)index; break;
-		case 3: arg.target = _First()->regTarget; break;
-		case 4: arg.data = (uint32)index; break;
+		case 0: arg.data = (uint32_t)index; break;
+		case 1: arg.data = (uint32_t)index; break;
+		case 2: arg.data = (uint32_t)index; break;
+		case 3: arg.target = First()->regTarget; break;
+		case 4: arg.data = (uint32_t)index; break;
 		}
 	}break;
 
 	default:
-		_Error("Unexpected token found");
+		Error("Unexpected token found");
 		break;
 	}
 }
 
-uint8 ASTWalker::WalkStore(Node* n) {
+uint8_t ASTWalker::WalkStore(Node* n) {
 	Function* f = currentFunction;
 	if (HasDebug) f->DebugLines[(int)n->line] = (int)instructionList.size();
 	auto first_child = n->children.size() ? n->children.front() : nullptr;
 	auto last_child = n->children.size() ? n->children.back() : nullptr;
 	switch (n->type) {
 	case Token::Id: {
-		_Walk;
+		Walk;
 		bool isNameSpace = false;
 		Symbol* symbol = nullptr;
 		auto& data = std::get<std::string>(n->data);
@@ -1699,14 +1699,14 @@ uint8 ASTWalker::WalkStore(Node* n) {
 			symbol = findSymbol(data, "", isNameSpace);
 		}
 		else {
-			if (_First()->sym) {
-				if (_First()->sym->type == SymbolType::Namespace) {
-					symbol = findSymbol(data, std::get<std::string>(_First()->data), isNameSpace);
+			if (First()->sym) {
+				if (First()->sym->type == SymbolType::Namespace) {
+					symbol = findSymbol(data, std::get<std::string>(First()->data), isNameSpace);
 				}
-				else if (_First()->sym->type == SymbolType::Variable) {
+				else if (First()->sym->type == SymbolType::Variable) {
 
 					UserDefinedType* typeProperty = nullptr;
-					size_t typeIndex = (size_t)_First()->varType - (size_t)VariableType::Object;
+					size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
 					if (typeIndex < currentFunction->TypeTableSymbols.size()) {
 						auto& objectName = currentFunction->TypeTableSymbols[typeIndex];
 						if (GetManager().GetType(typeProperty, objectName)) {
@@ -1719,9 +1719,9 @@ uint8 ASTWalker::WalkStore(Node* n) {
 
 					// @todo: Maybe type checking here?
 
-					_Op(StoreProperty);
-					_In8 = _First()->regTarget;
-					_Out;
+					Op(StoreProperty);
+					In8 = First()->regTarget;
+					Out;
 					size_t index = 0;
 					auto it = std::find(currentFunction->PropertyTableSymbols.begin(), currentFunction->PropertyTableSymbols.end(), data);
 					if (it != currentFunction->PropertyTableSymbols.end()) {
@@ -1734,16 +1734,16 @@ uint8 ASTWalker::WalkStore(Node* n) {
 
 					auto& arg = instructionList.emplace_back();
 					arg.code = OpCodes::Noop;
-					arg.param = static_cast<uint16>(index);
+					arg.param = static_cast<uint16_t>(index);
 
 					return n->regTarget;
 				}
 				else {
-					_Error("Unknown symbol: " + data);
+					Error("Unknown symbol: " + data);
 				}
 			}
 			else {
-				_Error("Unknown symbol: " + data);
+				Error("Unknown symbol: " + data);
 			}
 		}
 		if (!symbol || (symbol && symbol->needsLoading)) {
@@ -1761,32 +1761,32 @@ uint8 ASTWalker::WalkStore(Node* n) {
 			}
 
 			if (symbol) {
-				_Type = symbol->varType;
+				Type = symbol->varType;
 				n->sym = symbol;
 			}
 
-			_Op(StoreSymbol);
-			_In16 = index;
-			_Out;
+			Op(StoreSymbol);
+			In16 = index;
+			Out;
 			return n->regTarget;
 		}
 		else if (symbol) {
 			n->regTarget = symbol->reg;
 			symbol->endLife = instructionList.size();
-			_Type = symbol->varType;
+			Type = symbol->varType;
 			n->sym = symbol;
 			return n->regTarget;
 		}
 	} break;
 
 	case Token::Indexer: {
-		_Walk;
-		_Op(StoreIndex);
-		//n->sym = _First()->sym;
-		_In8 = _First()->regTarget;
-		_In8_2 = _Last()->regTarget;
-		_FreeConstant(_Last());
-		_Out;
+		Walk;
+		Op(StoreIndex);
+		//n->sym = First()->sym;
+		In8 = First()->regTarget;
+		In8_2 = Last()->regTarget;
+		FreeConstant(Last());
+		Out;
 		return n->regTarget;
 	}break;
 
@@ -1797,7 +1797,7 @@ uint8 ASTWalker::WalkStore(Node* n) {
 	case Token::TypeBoolean:
 	case Token::TypeString:
 	case Token::TypeFunction:
-		_Error("Invalid left-hand side"); // @todo: Add rest invalid sides;
+		Error("Invalid left-hand side"); // @todo: Add rest invalid sides;
 		break;
 
 
@@ -1854,7 +1854,7 @@ void ASTWalker::handleFunction(Node* n, Function* f, Symbol* s)
 			for (auto& stmt : c->children) {
 				try {
 					WalkLoad(stmt);
-					_FreeConstant(stmt);
+					FreeConstant(stmt);
 				}
 				catch (...) {
 					gError() << "Internal error occured!\n";
@@ -1917,10 +1917,10 @@ void ASTWalker::placeBreaks(Node* n, size_t start, size_t end)
 		switch (node->type)
 		{
 		case Token::Break: {
-			instructionList[node->instruction].param = (uint16)end;
+			instructionList[node->instruction].param = (uint16_t)end;
 		} break;
 		case Token::Continue: {
-			instructionList[node->instruction].param = (uint16)start;
+			instructionList[node->instruction].param = (uint16_t)start;
 		} break;
 		case Token::For:
 		case Token::While: break;

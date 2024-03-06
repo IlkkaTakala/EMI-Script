@@ -81,7 +81,7 @@ namespace EMI
 	};
 
 	// https://stackoverflow.com/a/65382619
-	struct __internal_function {
+	struct _internal_function {
 		void* state = 0;
 		InternalValue(*operate)(void*, size_t, InternalValue*) = 0;
 		void(*cleanup)(void*) = 0;
@@ -98,11 +98,11 @@ namespace EMI
 			if (arg_types) delete[] arg_types;
 			state = 0; operate = 0; cleanup = 0; arg_count = 0; name = nullptr; space = nullptr; arg_types = nullptr;
 		}
-		__internal_function(__internal_function const&) = delete;
-		__internal_function(__internal_function&& o) noexcept : 
+		_internal_function(_internal_function const&) = delete;
+		_internal_function(_internal_function&& o) noexcept : 
 			state(o.state), operate(o.operate), cleanup(o.cleanup), arg_count(o.arg_count), name(o.name), space(o.space), return_type(o.return_type)
 		{ o.cleanup = 0; o.name = nullptr; o.space = nullptr; o.arg_types = nullptr; o.clear(); }
-		__internal_function& operator=(__internal_function&& o) noexcept {
+		_internal_function& operator=(_internal_function&& o) noexcept {
 			if (this == &o) return *this;
 			clear();
 			state = o.state;
@@ -120,25 +120,25 @@ namespace EMI
 			return *this;
 		}
 
-		__internal_function() {}
-		~__internal_function() { clear(); }
+		_internal_function() {}
+		~_internal_function() { clear(); }
 		InternalValue operator()(size_t s, InternalValue* args)const { 
 			if ((!args && s != 0) || s != arg_count) return {};
 			return operate(state, s, args); 
 		}
 	};
 
-	CORE_API bool __internal_register(__internal_function* func);
-	CORE_API bool __internal_unregister(const char*, const char*);
+	CORE_API bool _internal_register(_internal_function* func);
+	CORE_API bool _internal_unregister(const char*, const char*);
 
 	template<class V, class F, typename ...Args, size_t... S> 
-	constexpr auto __make_caller(std::index_sequence<S...>) {
+	constexpr auto _make_caller(std::index_sequence<S...>) {
 		return +[](void* ptr, size_t, InternalValue* args)->InternalValue {
 			return (*(F*)(ptr))((args[S].as<Args>())...); };
 	}
 
 	template<class V, class F, typename ...Args, size_t... S> requires std::is_void_v<V>
-	constexpr auto __make_caller(std::index_sequence<S...>) {
+	constexpr auto _make_caller(std::index_sequence<S...>) {
 		return +[](void* ptr, size_t, InternalValue* args)->InternalValue {
 			(*(F*)(ptr))((args[S].as<Args>())...); return {}; };
 	}
@@ -146,7 +146,7 @@ namespace EMI
 	template<class F, class...Args> requires (std::is_convertible_v<F, InternalValue> || 
 		std::is_void_v<F>) && ((std::is_convertible_v<Args, InternalValue>) && ...)
 	bool RegisterFunction(const std::string& space, const std::string& name, std::function<F(Args...)>&& f) {
-		auto retval = new __internal_function();
+		auto retval = new _internal_function();
 		constexpr size_t size = sizeof...(Args);
 		constexpr auto seq = std::make_index_sequence<size>();
 		char* c = new char[name.length() + 1];
@@ -162,18 +162,18 @@ namespace EMI
 		retval->return_type = type<F>();
 		retval->arg_count = size;
 		retval->state = new std::decay_t<std::function<F(Args...)>>(std::forward<std::function<F(Args...)>>(f));
-		retval->operate = __make_caller<F, std::decay_t<std::function<F(Args...)>>, Args...>(std::make_index_sequence<size>());
+		retval->operate = _make_caller<F, std::decay_t<std::function<F(Args...)>>, Args...>(std::make_index_sequence<size>());
 		retval->cleanup = +[](void* ptr) {delete static_cast<std::decay_t<std::function<F(Args...)>>*>(ptr); };
-		return __internal_register(retval);
+		return _internal_register(retval);
 	}
 
 	inline bool UnregisterFunction(const std::string& space, const std::string& name) {
-		return __internal_unregister(space.c_str(), name.c_str());
+		return _internal_unregister(space.c_str(), name.c_str());
 	}
 
 	CORE_API void UnregisterAllExternals();
 
-#define EMI_REGISTER(Namespace, name, func) static inline bool __emi_reg_##Namespace##_##name = EMI::RegisterFunction(#Namespace, #name, std::function{func});
+#define EMI_REGISTER(Namespace, name, func) static inline bool _emi_reg_##Namespace##_##name = EMI::RegisterFunction(#Namespace, #name, std::function{func});
 
 	class CORE_API VMHandle
 	{
@@ -186,7 +186,7 @@ namespace EMI
 		FunctionHandle GetFunctionHandle(const char* name);
 
 		ValueHandle _internal_call(FunctionHandle handle, size_t count, InternalValue* args);
-		bool __internal_wait(void*);
+		bool _internal_wait(void*);
 
 		InternalValue GetReturn(ValueHandle handle);
 
@@ -228,7 +228,7 @@ namespace EMI
 
 	inline bool ScriptHandle::wait() {
 		if (ptr) {
-			auto res = vm->__internal_wait(ptr);
+			auto res = vm->_internal_wait(ptr);
 			ptr = nullptr;
 			return res;
 		} 

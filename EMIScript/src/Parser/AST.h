@@ -24,7 +24,7 @@ public:
 	}
 	VariableType varType;
 	Token type = Token::None;
-	uint8 regTarget;
+	uint8_t regTarget;
 	size_t line;
 	size_t depth;
 	NodeDataType data;
@@ -50,7 +50,7 @@ public:
 	bool HasError;
 private:
 	void WalkLoad(Node*);
-	uint8 WalkStore(Node*);
+	uint8_t WalkStore(Node*);
 	Symbol* findSymbol(const std::string& name, const std::string& space, bool& isNamespace);
 
 	void handleFunction(Node* n, Function* f, Symbol* s);
@@ -67,15 +67,15 @@ private:
 	ankerl::unordered_dense::set<std::string> stringList;
 	std::vector<Instruction> instructionList;
 	std::array<bool, 255> registers;
-	uint8 maxRegister;
+	uint8_t maxRegister;
 
 	void initRegs() {
 		for (auto& r : registers) r = false;
 		maxRegister = 0;
 	}
 
-	uint8 getFirstFree() {
-		for (uint8 i = 0; i < 255; i++) {
+	uint8_t getFirstFree() {
+		for (uint8_t i = 0; i < 255; i++) {
 			if (!registers[i]) {
 				registers[i] = true;
 				if (maxRegister < i) maxRegister = i;
@@ -87,9 +87,9 @@ private:
 		return 0;
 	}
 
-	uint8 getLastFree() {
-		uint8 idx = 255;
-		for (uint8 i = 0; i < 255; i++) {
+	uint8_t getLastFree() {
+		uint8_t idx = 254;
+		for (uint8_t i = 0; i < 255; i++) {
 			if (registers[i]) {
 				idx = i;
 			}
@@ -100,7 +100,7 @@ private:
 		return idx;
 	}
 
-	void freeReg(uint8 reg) {
+	void freeReg(uint8_t reg) {
 		registers[reg] = false;
 	}
 

@@ -16,16 +16,16 @@ public:
 		Type = VariableType::Object;
 	}
 
-	UserObject(VariableType type, uint16 count);
+	UserObject(VariableType type, uint16_t count);
 	~UserObject();
 
 	void Clear();
 
 	static Allocator<UserObject>* GetAllocator();
 
-	uint16 size() const { return DataCount; }
+	uint16_t size() const { return DataCount; }
 
-	Variable& operator[](uint16 index) {
+	Variable& operator[](uint16_t index) {
 		if (index < DataCount)
 			return Data[index];
 		return Data[0];
@@ -34,7 +34,7 @@ public:
 private:
 
 	Variable* Data;
-	uint16 DataCount;
+	uint16_t DataCount;
 };
 
 
@@ -67,13 +67,13 @@ public:
 
 	bool GetType(UserDefinedType*& type, const std::string& name);
 
-	bool GetPropertyIndex(uint16& out, const std::string& name, VariableType type);
+	bool GetPropertyIndex(uint16_t& out, const std::string& name, VariableType type);
 	bool GetPropertySymbol(Symbol*& symbol, const std::string& name, VariableType type);
 
 private:
 	ankerl::unordered_dense::map<VariableType, UserDefinedType> BaseTypes;
 	ankerl::unordered_dense::map<std::string, VariableType> NameToType;
-	uint32 TypeCounter = (uint32)VariableType::Object;
+	uint32_t TypeCounter = (uint32_t)VariableType::Object;
 };
 
 ObjectManager& GetManager();

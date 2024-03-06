@@ -23,18 +23,18 @@ union Instruction
 		OpCodes code : 8;
 		union {
 			struct {
-				uint8 target : 8;
+				uint8_t target : 8;
 				union {
 					struct {
-						uint8 in1 : 8;
-						uint8 in2 : 8;
+						uint8_t in1 : 8;
+						uint8_t in2 : 8;
 					} PACKED;
-					uint16 param : 16;
+					uint16_t param : 16;
 				};
 			} PACKED;
 		};
 	}PACKED;
-	uint32 data : 32;
+	uint32_t data : 32;
 
 	Instruction() { data = 0; }
 };
@@ -85,10 +85,10 @@ struct Function
 	ankerl::unordered_dense::set<size_t> JumpTable;
 
 	std::vector<Function*> FunctionTable;
-	std::vector<EMI::__internal_function*> ExternalTable;
+	std::vector<EMI::_internal_function*> ExternalTable;
 	std::vector<IntrinsicPtr> IntrinsicTable;
 	std::vector<Variable*> GlobalTable;
-	std::vector<int32> PropertyTable;
+	std::vector<int32_t> PropertyTable;
 	std::vector<VariableType> TypeTable;
 
 	std::vector<std::string> FunctionTableSymbols;
@@ -102,11 +102,11 @@ struct Function
 
 	std::vector<VariableType> Types;
 
-	uint8 ArgCount;
-	uint8 RegisterCount;
+	uint8_t ArgCount;
+	uint8_t RegisterCount;
 	bool IsPublic;
 
-	std::vector<uint32> Bytecode;
+	std::vector<uint32_t> Bytecode;
 
 	Function() {
 		FunctionScope = nullptr;

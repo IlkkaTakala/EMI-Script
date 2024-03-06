@@ -4,7 +4,7 @@
 
 using namespace EMI;
 
-bool EMI::__internal_register(__internal_function* func)
+bool EMI::_internal_register(_internal_function* func)
 {
 	if (ValidHostFunctions().find((uint64_t)func) != ValidHostFunctions().end()) return false;
 	std::string name;
@@ -21,7 +21,7 @@ bool EMI::__internal_register(__internal_function* func)
 	return true;
 }
 
-bool EMI::__internal_unregister(const char* space, const char* name)
+bool EMI::_internal_unregister(const char* space, const char* name)
 {
 	auto& f = HostFunctions();
 	std::string strname;
@@ -50,7 +50,7 @@ CORE_API void EMI::UnregisterAllExternals()
 
 VMHandle EMI::CreateEnvironment()
 {
-	uint idx = CreateVM();
+	uint32_t idx = CreateVM();
 	return VMHandle(idx, GetVM(idx));
 }
 
@@ -88,7 +88,7 @@ ValueHandle EMI::VMHandle::_internal_call(FunctionHandle handle, size_t count, I
 	return ValueHandle{ out, this };
 }
 
-bool EMI::VMHandle::__internal_wait(void* ptr)
+bool EMI::VMHandle::_internal_wait(void* ptr)
 {
 	return ((VM*)Vm)->WaitForResult(ptr);
 }

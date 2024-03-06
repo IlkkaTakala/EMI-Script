@@ -11,7 +11,7 @@ struct ItemHandle {
 	size_t id;
 };
 
-enum Action : uint8 {
+enum Action : uint8_t {
 	ACCEPT, SHIFT, REDUCE, DECIDE, ERROR, GOTO
 };
 

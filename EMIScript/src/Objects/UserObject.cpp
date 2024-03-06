@@ -24,10 +24,10 @@ Variable ObjectManager::Make(VariableType type) const
 {
 	if (auto it = BaseTypes.find(type); it != BaseTypes.end()) {
 
-		UserObject* object = UserObject::GetAllocator()->Make(type, (uint16)it->second.DefaultFields.size());
+		UserObject* object = UserObject::GetAllocator()->Make(type, (uint16_t)it->second.DefaultFields.size());
 		object->RefCount++;
 
-		uint16 idx = 0;
+		uint16_t idx = 0;
 		for (auto& field : it->second.DefaultFields) {
 			(*object)[idx] = field;
 			idx++;
@@ -50,7 +50,7 @@ bool ObjectManager::GetType(UserDefinedType*& type, const std::string& name)
 	return true;
 }
 
-bool ObjectManager::GetPropertyIndex(uint16& out, const std::string& name, VariableType type)
+bool ObjectManager::GetPropertyIndex(uint16_t& out, const std::string& name, VariableType type)
 {
 	if (auto it = BaseTypes.find(type); it != BaseTypes.end()) {
 		auto& fields = it->second.FieldNames;
@@ -61,7 +61,7 @@ bool ObjectManager::GetPropertyIndex(uint16& out, const std::string& name, Varia
 
 		auto index = std::distance(fields.begin(), field);
 
-		out = static_cast<uint16>(index);
+		out = static_cast<uint16_t>(index);
 		return true;
 	}
 	return false;
@@ -97,7 +97,7 @@ VariableType UserDefinedType::GetFieldType(const std::string& name) const
 	return VariableType::Undefined;
 }
 
-UserObject::UserObject(VariableType type, uint16 count)
+UserObject::UserObject(VariableType type, uint16_t count)
 {
 	Type = type;
 	Data = new Variable[count];

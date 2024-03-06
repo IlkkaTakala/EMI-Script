@@ -31,7 +31,7 @@ struct Symbol
 	SymbolFlags flags = SymbolFlags::None;
 	VariableType varType = VariableType::Undefined;
 	bool resolved = false;
-	uint8 reg = 0;
+	uint8_t reg = 0;
 	bool needsLoading = false;
 	size_t startLife = 0;
 	size_t endLife = 0;
