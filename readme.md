@@ -29,4 +29,8 @@ Scripting stage is used to call functions defined in the script files using the 
 | exit | | Exits the program |
 
 ## Game
-The game demo starts immediately and loads the game.ril script file automatically. The red dot uses A-star pathfinding to move around the boxed area. Player can draw walls using left mouse button and erase them with right mouse button.
+The demo requires Windows 10 or 11. Windows 11 OS uses different terminal by default and needs the Win11Startup binary.  
+  
+The game demo starts immediately and loads the game.ril script file automatically. The red dot uses A-star pathfinding to move around the boxed area. Player can draw walls using left mouse button and erase them with right mouse button.  
+  
+![image](https://github.com/IlkkaTakala/EMI-Script/assets/94061138/ff7d5cd8-ee4e-4dfc-b25a-2562a7b240ab)
