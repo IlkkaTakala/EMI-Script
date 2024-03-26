@@ -27,14 +27,14 @@ inline SymbolFlags operator^ (SymbolFlags a, SymbolFlags b) { return (SymbolFlag
 
 struct Symbol
 {
-	SymbolType type = SymbolType::Variable;
-	SymbolFlags flags = SymbolFlags::None;
-	VariableType varType = VariableType::Undefined;
-	bool resolved = false;
-	uint8_t reg = 0;
-	bool needsLoading = false;
-	size_t startLife = 0;
-	size_t endLife = 0;
+	SymbolType Type = SymbolType::Variable;
+	SymbolFlags Flags = SymbolFlags::None;
+	VariableType VarType = VariableType::Undefined;
+	bool Resolved = false;
+	uint8_t Register = 0;
+	bool NeedsLoading = false;
+	size_t StartLife = 0;
+	size_t EndLife = 0;
 
 	void setType(SymbolType t);
 };

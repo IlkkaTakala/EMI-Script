@@ -60,7 +60,7 @@ class RegisterStack
 public:
 	void to(size_t location) {
 		top = location;
-		fast = &_stack[top];
+		fast = &stack[top];
 	}
 
 	void destroy(size_t count) {
@@ -70,8 +70,8 @@ public:
 	}
 
 	void reserve(size_t count) {
-		if (count > _stack.size()) _stack.resize(count);
-		fast = &_stack[top];
+		if (count > stack.size()) stack.resize(count);
+		fast = &stack[top];
 	}
 
 	T& operator[](size_t location) {
@@ -81,7 +81,7 @@ public:
 private:
 
 	size_t top = 0;
-	std::vector<T> _stack;
+	std::vector<T> stack;
 	T* fast = nullptr;
 };
 
@@ -177,5 +177,4 @@ private:
 	ankerl::unordered_dense::map<std::string, Namespace> Namespaces;
 
 	std::unordered_map<std::string, Variable> GlobalVariables;
-	// Variable heap?
 };

@@ -3,6 +3,8 @@
 #include "EMI/Value.h"
 #include <string>
 
+// @todo: These should be inlined
+
 Variable moveOwnershipToVM(const InternalValue& var);
 InternalValue moveOwnershipToHost(const Variable& var);
 InternalValue makeHostArg(const Variable& var);

@@ -50,16 +50,16 @@ struct Scoped
 	Scoped* parent = nullptr;
 	std::list<Scoped> children;
 
-	Symbol* findSymbol(const std::string& name) {
+	Symbol* FindSymbol(const std::string& name) {
 		if (auto it = symbols.find(name); it != symbols.end()) {
 			return it->second;
 		}
 		if (!parent) return nullptr;
-		return parent->findSymbol(name);
+		return parent->FindSymbol(name);
 	}
 
 	Symbol* addSymbol(const std::string& name) {
-		auto it = findSymbol(name);
+		auto it = FindSymbol(name);
 		if (!it) {
 			auto s = symbols.emplace(name, new Symbol{});
 			return s.first->second;

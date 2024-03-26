@@ -32,7 +32,7 @@ public:
 	Symbol* sym;
 	size_t instruction;
 
-	Variable toVariable() const;
+	Variable ToVariable() const;
 
 #ifdef DEBUG
 	void print(const std::string& prefix, bool isLast = false);
@@ -46,39 +46,39 @@ public:
 	ASTWalker(VM*, Node*);
 	~ASTWalker();
 	void Run();
-	ankerl::unordered_dense::map<std::string, Namespace> namespaces;
+	ankerl::unordered_dense::map<std::string, Namespace> Namespaces;
 	bool HasError;
 private:
 	void WalkLoad(Node*);
 	uint8_t WalkStore(Node*);
-	Symbol* findSymbol(const std::string& name, const std::string& space, bool& isNamespace);
+	Symbol* FindSymbol(const std::string& name, const std::string& space, bool& isNamespace);
 
-	void handleFunction(Node* n, Function* f, Symbol* s);
+	void HandleFunction(Node* n, Function* f, Symbol* s);
 
 	bool HasDebug;
-	VM* vm;
-	Node* root;
-	Namespace* currentNamespace;
+	VM* Vm;
+	Node* Root;
+	Namespace* CurrentNamespace;
 
 
 	// Function parsing
-	Scoped* currentScope;
-	Function* currentFunction;
-	ankerl::unordered_dense::set<std::string> stringList;
-	std::vector<Instruction> instructionList;
-	std::array<bool, 255> registers;
-	uint8_t maxRegister;
+	Scoped* CurrentScope;
+	Function* CurrentFunction;
+	ankerl::unordered_dense::set<std::string> StringList;
+	std::vector<Instruction> InstructionList;
+	std::array<bool, 255> Registers;
+	uint8_t MaxRegister;
 
-	void initRegs() {
-		for (auto& r : registers) r = false;
-		maxRegister = 0;
+	void InitRegisters() {
+		for (auto& r : Registers) r = false;
+		MaxRegister = 0;
 	}
 
-	uint8_t getFirstFree() {
+	uint8_t GetFirstFree() {
 		for (uint8_t i = 0; i < 255; i++) {
-			if (!registers[i]) {
-				registers[i] = true;
-				if (maxRegister < i) maxRegister = i;
+			if (!Registers[i]) {
+				Registers[i] = true;
+				if (MaxRegister < i) MaxRegister = i;
 				return i;
 			}
 		}
@@ -87,24 +87,24 @@ private:
 		return 0;
 	}
 
-	uint8_t getLastFree() {
+	uint8_t GetLastFree() {
 		uint8_t idx = 254;
 		for (uint8_t i = 0; i < 255; i++) {
-			if (registers[i]) {
+			if (Registers[i]) {
 				idx = i;
 			}
 		}
 		idx++;
-		registers[idx] = true;
-		maxRegister = idx;
+		Registers[idx] = true;
+		MaxRegister = idx;
 		return idx;
 	}
 
-	void freeReg(uint8_t reg) {
-		registers[reg] = false;
+	void FreeRegister(uint8_t reg) {
+		Registers[reg] = false;
 	}
 
-	void placeBreaks(Node* n, size_t start, size_t end);
+	void PlaceBreaks(Node* n, size_t start, size_t end);
 };
 
 void TypeConverter(NodeDataType& n, const TokenHolder& h);

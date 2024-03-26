@@ -2,13 +2,13 @@
 
 void Symbol::setType(SymbolType t)
 {
-	type = t;
-	flags = SymbolFlags::None;
+	Type = t;
+	Flags = SymbolFlags::None;
 
 	switch (t)
 	{
 	case SymbolType::Static:
-		flags = SymbolFlags::Value;
+		Flags = SymbolFlags::Value;
 		break;
 	case SymbolType::Object:
 		break;
@@ -17,7 +17,7 @@ void Symbol::setType(SymbolType t)
 	case SymbolType::Namespace:
 		break;
 	case SymbolType::Variable:
-		flags = SymbolFlags::Assignable;
+		Flags = SymbolFlags::Assignable;
 		break;
 	default:
 		break;

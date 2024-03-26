@@ -58,13 +58,6 @@ Lexer::~Lexer()
 	Valid = false;
 }
 
-#define CASE(Token, Block) \
-case Token: { \
-	Block\
-} break;
-
-#define TOKEN(T) token = Token::T
-
 inline bool is_whitespace(unsigned char c) {
 	return (c >= 9 && c <= 13) || c == 32;
 }

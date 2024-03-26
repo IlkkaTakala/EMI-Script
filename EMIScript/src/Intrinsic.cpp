@@ -11,16 +11,8 @@
 void print(Variable&, Variable* args, size_t argc) {
 	if (argc > 0) {
 		std::string format = toStdString(args[0]);
-		std::vector<std::string> out_args(argc - 1);
-		/*
-		for (size_t i = 1; i < argc; ++i) {
-			try {
-				format = std::vformat(format, std::make_format_args(toStdString(args[i])));
-			}
-			catch (const std::exception& e) {
-				gError() << "Exception: " << e.what() << "\n";
-			}
-		}*/
+
+		// @todo: Add print formatting
 
 		gLogger() << format;
 	}
@@ -188,7 +180,7 @@ void mathsqrt(Variable& out, Variable* args, size_t argc) {
 
 
 
-
+// @todo: Something better for these intrinsic definitions
 ankerl::unordered_dense::map<std::string, IntrinsicPtr> IntrinsicFunctions {
 	{ "print", print },
 	{ "println", printLn },

@@ -92,7 +92,7 @@ void UserDefinedType::AddField(const std::string& name, Variable var, const Symb
 VariableType UserDefinedType::GetFieldType(const std::string& name) const
 {
 	if (auto it = FieldNames.find(name); it != FieldNames.end()) {
-		return it->second.varType;
+		return it->second.VarType;
 	}
 	return VariableType::Undefined;
 }

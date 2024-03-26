@@ -182,7 +182,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	ast.Run();
 
 	if (!ast.HasError) {
-		vm->AddNamespace(fullPath, ast.namespaces);
+		vm->AddNamespace(fullPath, ast.Namespaces);
 		options.CompileResult.set_value(true);
 	}
 	else {
@@ -348,12 +348,10 @@ Node* Parser::ConstructAST(CompileOptions& options)
 
 		ERRORCASE:
 		default: {
-			#ifdef _MSC_VER
 			const auto& c = lex.GetContext();
 			gError() << MakePath(options.Path) 
 				<< std::format(" ({}, {})", c.Row, c.Column) 
 				<< ": Critical error found '" << holder.data << "'. Expected one of: ";
-			#endif
 #ifdef DEBUG
 			int idx = 0;
 			for (auto& state : ParseTable[currentState]) {

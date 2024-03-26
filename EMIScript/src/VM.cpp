@@ -1,6 +1,6 @@
 #include "VM.h"
 #include "Parser/Parser.h"
-#include "NativeFuncs.h"
+#include "TypeConverters.h"
 #include "Helpers.h"
 #include "Objects/StringObject.h"
 #include "Objects/ArrayObject.h"
@@ -17,7 +17,7 @@ VM::VM()
 		auto [it, success] = Namespaces.emplace(space, Namespace{});
 		auto sym = new Symbol();
 		sym->setType(SymbolType::Namespace);
-		sym->resolved = true;
+		sym->Resolved = true;
 		it->second.Sym = sym;
 	}
 	
@@ -30,7 +30,7 @@ VM::VM()
 			auto [ns, success] = Namespaces.emplace(nsname, Namespace{});
 			auto sym = new Symbol();
 			sym->setType(SymbolType::Namespace);
-			sym->resolved = true;
+			sym->Resolved = true;
 			ns->second.Sym = sym;
 		}
 	}
@@ -195,10 +195,10 @@ Symbol* VM::FindSymbol(const std::string& name, const std::string& space, bool& 
 	}
 	isNamespace = false;
 	if (auto it = Namespaces.find(space); it != Namespaces.end()) {
-		auto res = it->second.findSymbol(name);
+		auto res = it->second.FindSymbol(name);
 		if (res) return res;
 	}
-	auto res = Namespaces["Global"].findSymbol(name);
+	auto res = Namespaces["Global"].FindSymbol(name);
 	if (res) return res;
 
 	return nullptr;
@@ -208,7 +208,7 @@ void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std:
 {
 	std::unique_lock lk(MergeMutex);
 	for (auto& [name, s] : space) {
-		for (auto& [oname, obj] : s.objects) {
+		for (auto& [oname, obj] : s.Objects) {
 			std::string fullobjname;
 			if (name != "Global") {
 				fullobjname = name + '.' + oname;
@@ -217,21 +217,21 @@ void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std:
 				fullobjname = oname;
 			}
 			auto type = GetManager().AddType(fullobjname, obj);
-			s.objectTypes[oname] = type;
-			Units[path].objects.push_back({ name, oname });
+			s.ObjectTypes[oname] = type;
+			Units[path].Objects.push_back({ name, oname });
 		}
-		s.objects.clear();
-		for (auto& [fname, func] : s.functions) {
+		s.Objects.clear();
+		for (auto& [fname, func] : s.Functions) {
 			auto full = name + '.' + fname;
 			if (auto it = NameToFunctionMap.find(full); it != NameToFunctionMap.end()) {
 				gWarn() << "Multiple definitions for function " << full << '\n';
 			}
 			NameToFunctionMap[full] = func;
 			ValidFunctions.emplace(func);
-			Units[path].functions.push_back({ name, fname });
+			Units[path].Functions.push_back({ name, fname });
 		}
-		for (auto& [vname, var] : s.variables) {
-			Units[path].variables.push_back({ name, vname });
+		for (auto& [vname, var] : s.Variables) {
+			Units[path].Variables.push_back({ name, vname });
 			GlobalVariables.emplace(name + '.' + vname, var);
 		}
 
@@ -249,29 +249,29 @@ void VM::RemoveUnit(const std::string& unit)
 	std::unique_lock lk(MergeMutex);
 	if (auto it = Units.find(unit); it != Units.end()) {
 		auto& u = it->second;
-		for (auto& [name, function] : u.functions) {
+		for (auto& [name, function] : u.Functions) {
 			Namespace& n = Namespaces[name];
 
-			n.symbols.erase(function);
-			auto ptr = n.functions[function.c_str()];
+			n.Symbols.erase(function);
+			auto ptr = n.Functions[function.c_str()];
 			ValidFunctions.erase(ptr);
 			delete ptr;
-			n.functions.erase(function.c_str());
+			n.Functions.erase(function.c_str());
 			auto full = name + '.' + function;
 			NameToFunctionMap.erase(full);
 			GlobalVariables.erase(full);
 		}
-		for (auto& [name, obj] : u.objects) {
+		for (auto& [name, obj] : u.Objects) {
 			GetManager().RemoveType(name + '.' + obj);
 			Namespace& n = Namespaces[name];
-			n.objects.erase(obj);
-			n.objectTypes.erase(obj);
-			n.symbols.erase(obj);
+			n.Objects.erase(obj);
+			n.ObjectTypes.erase(obj);
+			n.Symbols.erase(obj);
 		}
-		for (auto& [name, var] : u.variables) {
+		for (auto& [name, var] : u.Variables) {
 			Namespace& n = Namespaces[name];
-			n.variables.erase(var);
-			n.symbols.erase(var);
+			n.Variables.erase(var);
+			n.Symbols.erase(var);
 			GlobalVariables.erase(name + '.' + var);
 		}
 		
