@@ -40,7 +40,7 @@ Variable ObjectManager::Make(VariableType type) const
 	return Variable();
 }
 
-bool ObjectManager::GetType(UserDefinedType*& type, const std::string& name)
+bool ObjectManager::GetType(UserDefinedType*& type, const TName& name)
 {
 	auto it = NameToType.find(name);
 	if (it == NameToType.end()) {

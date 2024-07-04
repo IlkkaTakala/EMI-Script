@@ -65,14 +65,14 @@ public:
 
 	Variable Make(VariableType type) const ;
 
-	bool GetType(UserDefinedType*& type, const std::string& name);
+	bool GetType(UserDefinedType*& type, const TName& name);
 
 	bool GetPropertyIndex(uint16_t& out, const std::string& name, VariableType type);
 	bool GetPropertySymbol(Symbol*& symbol, const std::string& name, VariableType type);
 
 private:
 	ankerl::unordered_dense::map<VariableType, UserDefinedType> BaseTypes;
-	ankerl::unordered_dense::map<std::string, VariableType> NameToType;
+	ankerl::unordered_dense::map<TName, VariableType> NameToType;
 	uint32_t TypeCounter = (uint32_t)VariableType::Object;
 };
 

@@ -7,14 +7,6 @@
 
 class FunctionAllocator;
 
-enum class FunctionType 
-{
-	User,
-	Host,
-	Intrinsic,
-	None
-};
-
 class FunctionObject : public Object
 {
 public:

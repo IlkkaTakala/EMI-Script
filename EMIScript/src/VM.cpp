@@ -17,7 +17,6 @@ VM::VM()
 		auto [it, success] = Namespaces.emplace(space, Namespace{});
 		auto sym = new Symbol();
 		sym->setType(SymbolType::Namespace);
-		sym->Resolved = true;
 		it->second.Sym = sym;
 	}
 	
@@ -30,7 +29,6 @@ VM::VM()
 			auto [ns, success] = Namespaces.emplace(nsname, Namespace{});
 			auto sym = new Symbol();
 			sym->setType(SymbolType::Namespace);
-			sym->Resolved = true;
 			ns->second.Sym = sym;
 		}
 	}
@@ -187,7 +185,7 @@ bool VM::WaitForResult(void* ptr)
 	return false;
 }
 
-Symbol* VM::FindSymbol(const std::string& name, const std::string& space, bool& isNamespace)
+Symbol* VM::FindSymbol(const TName& name, const TName& space, bool& isNamespace)
 {
 	if (auto it = Namespaces.find(name); it != Namespaces.end()) {
 		isNamespace = true;
@@ -204,14 +202,14 @@ Symbol* VM::FindSymbol(const std::string& name, const std::string& space, bool& 
 	return nullptr;
 }
 
-void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std::string, Namespace>& space)
+void VM::AddNamespace(const TName& path, ankerl::unordered_dense::map<TName, Namespace>& space)
 {
 	std::unique_lock lk(MergeMutex);
 	for (auto& [name, s] : space) {
 		for (auto& [oname, obj] : s.Objects) {
 			std::string fullobjname;
-			if (name != "Global") {
-				fullobjname = name + '.' + oname;
+			if (name != TName("Global")) {
+				fullobjname = std::string(name) + '.' + std::string(oname);
 			}
 			else {
 				fullobjname = oname;
@@ -222,13 +220,13 @@ void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std:
 		}
 		s.Objects.clear();
 		for (auto& [fname, func] : s.Functions) {
-			auto full = name + '.' + fname;
+			auto full = name + '.' + fname.toString();
 			if (auto it = NameToFunctionMap.find(full); it != NameToFunctionMap.end()) {
 				gWarn() << "Multiple definitions for function " << full << '\n';
 			}
-			NameToFunctionMap[full] = func;
+			NameToFunctionMap[full] = (Function*)func->Ptr;
 			ValidFunctions.emplace(func);
-			Units[path].Functions.push_back({ name, fname });
+			Units[path].Functions.push_back({ name, fname.toString()});
 		}
 		for (auto& [vname, var] : s.Variables) {
 			Units[path].Variables.push_back({ name, vname });
@@ -254,7 +252,7 @@ void VM::RemoveUnit(const std::string& unit)
 
 			n.Symbols.erase(function);
 			auto ptr = n.Functions[function.c_str()];
-			ValidFunctions.erase(ptr);
+			ValidFunctions.erase((Function*)ptr->Ptr);
 			delete ptr;
 			n.Functions.erase(function.c_str());
 			auto full = name + '.' + function;

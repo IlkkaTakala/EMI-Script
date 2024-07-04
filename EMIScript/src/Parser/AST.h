@@ -29,7 +29,7 @@ public:
 	size_t depth;
 	NodeDataType data;
 	std::vector<Node*> children;
-	Symbol* sym;
+	CompileSymbol* sym;
 	size_t instruction;
 
 	Variable ToVariable() const;
@@ -46,14 +46,15 @@ public:
 	ASTWalker(VM*, Node*);
 	~ASTWalker();
 	void Run();
-	ankerl::unordered_dense::map<std::string, Namespace> Namespaces;
+	Namespace Global;
 	bool HasError;
 private:
 	void WalkLoad(Node*);
 	uint8_t WalkStore(Node*);
-	Symbol* FindSymbol(const std::string& name, const std::string& space, bool& isNamespace);
+	Symbol* FindSymbol(const TNameQuery& name, Namespace* space);
+	Symbol* FindOrCreateSymbol(const TNameQuery& name, Namespace* space, SymbolType type = SymbolType::None);
 
-	void HandleFunction(Node* n, Function* f, Symbol* s);
+	void HandleFunction(Node* n, Function* f, CompileSymbol* s);
 
 	bool HasDebug;
 	VM* Vm;
@@ -66,7 +67,7 @@ private:
 	Function* CurrentFunction;
 	ankerl::unordered_dense::set<std::string> StringList;
 	std::vector<Instruction> InstructionList;
-	std::array<bool, 255> Registers;
+	std::array<bool, 256> Registers;
 	uint8_t MaxRegister;
 
 	void InitRegisters() {
@@ -89,7 +90,7 @@ private:
 
 	uint8_t GetLastFree() {
 		uint8_t idx = 254;
-		for (uint8_t i = 0; i < 255; i++) {
+		for (uint8_t i = 0; i < 254; i++) {
 			if (Registers[i]) {
 				idx = i;
 			}
