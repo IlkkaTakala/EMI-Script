@@ -425,7 +425,6 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n)
 {
 	Vm = in_vm;
 	Root = n;
-	CurrentNamespace = &Global;
 	CurrentFunction = nullptr;
 	CurrentScope = nullptr;
 	HasError = false;
@@ -439,13 +438,13 @@ ASTWalker::~ASTWalker()
 	delete Root;
 }
 
-std::string getFullId(Node* n) {
-	std::string full;
+TName getFullId(Node* n) {
+	TName full;
 	for (auto& c : n->children) {
 		if (c->type != Token::Id) break;
-		full += getFullId(c) + ".";
+		full << getFullId(c);
 	}
-	full += std::get<0>(n->data);
+	full << std::get<0>(n->data).c_str();
 	return full;
 }
 
@@ -458,27 +457,28 @@ void ASTWalker::Run()
 		case Token::NamespaceDef:
 		{
 			TName name(std::get<0>(c->data).c_str());
-			Symbol* sym = FindOrCreateSymbol({ name }, CurrentNamespace, SymbolType::Namespace);
-			if (!sym->Data) {
+			auto [n, sym] = FindOrCreateSymbol(name, SymbolType::Namespace);
+			if (sym && sym->Type == SymbolType::Namespace) {
+				CurrentNamespace = n;
 				Namespace* space = new Namespace();
-				space->Name = name;
+				space->Name = n;
 				sym->Data = space;
-			}
-			if (sym->Type == SymbolType::Namespace) {
-				CurrentNamespace = (Namespace*)sym->Data;
 			}
 		} break;
 		
 		case Token::ObjectDef:
 		{
 			TName data(std::get<0>(c->data).c_str());
-			bool isNameSpace;
-			auto s = FindSymbol({ data }, CurrentNamespace);
-			if (!s && !isNameSpace) {
-				auto it = CurrentNamespace->Symbols.emplace(data, new Symbol{});
-				auto& symbol = it.first->second;
+			auto [name, s] = FindSymbol(data);
+			if (!s) {
+				auto symbol = new Symbol{};
+				TName addedName(data.Append(CurrentNamespace));
+				if (!Global.AddName(addedName, symbol)) {
+					delete symbol;
+					break;
+				}
 				symbol->setType(SymbolType::Object);
-				auto& object = new UserDefinedType{};
+				auto object = new UserDefinedType{};
 				symbol->Data = object;
 				
 				for (auto& field : c->children) {
@@ -522,7 +522,7 @@ void ASTWalker::Run()
 								var = field->children.back()->ToVariable(); // @todo: Add implicit conversions
 							}
 							else {
-								gError() << "Trying to initialize with wrong type: In object " << data << ", field " << std::get<0>(field->data) << '\n';
+								gError() << "Trying to initialize with wrong type: In object " << addedName << ", field " << std::get<0>(field->data) << '\n';
 							}
 						}
 						else {
@@ -530,10 +530,11 @@ void ASTWalker::Run()
 						}
 					} 
 					else {
-						gError() << "Parse error in object " << data << '\n';
+						gError() << "Parse error in object " << addedName << '\n';
 					}
-					
-					object->AddField(std::get<0>(field->data), var, flags);
+					TName fieldName(std::get<0>(field->data).c_str());
+					Global.AddName(fieldName.Append(addedName), nullptr);
+					object->AddField(fieldName, var, flags);
 				}
 			}
 			else {
@@ -545,22 +546,22 @@ void ASTWalker::Run()
 		case Token::FunctionDef:
 		{
 			TName data(std::get<0>(c->data).c_str());
-			auto s = FindSymbol({ data }, CurrentNamespace);
-			if (!s) {
-				auto it = CurrentNamespace->Symbols.emplace(data, new Symbol{});
-				auto& symbol = it.first->second;
+			auto [name, s] = FindSymbol(data);
+			if (!name) {
+				auto symbol = new Symbol{};
+				Global.AddName(data.Append(CurrentNamespace), symbol);
 				symbol->setType(SymbolType::Function);
 				symbol->VarType = VariableType::Function;
 				FunctionSymbol* functionSym = new FunctionSymbol();
 				symbol->Data = functionSym;
 				Function* function = new Function();
 				functionSym->Type = FunctionType::User;
-				functionSym->Ptr = function;
+				functionSym->DirectPtr = function;
 
 				function->Name = data;
-				function->IsPublic = c->type == Token::PublicFunctionDef || CurrentNamespace->Name == TName("Global");
+				function->IsPublic = c->type == Token::PublicFunctionDef || CurrentNamespace == TName();
 				c->sym = new CompileSymbol();
-				c->sym->Sym = *symbol;
+				c->sym->Sym = symbol;
 				functionList.emplace_back(c, function);
 				function->Types.resize(1);
 				function->FunctionScope = new Scoped();
@@ -573,21 +574,22 @@ void ASTWalker::Run()
 					case Token::CallParams: {
 						function->ArgCount = (uint8_t)node->children.size();
 						for (auto& v : node->children) {
-							auto symParam = FindSymbol({ std::get<0>(v->data).c_str()}, CurrentNamespace);
-							if (symParam) {
-								gError() << "Line " << node->line << ": Symbol '" << std::get<0>(v->data) << "' already defined\n";
+							auto [paramName, symParam] = FindSymbol(std::get<0>(v->data).c_str());
+							if (paramName) {
+								gError() << "Line " << node->line << ": Symbol '" << paramName << "' already defined\n";
 								HasError = true;
 								break;
 							}
 							CompileSymbol* sym = function->FunctionScope->addSymbol(std::get<0>(v->data).c_str());
 							WalkLoad(v->children.front());
-							sym->Sym.setType(SymbolType::Variable);
-							sym->Sym.VarType = v->children.front()->varType;
-							if (sym->Sym.VarType != VariableType::Undefined) {
-								sym->Sym.Flags = sym->Sym.Flags | SymbolFlags::Typed;
+							sym->Sym = new Symbol();
+							sym->Sym->setType(SymbolType::Variable);
+							sym->Sym->VarType = v->children.front()->varType;
+							if (sym->Sym->VarType != VariableType::Undefined) {
+								sym->Sym->Flags = sym->Sym->Flags | SymbolFlags::Typed;
 							}
 							sym->Resolved = true;
-							function->Types.push_back(sym->Sym.VarType);
+							function->Types.push_back(sym->Sym->VarType);
 						}
 					} break;
 					default:
@@ -608,11 +610,10 @@ void ASTWalker::Run()
 		case Token::VarDeclare:
 		{
 			TName data(std::get<0>(c->data).c_str());
-			bool isNameSpace;
-			auto s = FindSymbol({ data }, CurrentNamespace);
-			if (!s && !isNameSpace) {
-				auto it = CurrentNamespace->Symbols.emplace(data, new Symbol{});
-				auto& symbol = it.first->second;
+			auto [name, s] = FindSymbol(data);
+			if (!name) {
+				auto symbol = new Symbol();
+				Global.AddName(data.Append(CurrentNamespace), symbol);
 				switch (c->type)
 				{
 				case Token::Static: symbol->setType(SymbolType::Static); break;
@@ -799,7 +800,7 @@ void ASTWalker::WalkLoad(Node* n)
 		size_t index = 0;
 		if (it == CurrentFunction->TypeTableSymbols.end()) {
 			index = CurrentFunction->TypeTableSymbols.size();
-			CurrentFunction->TypeTableSymbols.push_back(name);
+			CurrentFunction->TypeTableSymbols.push_back({ name });
 		}
 		else {
 			index = it - CurrentFunction->TypeTableSymbols.begin();
@@ -979,18 +980,27 @@ void ASTWalker::WalkLoad(Node* n)
 
 	case Token::Id: {
 		Walk;
-		bool isNameSpace = false;
-		Symbol* symbol = nullptr;
+		CompileSymbol* symbol = nullptr;
 		TName data(std::get<std::string>(n->data).c_str());
 		if (n->children.size() != 1) {
-			symbol = FindSymbol({ data }, CurrentNamespace);
+			auto [fullname, globalSymbol] = FindSymbol(data);
+
+			if (fullname) {
+				symbol = FindOrCreateLocalSymbol(data);
+				symbol->Sym = globalSymbol;
+			}
 		}
 		else {
 			if (First()->sym) {
-				if (First()->sym->Sym.Type == SymbolType::Namespace) {
-					symbol = FindSymbol(data, std::get<std::string>(First()->data));
+				if (First()->sym->Sym->Type == SymbolType::Namespace) {
+					auto [fullName, globalSymbol] = FindSymbol(data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name));
+					if (fullName) {
+						symbol = FindOrCreateLocalSymbol(data);
+						symbol->Sym = globalSymbol;
+						symbol->EndLife = InstructionList.size();
+					}
 				}
-				else if (First()->sym->Sym.Type == SymbolType::Variable) {
+				else if (First()->sym->Sym->Type == SymbolType::Variable) {
 					Op(LoadProperty);
 					In8 = First()->regTarget;
 					FreeChildren;
@@ -1009,15 +1019,11 @@ void ASTWalker::WalkLoad(Node* n)
 					arg.code = OpCodes::Noop;
 					arg.param = static_cast<uint16_t>(index);
 
-					UserDefinedType* typeProperty = nullptr;
 					size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
 					if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
 						auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
-						if (GetManager().GetType(typeProperty, objectName)) {
-							n->varType = typeProperty->GetFieldType(data);
-						}
-						else if (auto localObject = CurrentNamespace->Symbols.find(objectName); localObject != CurrentNamespace->Symbols.end()) {
-							n->varType = static_cast<UserDefinedType*>(localObject->second->Data)->GetFieldType(data);
+						if (auto [localObject, objectType] = FindSymbol(objectName); objectType && objectType->Type == SymbolType::Object) {
+							n->varType = static_cast<UserDefinedType*>(objectType->Data)->GetFieldType(data);
 						}
 					}
 					break;
@@ -1045,7 +1051,7 @@ void ASTWalker::WalkLoad(Node* n)
 			}
 
 			if (symbol) {
-				NodeType = symbol->VarType;
+				NodeType = symbol->Sym->VarType;
 				n->sym = symbol;
 			}
 
@@ -1056,15 +1062,15 @@ void ASTWalker::WalkLoad(Node* n)
 		else if (symbol) {
 			n->regTarget = symbol->Register;
 			symbol->EndLife = InstructionList.size();
-			NodeType = symbol->VarType;
+			NodeType = symbol->Sym->VarType;
 			n->sym = symbol;
 		}
 	}break;
 
 	case Token::Property: {
-		auto& data = std::get<std::string>(n->data);
+		TName data(std::get<std::string>(n->data).c_str());
 		if (n->children.size() != 1) {
-			Error("Invalid property access: " + data);
+			Error("Invalid property access: " + data.toString());
 			break;
 		}
 		Walk;
@@ -1086,21 +1092,17 @@ void ASTWalker::WalkLoad(Node* n)
 			arg.code = OpCodes::Noop;
 			arg.param = static_cast<uint16_t>(index);
 
-			UserDefinedType* typeProperty = nullptr;
 			size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
 			if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
 				auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
-				if (GetManager().GetType(typeProperty, objectName)) {
-					n->varType = typeProperty->GetFieldType(data);
-				}
-				else if (auto localObject = CurrentNamespace->Objects.find(objectName); localObject != CurrentNamespace->Objects.end()) {
-					n->varType = localObject->second.GetFieldType(data);
+				if (auto localObject = FindSymbol(objectName); localObject.second && localObject.second->Type == SymbolType::Object) {
+					n->varType = static_cast<UserDefinedType*>(localObject.second->Data)->GetFieldType(data);
 				}
 			}
 			break;
 		}
 		else {
-			Error("Unknown symbol: " + data);
+			Error("Unknown symbol: " + data.toString());
 		}
 	} break;
 
@@ -1225,44 +1227,45 @@ void ASTWalker::WalkLoad(Node* n)
 			SetOut(n) = WalkStore(lhs);
 		}
 		n->sym = lhs->sym;
-		if (lhs->sym && !isAssignable(lhs->sym->Flags)) {
+		if (lhs->sym && !isAssignable(lhs->sym->Sym->Flags)) {
 			Error("Trying to assign to unassignable type");
 			HasError = true;
 		}
 		if (rhs->varType != VariableType::Undefined && lhs->varType != rhs->varType && lhs->sym) {
-			if (isTyped(lhs->sym->Flags) || lhs->data.index() != 0) {
+			if (isTyped(lhs->sym->Sym->Flags) || lhs->data.index() != 0) {
 				Error("Trying to assign unrelated types");
 				HasError = true;
 			}
 			else if (lhs->varType == VariableType::Undefined) {
-				lhs->sym->VarType = NodeType = lhs->varType = rhs->varType;
+				lhs->sym->Sym->VarType = NodeType = lhs->varType = rhs->varType;
 			}
 		}
 	}break;
 
 	case Token::Const:
 	case Token::VarDeclare: {
-		bool isNamespace;
-		if (FindSymbol(std::get<std::string>(n->data), CurrentNamespace)) {
-			Error("Symbol already defined: " + std::get<std::string>(n->data));
+		TName data(std::get<std::string>(n->data).c_str());
+		if (FindSymbol(data).first || CurrentScope->FindSymbol(data)) {
+			Error("Symbol already defined: " + data.toString());
 			break;
 		}
-		auto sym = CurrentScope->addSymbol(std::get<std::string>(n->data));
+		auto sym = CurrentScope->addSymbol(data);
+		sym->Sym = new Symbol();
 		sym->StartLife = InstructionList.size();
 		sym->EndLife = InstructionList.size();
-		sym->setType(n->type == Token::VarDeclare ? SymbolType::Variable : SymbolType::Static);
+		sym->Sym->setType(n->type == Token::VarDeclare ? SymbolType::Variable : SymbolType::Static);
 		sym->Resolved = true;
 		sym->NeedsLoading = false;
 		n->sym = sym;
 		if (n->children.size() > 0) {
 			Walk;
-			sym->VarType = NodeType = First()->varType;
-			if (sym->VarType != VariableType::Undefined) {
-				sym->Flags = sym->Flags | SymbolFlags::Typed;
+			sym->Sym->VarType = NodeType = First()->varType;
+			if (sym->Sym->VarType != VariableType::Undefined) {
+				sym->Sym->Flags = sym->Sym->Flags | SymbolFlags::Typed;
 			}
 			if (n->children.size() == 2) {
 				if (Last()->varType == NodeType || NodeType == VariableType::Undefined || Last()->varType == VariableType::Undefined) {
-					sym->VarType = NodeType = Last()->varType;
+					sym->Sym->VarType = NodeType = Last()->varType;
 					if (!Last()->sym) {
 						sym->Register = n->regTarget = Last()->regTarget;
 					}
@@ -1276,14 +1279,14 @@ void ASTWalker::WalkLoad(Node* n)
 				Error("Cannot assign unrelated types");
 			}
 		}
-		if (sym->VarType >= VariableType::Object) {
+		if (sym->Sym->VarType >= VariableType::Object) {
 			Op(PushObjectDefault);
-			In16 = (uint16_t)sym->VarType - (uint16_t)VariableType::Object;
+			In16 = (uint16_t)sym->Sym->VarType - (uint16_t)VariableType::Object;
 			sym->Register = Out;
 		}
 		else {
 			Op(PushTypeDefault);
-			In16 = (uint16_t)sym->VarType;
+			In16 = (uint16_t)sym->Sym->VarType;
 			sym->Register = Out;
 		}
 	}break;
@@ -1470,25 +1473,26 @@ void ASTWalker::WalkLoad(Node* n)
 			WalkLoad(First());
 
 			auto sym = CurrentScope->addSymbol("_index_");
+			sym->Sym = new Symbol();
 			sym->Register = GetFirstFree();
-			sym->Sym.setType(SymbolType::Static);
-			sym->Sym.VarType = VariableType::Number;
+			sym->Sym->setType(SymbolType::Static);
+			sym->Sym->VarType = VariableType::Number;
 			{
 				Op(LoadImmediate);
 				In16 = (uint16_t)-1;
 				n->regTarget = instruction.target = sym->Register;
 			}
 
-			auto& data = std::get<std::string>(n->data);
-			bool isVar = !data.empty();
+			TName data(std::get<std::string>(n->data).c_str());
+			bool isVar = data;
 
 			auto start = InstructionList.size();
 			uint8_t regtarget = 0;
 			if (isVar) {
 				auto var = CurrentScope->addSymbol(data);
 				var->Register = GetFirstFree();
-				var->Sym.setType(SymbolType::Variable);
-				if (First()->varType == VariableType::Number) var->Sym.VarType = VariableType::Number;
+				var->Sym->setType(SymbolType::Variable);
+				if (First()->varType == VariableType::Number) var->Sym->VarType = VariableType::Number;
 				{
 					Op(RangeForVar);
 					In8 = sym->Register;
@@ -1587,25 +1591,25 @@ void ASTWalker::WalkLoad(Node* n)
 		auto name = getFullId(First());
 		if (!First()->sym) {
 
-			if (auto it = HostFunctions().find(name); it != HostFunctions().end()) {
+			if (auto it = HostFunctions().find(name.toString()); it != HostFunctions().end()) {
 				NodeType = TypeFromValue(it->second->return_type);
 				type = 1;
 				goto function;
 			}
-			if (IntrinsicFunctions.find(name) != IntrinsicFunctions.end()) {
-				NodeType = IntrinsicFunctionTypes[name][0];
+			if (IntrinsicFunctions.find(name.toString()) != IntrinsicFunctions.end()) {
+				NodeType = IntrinsicFunctionTypes[name.toString()][0];
 				type = 2;
 				goto function;
 			}
 			type = 3; // @todo: This should be 4, fix 
 			goto function;
 		}
-		else if (First()->sym->Sym.Type != SymbolType::Function && First()->sym->Sym.Type == SymbolType::Variable) {
+		else if (First()->sym->Sym->Type != SymbolType::Function && First()->sym->Sym->Type == SymbolType::Variable) {
 			type = 3;
 			goto function;
 		}
 		else {
-			if (First()->sym->Sym.Type == SymbolType::Function) {
+			if (First()->sym->Sym->Type == SymbolType::Function) {
 			// @todo: Get return type for user functions
 
 			}
@@ -1691,28 +1695,33 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 	switch (n->type) {
 	case Token::Id: {
 		Walk;
-		bool isNameSpace = false;
 		CompileSymbol* symbol = nullptr;
-		auto& data = std::get<std::string>(n->data);
+		TName data(std::get<std::string>(n->data).c_str());
 		if (n->children.size() != 1) {
-			symbol = FindSymbol(data, CurrentNamespace);
+			auto [fullname, globalSymbol] = FindSymbol(data);
+
+			if (fullname) {
+				symbol = FindOrCreateLocalSymbol(data);
+				symbol->Sym = globalSymbol;
+			}
 		}
 		else {
 			if (First()->sym) {
-				if (First()->sym->Type == SymbolType::Namespace) {
-					symbol = FindSymbol(data, std::get<std::string>(First()->data), isNameSpace);
+				if (First()->sym->Sym->Type == SymbolType::Namespace) {
+					auto [fullName, globalSymbol] = FindSymbol(data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name));
+					if (fullName) {
+						symbol = FindOrCreateLocalSymbol(data);
+						symbol->Sym = globalSymbol;
+						symbol->EndLife = InstructionList.size();
+					}
 				}
-				else if (First()->sym->Type == SymbolType::Variable) {
+				else if (First()->sym->Sym->Type == SymbolType::Variable) {
 
-					UserDefinedType* typeProperty = nullptr;
 					size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
 					if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
 						auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
-						if (GetManager().GetType(typeProperty, objectName)) {
-							n->varType = typeProperty->GetFieldType(data);
-						}
-						else if (auto localObject = CurrentNamespace->Objects.find(objectName); localObject != CurrentNamespace->Objects.end()) {
-							n->varType = localObject->second.GetFieldType(data);
+						if (auto it = FindSymbol(objectName); it.second && it.second->Type == SymbolType::Object) {
+							n->varType = static_cast<UserDefinedType*>(it.second->Data)->GetFieldType(data);
 						}
 					}
 
@@ -1738,11 +1747,11 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 					return n->regTarget;
 				}
 				else {
-					Error("Unknown symbol: " + data);
+					Error("Unknown symbol: " + data.toString());
 				}
 			}
 			else {
-				Error("Unknown symbol: " + data);
+				Error("Unknown symbol: " + data.toString());
 			}
 		}
 		if (!symbol || (symbol && symbol->NeedsLoading)) {
@@ -1760,7 +1769,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 			}
 
 			if (symbol) {
-				NodeType = symbol->Sym.VarType;
+				NodeType = symbol->Sym->VarType;
 				n->sym = symbol;
 			}
 
@@ -1772,7 +1781,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 		else if (symbol) {
 			n->regTarget = symbol->Register;
 			symbol->EndLife = InstructionList.size();
-			NodeType = symbol->Sym.VarType;
+			NodeType = symbol->Sym->VarType;
 			n->sym = symbol;
 			return n->regTarget;
 		}
@@ -1808,56 +1817,73 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 	return n->regTarget;
 }
 
-Symbol* ASTWalker::FindSymbol(const TNameQuery& name, Namespace* space)
+CompileSymbol* ASTWalker::FindLocalSymbol(const TName& name)
 {
-	if (!name) return nullptr; 
-
-	bool Search = true;
-	Namespace* current = space;
-	size_t index = 0;
-	Symbol* symbol = nullptr;
-	if (CurrentScope && name.NameList.size() == 1) {
-		auto comp = CurrentScope->FindSymbol(name.NameList[0]);
-		if (comp) return &comp->Sym;
-	}
-	while (Search && current) {
-		symbol = current->FindSymbol(name.NameList[index]);
-		index++;
-		if (symbol) {
-			if (index == name.NameList.size()) {
-				Search = false;
-			}
-			if (symbol->Type == SymbolType::Namespace) {
-				current = static_cast<Namespace*>(symbol->Data);
-			}
-			continue;
-		}
-		index = 0;
-		current = current->Parent;
-	}
-	if (!symbol) {
-		symbol = Vm->FindSymbol(name, space);
+	CompileSymbol* symbol = nullptr;
+	if (CurrentScope) {
+		symbol = CurrentScope->FindSymbol(name);
 	}
 	return symbol;
 }
 
-Symbol* ASTWalker::FindOrCreateSymbol(const TNameQuery& name, Namespace* space, SymbolType type)
+CompileSymbol* ASTWalker::FindOrCreateLocalSymbol(const TName& name)
 {
-	auto symbol = FindSymbol(name, space);
-	if (symbol) return;
+	auto symbol = FindLocalSymbol(name);
 
-	symbol = new Symbol();
+	if (!symbol && CurrentScope) {
+		symbol = CurrentScope->addSymbol(name);
+		symbol->EndLife = symbol->StartLife = InstructionList.size();
+	}
+
+	return symbol;
+}
+
+std::pair<TName, Symbol*> ASTWalker::FindSymbol(const TNameQuery& name)
+{
+	if (!name) return { {}, nullptr };
+
+	auto res = Global.FindName(name);
+
+	if (!res.first) {
+		res = Vm->FindSymbol(name);
+	}
+	return res;
+}
+
+std::pair<TName, Symbol*> ASTWalker::FindSymbol(const TName& name)
+{
+	if (!name) return { name, nullptr };
+
+	TNameQuery query(name, { CurrentNamespace });
+	auto res = Global.FindName(query);
+
+	if (!res.first) {
+		res = Vm->FindSymbol(query);
+	}
+	return res;
+}
+
+std::pair<TName, Symbol*> ASTWalker::FindOrCreateSymbol(const TName& name, SymbolType type)
+{
+	auto res = FindSymbol(name);
+	if (res.first) return res;
+
+	auto symbol = new Symbol();
 	symbol->setType(type);
 
-	space->Symbols.emplace(name, symbol);
-	return symbol;
+	TName newName(name.Append(CurrentNamespace));
+	if (Global.AddName(newName, symbol)) {
+		return { newName, symbol };
+	}
+	delete symbol;
+	return { {}, nullptr };
 }
 
 void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 {
 	InitRegisters();
 	CurrentFunction = f;
-	CurrentNamespace = &Namespaces[f->Namespace];
+	CurrentNamespace = f->Name.Get(1);
 
 	for (auto& c : n->children) {
 		switch (c->type)

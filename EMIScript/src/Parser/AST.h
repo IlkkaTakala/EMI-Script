@@ -46,21 +46,23 @@ public:
 	ASTWalker(VM*, Node*);
 	~ASTWalker();
 	void Run();
-	Namespace Global;
+	SymbolTable Global;
 	bool HasError;
 private:
 	void WalkLoad(Node*);
 	uint8_t WalkStore(Node*);
-	Symbol* FindSymbol(const TNameQuery& name, Namespace* space);
-	Symbol* FindOrCreateSymbol(const TNameQuery& name, Namespace* space, SymbolType type = SymbolType::None);
+	CompileSymbol* FindLocalSymbol(const TName& name);
+	CompileSymbol* FindOrCreateLocalSymbol(const TName& name);
+	std::pair<TName, Symbol*> FindSymbol(const TNameQuery& name);
+	std::pair<TName, Symbol*> FindSymbol(const TName& name);
+	std::pair<TName, Symbol*> FindOrCreateSymbol(const TName& name, SymbolType type = SymbolType::None);
 
 	void HandleFunction(Node* n, Function* f, CompileSymbol* s);
 
 	bool HasDebug;
 	VM* Vm;
 	Node* Root;
-	Namespace* CurrentNamespace;
-
+	TName CurrentNamespace;
 
 	// Function parsing
 	Scoped* CurrentScope;

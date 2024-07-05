@@ -49,7 +49,7 @@ struct Symbol
 
 struct CompileSymbol
 {
-	Symbol Sym;
+	Symbol* Sym;
 
 	bool Resolved = false;
 	uint8_t Register = 0;
@@ -61,7 +61,8 @@ struct CompileSymbol
 struct FunctionSymbol
 {
 	FunctionType Type;
-	void* Ptr;
+	void* DirectPtr;
+	Variable Function;
 	VariableType Return;
 	std::vector<VariableType> Arguments;
 };

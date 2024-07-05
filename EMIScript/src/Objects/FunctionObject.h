@@ -10,14 +10,14 @@ class FunctionAllocator;
 class FunctionObject : public Object
 {
 public:
-	FunctionObject(const std::string& name) : FunctionObject(FunctionType::None, name) {}
-	FunctionObject(FunctionType type, const std::string& name);
+	FunctionObject(const TName& name) : FunctionObject(FunctionType::None, name) {}
+	FunctionObject(FunctionType type, const TName& name);
 	FunctionObject() : FunctionObject(FunctionType::None, "") {}
 
 	static Allocator<FunctionObject>* GetAllocator();
 
 	FunctionType InternalType;
-	std::string Name;
+	TName Name;
 
 	std::variant<Function*, EMI::_internal_function*, IntrinsicPtr> Callee;
 

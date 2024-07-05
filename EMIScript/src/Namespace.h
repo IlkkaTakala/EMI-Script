@@ -4,52 +4,48 @@
 #include "Objects/UserObject.h"
 #include <ankerl/unordered_dense.h>
 
+struct SymbolTable
+{
+	ankerl::unordered_dense::map<TName, Symbol*> Table;
+
+	std::pair<TName, Symbol*> FindName(const TNameQuery& name) const {
+		TName searchName;
+		for (auto& p : name.GetPaths()) {
+			for (char i = 0; i < p.Length(); i++) {
+				searchName = name.GetTarget().Append(p, i);
+				if (auto it = Table.find(searchName); it != Table.end()) {
+					return { searchName, it->second };
+				}
+			}
+		}
+		if (auto it = Table.find(name.GetTarget()); it != Table.end()) {
+			return { name.GetTarget(), it->second };
+		}
+		return { {}, nullptr };
+	}
+
+	Symbol* FindNameFromObject(const TName& name, const TName& path) const {
+		if (auto it = Table.find(name.Append(path)); it != Table.end()) {
+			return it->second;
+		}
+		return nullptr;
+	}
+
+	bool AddName(TName name, Symbol* symbol) {
+		if (auto it = Table.find(name); it == Table.end()) {
+			Table.emplace(name, symbol);
+			return true;
+		}
+		return false;
+	}
+};
+
 struct Namespace
 {
-	Namespace* Parent;
 	TName Name;
-	ankerl::unordered_dense::map<TName, Symbol*> Symbols;
-
-	Symbol* FindSymbol(const TName& name) {
-		if (auto it = Symbols.find(name); it == Symbols.end()) return nullptr;
-		else return it->second;
-	}
-
-	inline void merge(Namespace& rhs) {
-		Symbols.insert(rhs.Symbols.begin(), rhs.Symbols.end());
-		rhs.Symbols.clear();
-	}
-
-	inline void remove(Namespace& rhs) {
-		for (auto& [name, func] : rhs.Symbols) {
-			Symbols.erase(name);
-		}
-	}
-
-	~Namespace() {
-		for (auto& [name, f] : Symbols) {
-			delete f;
-		}
-	}
-	// @todo: check these
-	Namespace() = default;
-	Namespace(Namespace&& rhs) noexcept {
-		merge(rhs);
-	};
-	Namespace(Namespace& rhs) = delete;
-	Namespace& operator=(Namespace& rhs) {
-		merge(rhs);
-		return *this;
-	};
-	Namespace& operator=(Namespace&& rhs) noexcept {
-		merge(rhs);
-		return *this;
-	}
 };
 
 struct CompileUnit
 {
-	std::vector<std::pair<std::string, std::string>> Functions;
-	std::vector<std::pair<std::string, std::string>> Objects;
-	std::vector<std::pair<std::string, std::string>> Variables;
+	std::vector<TName> Symbols;
 };

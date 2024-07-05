@@ -1,6 +1,6 @@
 #include "FunctionObject.h"
 
-FunctionObject::FunctionObject(FunctionType type, const std::string& name)
+FunctionObject::FunctionObject(FunctionType type, const TName& name)
 	: InternalType(type), Name(name)
 {
 	Type = VariableType::Function;

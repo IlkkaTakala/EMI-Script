@@ -182,7 +182,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	ast.Run();
 
 	if (!ast.HasError) {
-		vm->AddNamespace(fullPath, ast.Namespaces);
+		vm->AddNamespace(fullPath, ast.Global);
 		options.CompileResult.set_value(true);
 	}
 	else {

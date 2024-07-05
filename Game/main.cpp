@@ -5,7 +5,7 @@ int main()
 {
 	srand(time(0));
 	auto vm = EMI::CreateEnvironment();
-	EMI::SetLogLevel(4);
+	EMI::SetLogLevel(0);
 	auto result = vm.CompileScript("Scripts/game.ril");
 
 	printf("Waiting for compile...\n");

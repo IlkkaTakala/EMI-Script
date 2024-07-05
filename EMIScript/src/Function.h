@@ -89,10 +89,10 @@ struct Function
 	std::vector<int32_t> PropertyTable;
 	std::vector<VariableType> TypeTable;
 
-	std::vector<TName> FunctionTableSymbols;
+	std::vector<TNameQuery> FunctionTableSymbols;
 	std::vector<TName> PropertyTableSymbols;
-	std::vector<TName> TypeTableSymbols;
-	std::vector<TName> GlobalTableSymbols;
+	std::vector<TNameQuery> TypeTableSymbols;
+	std::vector<TNameQuery> GlobalTableSymbols;
 
 	ankerl::unordered_dense::map<int, int> DebugLines;
 

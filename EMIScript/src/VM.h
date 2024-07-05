@@ -135,8 +135,8 @@ public:
 	InternalValue GetReturnValue(size_t index);
 	bool WaitForResult(void* ptr);
 
-	Symbol* FindSymbol(const TName& name, const TName& space, bool& isNamespace);
-	void AddNamespace(const TName& path, ankerl::unordered_dense::map<TName, Namespace>& space);
+	std::pair<TName, Symbol*> FindSymbol(const TNameQuery& name);
+	void AddNamespace(const std::string& path, const SymbolTable& space);
 
 	inline bool IsRunning() const { return VMRunning; }
 
@@ -171,7 +171,7 @@ private:
 	std::vector<std::promise<Variable>> ReturnPromiseValues;
 	std::vector<size_t> ReturnFreeList;
 
-	ankerl::unordered_dense::map<TName, CompileUnit> Units;
+	ankerl::unordered_dense::map<std::string, CompileUnit> Units;
 	ankerl::unordered_dense::set<Function*> ValidFunctions;
-	ankerl::unordered_dense::map<TName, Symbol> GlobalSymbols;
+	SymbolTable GlobalSymbols;
 };
