@@ -2,6 +2,7 @@
 #include <variant>
 #include "ParseHelper.h"
 #include "Namespace.h"
+#include "Function.h"
 
 using NodeDataType = std::variant<std::string, double, bool>;
 

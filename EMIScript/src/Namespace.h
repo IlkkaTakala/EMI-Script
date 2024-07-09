@@ -1,7 +1,5 @@
 #pragma once
-#include "Function.h"
 #include "Symbol.h"
-#include "Objects/UserObject.h"
 #include <ankerl/unordered_dense.h>
 
 struct SymbolTable

@@ -31,9 +31,11 @@ public:
 	TName Get(char off);
 
 	TName& operator<<(const TName& name);
-	bool operator<(const TName& rhs) const;
+	bool operator<(const TName& rhs) const {
+		return Path[0] < rhs.Path[0];
+	}
 	friend bool operator==(const TName& lhs, const TName& rhs) {
-		return lhs.Path[0] < rhs.Path[0];
+		return lhs.Path == rhs.Path;
 	}
 	std::string toString() const;
 	operator const char* () const;
@@ -120,8 +122,8 @@ inline std::vector<std::string> splits(const std::string& s, char delim) {
 inline TName operator""_name(const char* src, size_t) {
 	auto parts = splits(src, '.');
 	TName out;
-	for (auto& p : parts) {
-		out.Append(p.c_str());
+	for (auto p = parts.rbegin(); p != parts.rend(); p++) {
+		out = out.Append(p->c_str());
 	}
 	return out;
 }

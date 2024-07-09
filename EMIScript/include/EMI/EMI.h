@@ -87,21 +87,19 @@ namespace EMI
 		void(*cleanup)(void*) = 0;
 		size_t arg_count = 0;
 		const char* name = nullptr;
-		const char* space = nullptr;
 		ValueType* arg_types = nullptr;
 		ValueType return_type = ValueType::Undefined;
 
 		void clear() { 
 			if (cleanup) { cleanup(state); } 
 			if (name) delete[] name; 
-			if (space) delete[] space; 
 			if (arg_types) delete[] arg_types;
-			state = 0; operate = 0; cleanup = 0; arg_count = 0; name = nullptr; space = nullptr; arg_types = nullptr;
+			state = 0; operate = 0; cleanup = 0; arg_count = 0; name = nullptr; arg_types = nullptr;
 		}
 		_internal_function(_internal_function const&) = delete;
 		_internal_function(_internal_function&& o) noexcept : 
-			state(o.state), operate(o.operate), cleanup(o.cleanup), arg_count(o.arg_count), name(o.name), space(o.space), return_type(o.return_type)
-		{ o.cleanup = 0; o.name = nullptr; o.space = nullptr; o.arg_types = nullptr; o.clear(); }
+			state(o.state), operate(o.operate), cleanup(o.cleanup), arg_count(o.arg_count), name(o.name), return_type(o.return_type)
+		{ o.cleanup = 0; o.name = nullptr; o.arg_types = nullptr; o.clear(); }
 		_internal_function& operator=(_internal_function&& o) noexcept {
 			if (this == &o) return *this;
 			clear();
@@ -110,11 +108,9 @@ namespace EMI
 			cleanup = o.cleanup;
 			arg_count = o.arg_count;
 			name = o.name;
-			space = o.space;
 			return_type = o.return_type;
 			o.cleanup = 0; 
 			o.name = nullptr; 
-			o.space = nullptr;
 			o.arg_types = nullptr;
 			o.clear();
 			return *this;
@@ -129,7 +125,7 @@ namespace EMI
 	};
 
 	CORE_API bool _internal_register(_internal_function* func);
-	CORE_API bool _internal_unregister(const char*, const char*);
+	CORE_API bool _internal_unregister(const char*);
 
 	template<class V, class F, typename ...Args, size_t... S> 
 	constexpr auto _make_caller(std::index_sequence<S...>) {
@@ -145,19 +141,13 @@ namespace EMI
 
 	template<class F, class...Args> requires (std::is_convertible_v<F, InternalValue> || 
 		std::is_void_v<F>) && ((std::is_convertible_v<Args, InternalValue>) && ...)
-	bool RegisterFunction(const std::string& space, const std::string& name, std::function<F(Args...)>&& f) {
+	bool RegisterFunction(const std::string& name, std::function<F(Args...)>&& f) {
 		auto retval = new _internal_function();
 		constexpr size_t size = sizeof...(Args);
 		constexpr auto seq = std::make_index_sequence<size>();
 		char* c = new char[name.length() + 1];
 		strcpy_s(c, name.length() + 1, name.c_str());
 		retval->name = c;
-		retval->space = nullptr;
-		if (space.length() > 0 && space != "Global") {
-			c = new char[space.length() + 1];
-			strcpy_s(c, space.length() + 1, space.c_str());
-			retval->space = c;
-		}
 		retval->arg_types = new ValueType[size]{type<Args>()...};
 		retval->return_type = type<F>();
 		retval->arg_count = size;
@@ -167,13 +157,13 @@ namespace EMI
 		return _internal_register(retval);
 	}
 
-	inline bool UnregisterFunction(const std::string& space, const std::string& name) {
-		return _internal_unregister(space.c_str(), name.c_str());
+	inline bool UnregisterFunction(const std::string& name) {
+		return _internal_unregister(name.c_str());
 	}
 
 	CORE_API void UnregisterAllExternals();
 
-#define EMI_REGISTER(Namespace, name, func) static inline bool _emi_reg_##Namespace##_##name = EMI::RegisterFunction(#Namespace, #name, std::function{func});
+#define EMI_REGISTER(name, func) static inline bool _emi_reg_##name = EMI::RegisterFunction(#name, std::function{func});
 
 	class CORE_API VMHandle
 	{

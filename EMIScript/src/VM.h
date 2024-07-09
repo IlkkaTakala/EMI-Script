@@ -104,17 +104,7 @@ private:
 };
 
 inline auto& HostFunctions() {
-	static ankerl::unordered_dense::map<std::string, _internal_function*> f;
-	return f;
-}
-
-inline auto& InternalFunctions() {
-	static ankerl::unordered_dense::map<std::string, IntrinsicPtr> f;
-	return f;
-}
-
-inline auto& ValidHostFunctions() {
-	static ankerl::unordered_dense::set<uint64_t> f;
+	static SymbolTable f;
 	return f;
 }
 

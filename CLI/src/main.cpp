@@ -30,7 +30,7 @@ int print(const char* number) {
 	return 100;
 }
 
-EMI_REGISTER(Global, printStr, print);
+EMI_REGISTER(printStr, print);
 
 int main()
 {

@@ -45,6 +45,8 @@ struct Symbol
 	bool Referenced = false;
 
 	void setType(SymbolType t);
+
+	~Symbol();
 };
 
 struct CompileSymbol

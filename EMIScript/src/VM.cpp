@@ -13,25 +13,8 @@ VM::VM()
 	auto counter = std::thread::hardware_concurrency();
 	CompileRunning = true;
 
-	//for (auto& space : DefaultNamespaces) {
-	//	auto [it, success] = Namespaces.emplace(space, Namespace{});
-	//	auto sym = new Symbol();
-	//	sym->setType(SymbolType::Namespace);
-	//	it->second.Sym = sym;
-	//}
-	//
-	//// @todo: Fix this to be more dynamic
-	//for (auto& [name, fn]: HostFunctions()) {
-	//	if (fn->space == nullptr) continue;
-	//	std::string nsname = fn->space;
-	//	auto it = Namespaces.find(nsname);
-	//	if (it == Namespaces.end()) {
-	//		auto [ns, success] = Namespaces.emplace(nsname, Namespace{});
-	//		auto sym = new Symbol();
-	//		sym->setType(SymbolType::Namespace);
-	//		ns->second.Sym = sym;
-	//	}
-	//}
+	GlobalSymbols.Table.insert(IntrinsicFunctions.Table.begin(), IntrinsicFunctions.Table.end());
+	GlobalSymbols.Table.insert(HostFunctions().Table.begin(), HostFunctions().Table.end());
 
 	VMRunning = true;
 	for (uint32_t i = 0; i < counter / 2; i++) {
@@ -211,29 +194,6 @@ void VM::AddNamespace(const std::string& path, const SymbolTable& space)
 	}
 }
 
-void DeleteSymbolData(Symbol* symbol) {
-	switch (symbol->Type)
-	{
-	case SymbolType::Namespace: {
-		delete static_cast<Namespace*>(symbol->Data);
-	} break;
-	case SymbolType::Function: {
-		auto sym = static_cast<FunctionSymbol*>(symbol->Data);
-		delete static_cast<Function*>(sym->DirectPtr);
-		delete sym;
-	} break;
-	case SymbolType::Object: {
-		delete static_cast<UserDefinedType*>(symbol->Data);
-	} break;
-	case SymbolType::Variable: {
-		delete static_cast<Variable*>(symbol->Data);
-	} break;
-	default:
-		break;
-	}
-	symbol->Data = nullptr;
-}
-
 void VM::RemoveUnit(const std::string& unit)
 {
 	std::unique_lock lk(MergeMutex);
@@ -242,7 +202,6 @@ void VM::RemoveUnit(const std::string& unit)
 
 		for (auto& name : u.Symbols) {
 			Symbol* node = GlobalSymbols.Table[name];
-			DeleteSymbolData(node);
 			switch (node->Type)
 			{
 			case SymbolType::Object: {

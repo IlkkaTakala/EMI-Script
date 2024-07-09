@@ -456,13 +456,16 @@ void ASTWalker::Run()
 		{
 		case Token::NamespaceDef:
 		{
+			CurrentNamespace = TName();
 			TName name(std::get<0>(c->data).c_str());
-			auto [n, sym] = FindOrCreateSymbol(name, SymbolType::Namespace);
-			if (sym && sym->Type == SymbolType::Namespace) {
-				CurrentNamespace = n;
-				Namespace* space = new Namespace();
-				space->Name = n;
-				sym->Data = space;
+			if (name.toString() != "Global") {
+				auto [n, sym] = FindOrCreateSymbol(name, SymbolType::Namespace);
+				if (sym && sym->Type == SymbolType::Namespace) {
+					CurrentNamespace = n;
+					Namespace* space = new Namespace();
+					space->Name = n;
+					sym->Data = space;
+				}
 			}
 		} break;
 		
@@ -1036,6 +1039,9 @@ void ASTWalker::WalkLoad(Node* n)
 				Error(std::string("Unknown symbol: ") + data.toString());
 			}
 		}
+		if (!symbol && CurrentScope) {
+			symbol = CurrentScope->FindSymbol(data);
+		}
 		if (!symbol || (symbol && symbol->NeedsLoading)) {
 			auto name = getFullId(n);
 			auto it = std::find(CurrentFunction->GlobalTableSymbols.begin(), CurrentFunction->GlobalTableSymbols.end(), name);
@@ -1490,6 +1496,7 @@ void ASTWalker::WalkLoad(Node* n)
 			uint8_t regtarget = 0;
 			if (isVar) {
 				auto var = CurrentScope->addSymbol(data);
+				var->Sym = new Symbol();
 				var->Register = GetFirstFree();
 				var->Sym->setType(SymbolType::Variable);
 				if (First()->varType == VariableType::Number) var->Sym->VarType = VariableType::Number;
@@ -1590,7 +1597,7 @@ void ASTWalker::WalkLoad(Node* n)
 		WalkLoad(First());
 		auto name = getFullId(First());
 		if (!First()->sym) {
-
+			/*
 			if (auto it = HostFunctions().find(name.toString()); it != HostFunctions().end()) {
 				NodeType = TypeFromValue(it->second->return_type);
 				type = 1;
@@ -1600,7 +1607,7 @@ void ASTWalker::WalkLoad(Node* n)
 				NodeType = IntrinsicFunctionTypes[name.toString()][0];
 				type = 2;
 				goto function;
-			}
+			}*/
 			type = 3; // @todo: This should be 4, fix 
 			goto function;
 		}
