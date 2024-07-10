@@ -86,32 +86,31 @@ void VM::Interrupt()
 
 }
 
-void* VM::GetFunctionID(const std::string&)
+void* VM::GetFunctionID(const std::string& id)
 {
-
-	/*if (name.find('.') == std::string::npos) {
-		if (auto it = NameToFunctionMap.find("Global." + name); it != NameToFunctionMap.end()) {
-			return it->second;
+	TName name(id.c_str());
+	auto [fullName, symbol] = GlobalSymbols.FindName(name);
+	if (symbol && symbol->Type == SymbolType::Function) {
+		auto fn = static_cast<FunctionSymbol*>(symbol->Data);
+		if (fn->Type != FunctionType::User) {
+			gWarn() << "Symbol is not a script function";
+			return 0;
 		}
-		return 0;
+		if (!static_cast<Function*>(fn->DirectPtr)->IsPublic) {
+			gWarn() << "Function is private";
+			return 0;
+		}
+
+		return fn->DirectPtr;
 	}
-	if (auto it = NameToFunctionMap.find(name); it != NameToFunctionMap.end()) {
-		return it->second;
-	}*/
 	return 0;
 }
 
 size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& args)
 {
 	Function* fn = (Function*)(void*)handle;
-	auto it = ValidFunctions.find(fn);
-	if (it == ValidFunctions.end()) {
-		gWarn() << "Invalid function handle\n";
-		return (size_t)-1;
-	}
-
-	if (!fn->IsPublic) {
-		gWarn() << "Function is private\n";
+	if (!fn) {
+		gWarn() << "Invalid function handle";
 		return (size_t)-1;
 	}
 
@@ -180,18 +179,21 @@ void VM::AddNamespace(const std::string& path, const SymbolTable& space)
 	Units[path].Symbols.reserve(space.Table.size());
 	for (auto& [name, s] : space.Table) {
 		Units[path].Symbols.push_back(name);
+		if (!s) continue;
 
 		switch (s->Type)
 		{
 		case SymbolType::Object: {
 			auto type = GetManager().AddType(name, *static_cast<UserDefinedType*>(s->Data));
 			s->VarType = type;
+			static_cast<UserDefinedType*>(s->Data)->Type = type;
 		} break;
 
 		default:
 			break;
 		}
 	}
+	GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
 }
 
 void VM::RemoveUnit(const std::string& unit)
@@ -250,6 +252,8 @@ void Runner::Join()
 }
 
 #define TARGET(Op) Op: 
+#define Error() gError() << current->FunctionPtr->Name << ":" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "> "
+#define Warn() gWarn() << current->FunctionPtr->Name << ":" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "> "
 
 void Runner::Run()
 {
@@ -324,7 +328,7 @@ void Runner::Run()
 					auto& cmp = Registers[byte.in2];
 
 					if (index.getType() != VariableType::Number) {
-						gError() << "Index type does not match the expression\n";
+						Error() << "Index type does not match the expression";
 						goto start;
 					}
 					index = index.as<double>() + 1.0;
@@ -355,7 +359,7 @@ void Runner::Run()
 					auto& cmp = Registers[byte.in2];
 
 					if (index.getType() != VariableType::Number) {
-						gError() << "Index type does not match the expression\n";
+						Error() << "Index type does not match the expression";
 						goto start;
 					}
 					index = index.as<double>() + 1.0;
@@ -402,7 +406,7 @@ void Runner::Run()
 						auto& name = current->FunctionPtr->GlobalTableSymbols[byte.param];
 						auto res = Owner->GlobalSymbols.FindName(name);
 						if (res.second) {
-							if (res.second->Type == SymbolType::Variable) {
+							if (res.second->Type == SymbolType::Variable || res.second->Type == SymbolType::Static) {
 								var = static_cast<Variable*>(res.second->Data);
 							}
 							else if (res.second->Type == SymbolType::Function) {
@@ -418,11 +422,12 @@ void Runner::Run()
 							}
 						}
 						else {
-							gWarn() << "Variable does not exist: " << name << "\n";
+							Warn() << "Variable does not exist: " << name;
 							goto start;
 						}	
 					}
 
+					if (var)
 					Registers[byte.target] = *var;
 
 				} goto start;
@@ -436,7 +441,7 @@ void Runner::Run()
 							var = static_cast<Variable*>(res.second->Data);
 						}
 						else {
-							gWarn() << "Symbol does not exist: " << name << "\n";
+							Warn() << "Symbol does not exist: " << name;
 							goto start;
 						}
 					}
@@ -455,7 +460,7 @@ void Runner::Run()
 						uint16_t idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
-							gError() << "Property not found: " << name << ", in function " << current->FunctionPtr->Name << '\n';
+							Error() << "Property not found: " << name;
 							Registers[byte.target].setUndefined();
 							goto start;
 						}
@@ -465,7 +470,7 @@ void Runner::Run()
 					if (prop.getType() > VariableType::Object) {
 						UserObject* ptr = prop.as<UserObject>();
 						if (ptr->size() <= propertyIdx) {
-							gError() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param] << '\n';
+							Error() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param];
 							Registers[byte.target].setUndefined();
 							goto start;
 						}
@@ -484,7 +489,7 @@ void Runner::Run()
 						uint16_t idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
-							gError() << "Property not found: " << name << ", in function " << current->FunctionPtr->Name << '\n';
+							Error() << "Property not found: " << name;
 							goto start;
 						}
 						propertyIdx = idx;
@@ -493,7 +498,7 @@ void Runner::Run()
 					if (prop.getType() > VariableType::Object) {
 						UserObject* ptr = prop.as<UserObject>();
 						if (ptr->size() <= propertyIdx) {
-							gError() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param] << '\n';
+							Error() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param];
 							goto start;
 						}
 						(*ptr)[static_cast<uint16_t>(propertyIdx)] = Registers[byte.target];
@@ -537,23 +542,18 @@ void Runner::Run()
 								fn = static_cast<Function*>(f->DirectPtr);
 							}
 							else {
-								gWarn() << "Function has unexpected location: " << name.GetTarget() << "\n";
+								Warn() << "Function has unexpected location: " << name.GetTarget();
 								goto start;
 							}
 						}
 						else {
-							gWarn() << "Function does not exist: " << name.GetTarget() << "\n";
+							Warn() << "Function does not exist: " << name.GetTarget();
 							goto start;
 						}
 					}
-					//else if (Owner->ValidFunctions.find(fn) == Owner->ValidFunctions.end()) { // @todo: check is maybe required but very slow
-					//	current->FunctionPtr->FunctionTable[data.data] = nullptr;
-					//	gWarn() << "Cannot call deleted function\n";
-					//	goto start;
-					//}
 
 					if (!fn->IsPublic && fn->Name.IsChildOf(current->FunctionPtr->Name.Get(1))) {
-						gWarn() << "Cannot call private function " << fn->Name << "\n";
+						Warn() << "Cannot call private function " << fn->Name;
 						goto start;
 					}
 
@@ -577,12 +577,12 @@ void Runner::Run()
 									}
 								}
 								else {
-									gError() << "Invalid type while calling " << fn->Name << "\n";
+									Error() << "Invalid type while calling " << fn->Name;
 								}
 							}
 
 							if (real != Registers[byte.in1 + (i - 1)].getType()) {
-								gWarn() << "Invalid argument types when calling " << fn->Name << " from " << current->FunctionPtr->Name << "\n";
+								Warn() << "Invalid argument types when calling " << fn->Name;
 								goto start;
 							}
 						}
@@ -601,7 +601,7 @@ void Runner::Run()
 					const Instruction& data = *(Instruction*)current->Ptr++;
 
 					if (Registers[data.target].getType() != VariableType::Function) {
-						gWarn() << "Variable does not contain a function\n";
+						Warn() << "Variable does not contain a function";
 						goto start;
 					}
 
@@ -612,7 +612,7 @@ void Runner::Run()
 					case FunctionType::User: {
 						if (auto ptr = std::get<Function*>(f->Callee)) { // @todo: Add finding function
 							if (!ptr->IsPublic && ptr->Name.IsChildOf(current->FunctionPtr->Name.Get(1))) {
-								gWarn() << "Cannot call private function " << ptr->Name << "\n";
+								Warn() << "Cannot call private function " << ptr->Name;
 								goto start;
 							}
 
@@ -636,12 +636,12 @@ void Runner::Run()
 											}
 										}
 										else {
-											gError() << "Invalid type while calling " << ptr->Name << "\n";
+											Error() << "Invalid type while calling " << ptr->Name;
 										}
 									}
 
 									if (real != Registers[byte.in1 + (i - 1)].getType()) {
-										gWarn() << "Invalid argument types when calling " << ptr->Name << " from " << current->FunctionPtr->Name << "\n";
+										Warn() << "Invalid argument types when calling " << ptr->Name;
 										goto start;
 									}
 								}
@@ -700,7 +700,7 @@ void Runner::Run()
 							}
 						}
 						else {
-							gWarn() << "Function does not exist: " << name << "\n";
+							Warn() << "Function does not exist: " << name;
 							goto start;
 							break;
 						}
@@ -723,7 +723,7 @@ void Runner::Run()
 							}
 						}
 						else {
-							gWarn() << "Function does not exist: " << name << "\n";
+							Warn() << "Function does not exist: " << name;
 							goto start;
 							break;
 						}
@@ -740,7 +740,7 @@ void Runner::Run()
 				} goto start;
 
 				TARGET(Call) {
-					gError() << "Unknown functions not implemented\n";
+					Error() << "Unknown functions not implemented";
 				} goto start;
 
 				TARGET(PushUndefined) {
@@ -765,7 +765,7 @@ void Runner::Run()
 							type = usertype->Type;
 						}
 						else {
-							gError() << "Type not defined: " << name << "\n";
+							Error() << "Type not defined: " << name;
 							goto start;
 						}
 					}
@@ -785,7 +785,7 @@ void Runner::Run()
 							type = usertype->Type;
 						}
 						else {
-							gError() << "Type not defined: " << name << "\n";
+							Error() << "Type not defined: " << name;
 							goto start;
 						}
 					}
@@ -811,13 +811,13 @@ void Runner::Run()
 						auto& arr = Registers[byte.in1].as<Array>()->data();
 						size_t idx = static_cast<size_t>(toNumber(Registers[byte.in2]));
 						if (arr.size() <= idx) {
-							gError() << "Array out of bounds: Size " << arr.size() << ", tried to access index " << idx << "\n";
+							Error() << "Array out of bounds: Size " << arr.size() << ", tried to access index " << idx;
 							goto start;
 						}
 						arr[idx] = Registers[byte.target];
 					}
 					else {
-						gWarn() << "Indexing target is not array\n";
+						Warn() << "Indexing target is not array";
 					}
 				} goto start;
 
@@ -829,12 +829,12 @@ void Runner::Run()
 							Registers[byte.target] = arr->data()[idx];
 						}
 						else {
-							gError() << "Array out of bounds: Size " << arr->size() << ", tried to access index " << idx << "\n";
+							Error() << "Array out of bounds: Size " << arr->size() << ", tried to access index " << idx;
 							goto start;
 						}
 					}
 					else {
-						gWarn() << "Indexing target is not array\n";
+						Warn() << "Indexing target is not array";
 					}
 				} goto start;
 

@@ -84,7 +84,7 @@ void Node::print(const std::string& prefix, bool isLast)
 {
 	gLogger() << prefix;
 	gLogger() << (isLast ? (char*)print_last : (char*)print_first);
-	gLogger() << TokensToName[type] << ": " << VariantToStr(this) << '\n';
+	gLogger() << TokensToName[type] << ": " << VariantToStr(this) << "\n";
 
 	for (auto& node : children) {
 		node->print(prefix + (isLast ? "    " : (char*)print_add), node == children.back());
@@ -440,11 +440,11 @@ ASTWalker::~ASTWalker()
 
 TName getFullId(Node* n) {
 	TName full;
+	full << std::get<0>(n->data).c_str();
 	for (auto& c : n->children) {
 		if (c->type != Token::Id) break;
 		full << getFullId(c);
 	}
-	full << std::get<0>(n->data).c_str();
 	return full;
 }
 
@@ -459,6 +459,10 @@ void ASTWalker::Run()
 			CurrentNamespace = TName();
 			TName name(std::get<0>(c->data).c_str());
 			if (name.toString() != "Global") {
+				if (CurrentNamespace.Length() >= 5) {
+					HasError = true;
+					gError() << "Maximum namespace depth reached with " << name << "!";
+				}
 				auto [n, sym] = FindOrCreateSymbol(name, SymbolType::Namespace);
 				if (sym && sym->Type == SymbolType::Namespace) {
 					CurrentNamespace = n;
@@ -523,9 +527,10 @@ void ASTWalker::Run()
 						if (IsConstant(field->children.back()->type)) {
 							if (TypesMatch(field->children.front()->type, field->children.back()->type)) {
 								var = field->children.back()->ToVariable(); // @todo: Add implicit conversions
+								flags.VarType = var.getType();
 							}
 							else {
-								gError() << "Trying to initialize with wrong type: In object " << addedName << ", field " << std::get<0>(field->data) << '\n';
+								gError() << "Trying to initialize with wrong type: In object " << addedName << ", field " << std::get<0>(field->data);
 							}
 						}
 						else {
@@ -533,7 +538,7 @@ void ASTWalker::Run()
 						}
 					} 
 					else {
-						gError() << "Parse error in object " << addedName << '\n';
+						gError() << "Parse error in object " << addedName;
 					}
 					TName fieldName(std::get<0>(field->data).c_str());
 					Global.AddName(fieldName.Append(addedName), nullptr);
@@ -541,7 +546,7 @@ void ASTWalker::Run()
 				}
 			}
 			else {
-				gError() << "Line " << c->line << ": Symbol '" << data << "' already defined\n";
+				gError() << "Line " << c->line << ": Symbol '" << data << "' already defined";
 			}
 		} break;
 		
@@ -579,7 +584,7 @@ void ASTWalker::Run()
 						for (auto& v : node->children) {
 							auto [paramName, symParam] = FindSymbol(std::get<0>(v->data).c_str());
 							if (paramName) {
-								gError() << "Line " << node->line << ": Symbol '" << paramName << "' already defined\n";
+								gError() << "Line " << node->line << ": Symbol '" << paramName << "' already defined";
 								HasError = true;
 								break;
 							}
@@ -604,7 +609,7 @@ void ASTWalker::Run()
 
 			}
 			else {
-				gError() << "Line " << c->line << ": Symbol '" << data << "' already defined\n";
+				gError() << "Line " << c->line << ": Symbol '" << data << "' already defined";
 			}
 		} break;
 
@@ -704,7 +709,7 @@ void ASTWalker::Run()
 
 	for (auto& [node, function] : functionList) {
 		HandleFunction(node, function, node->sym);
-		gDebug() << "Generated function '" << function->Name << "', used " << MaxRegister + 1 << " registers and " << function->Bytecode.size() << " instructions\n";
+		gDebug() << "Generated function '" << function->Name << "', used " << MaxRegister + 1 << " registers and " << function->Bytecode.size() << " instructions";
 
 	}
 }
@@ -715,7 +720,7 @@ void printInstruction(const Instruction& in) {
 }
 #endif // DEBUG
 
-#define Op(op) n->instruction = InstructionList.size(); auto& instruction = InstructionList.emplace_back(); instruction.code = OpCodes::op; 
+#define Op(op) n->instruction = InstructionList.size(); auto& instruction = InstructionList.emplace_back(); instruction.code = OpCodes::op; if (HasDebug) f->DebugLines[(int)n->instruction] = (int)n->line;
 #define Walk for(auto& child : n->children) WalkLoad(child);
 #define In16 instruction.param
 #define In8 instruction.in1
@@ -726,8 +731,8 @@ void printInstruction(const Instruction& in) {
 #define SetOut(n) n->regTarget = InstructionList[n->instruction].target
 #define First() first_child
 #define Last() last_child
-#define Error(text) gError() << "Line " << n->line << ": " << text << "\n"; HasError = true;
-#define Warn(text) gWarn() << "Line " << n->line << ": " << text << "\n";
+#define Error(text) gError() << "Line " << n->line << ": " << text; HasError = true;
+#define Warn(text) gWarn() << "Line " << n->line << ": " << text;
 #define FreeConstant(n) if (!n->sym || (n->sym && n->sym->NeedsLoading) ) FreeRegister(n->regTarget);
 #define EnsureOperands if (n->children.size() != 2) { Error("Invalid number of operands") break; }
 
@@ -762,7 +767,6 @@ Out;\
 void ASTWalker::WalkLoad(Node* n)
 {
 	Function* f = CurrentFunction;
-	if (HasDebug) f->DebugLines[(int)n->line] = (int)InstructionList.size();
 	Node* first_child = n->children.size() ? n->children.front() : nullptr;
 	Node* last_child = n->children.size() ? n->children.back() : nullptr;
 	switch (n->type) {
@@ -985,62 +989,67 @@ void ASTWalker::WalkLoad(Node* n)
 		Walk;
 		CompileSymbol* symbol = nullptr;
 		TName data(std::get<std::string>(n->data).c_str());
-		if (n->children.size() != 1) {
-			auto [fullname, globalSymbol] = FindSymbol(data);
-
-			if (fullname) {
-				symbol = FindOrCreateLocalSymbol(data);
-				symbol->Sym = globalSymbol;
-			}
+		if (CurrentScope && n->children.empty()) {
+			symbol = CurrentScope->FindSymbol(data);
 		}
-		else {
-			if (First()->sym) {
-				if (First()->sym->Sym->Type == SymbolType::Namespace) {
-					auto [fullName, globalSymbol] = FindSymbol(data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name));
-					if (fullName) {
-						symbol = FindOrCreateLocalSymbol(data);
-						symbol->Sym = globalSymbol;
-						symbol->EndLife = InstructionList.size();
-					}
+		if (!symbol) {
+			if (n->children.size() != 1) {
+				auto [fullname, globalSymbol] = FindSymbol(data);
+
+				if (fullname) {
+					symbol = FindOrCreateLocalSymbol(data);
+					symbol->Sym = globalSymbol;
+					if (globalSymbol->Type == SymbolType::Variable
+					 || globalSymbol->Type == SymbolType::Static)
+						symbol->NeedsLoading = true;
 				}
-				else if (First()->sym->Sym->Type == SymbolType::Variable) {
-					Op(LoadProperty);
-					In8 = First()->regTarget;
-					FreeChildren;
-					Out;
-					size_t index = 0;
-					auto it = std::find(CurrentFunction->PropertyTableSymbols.begin(), CurrentFunction->PropertyTableSymbols.end(), data);
-					if (it != CurrentFunction->PropertyTableSymbols.end()) {
-						index = it - CurrentFunction->PropertyTableSymbols.begin();
-					}
-					else {
-						index = CurrentFunction->PropertyTableSymbols.size();
-						CurrentFunction->PropertyTableSymbols.push_back(data);
-					}
-
-					auto& arg = InstructionList.emplace_back();
-					arg.code = OpCodes::Noop;
-					arg.param = static_cast<uint16_t>(index);
-
-					size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
-					if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
-						auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
-						if (auto [localObject, objectType] = FindSymbol(objectName); objectType && objectType->Type == SymbolType::Object) {
-							n->varType = static_cast<UserDefinedType*>(objectType->Data)->GetFieldType(data);
+			}
+			else {
+				if (First()->sym) {
+					if (First()->sym->Sym->Type == SymbolType::Namespace) {
+						auto [fullName, globalSymbol] = FindSymbol(data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name));
+						if (fullName) {
+							symbol = FindOrCreateLocalSymbol(data);
+							symbol->Sym = globalSymbol;
+							symbol->EndLife = InstructionList.size();
 						}
 					}
-					break;
+					else if (First()->sym->Sym->Type == SymbolType::Variable) {
+						Op(LoadProperty);
+						In8 = First()->regTarget;
+						FreeChildren;
+						Out;
+						size_t index = 0;
+						auto it = std::find(CurrentFunction->PropertyTableSymbols.begin(), CurrentFunction->PropertyTableSymbols.end(), data);
+						if (it != CurrentFunction->PropertyTableSymbols.end()) {
+							index = it - CurrentFunction->PropertyTableSymbols.begin();
+						}
+						else {
+							index = CurrentFunction->PropertyTableSymbols.size();
+							CurrentFunction->PropertyTableSymbols.push_back(data);
+						}
+
+						auto& arg = InstructionList.emplace_back();
+						arg.code = OpCodes::Noop;
+						arg.param = static_cast<uint16_t>(index);
+
+						size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
+						if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
+							auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
+							if (auto [localObject, objectType] = FindSymbol(objectName); objectType && objectType->Type == SymbolType::Object) {
+								n->varType = static_cast<UserDefinedType*>(objectType->Data)->GetFieldType(data);
+							}
+						}
+						break;
+					}
+					else {
+						Error(std::string("Unknown symbol: ") + data.toString());
+					}
 				}
 				else {
 					Error(std::string("Unknown symbol: ") + data.toString());
 				}
 			}
-			else {
-				Error(std::string("Unknown symbol: ") + data.toString());
-			}
-		}
-		if (!symbol && CurrentScope) {
-			symbol = CurrentScope->FindSymbol(data);
 		}
 		if (!symbol || (symbol && symbol->NeedsLoading)) {
 			auto name = getFullId(n);
@@ -1270,7 +1279,7 @@ void ASTWalker::WalkLoad(Node* n)
 				sym->Sym->Flags = sym->Sym->Flags | SymbolFlags::Typed;
 			}
 			if (n->children.size() == 2) {
-				if (Last()->varType == NodeType || NodeType == VariableType::Undefined || Last()->varType == VariableType::Undefined) {
+				if (Last()->varType == NodeType || NodeType == VariableType::Undefined) {
 					sym->Sym->VarType = NodeType = Last()->varType;
 					if (!Last()->sym) {
 						sym->Register = n->regTarget = Last()->regTarget;
@@ -1597,29 +1606,39 @@ void ASTWalker::WalkLoad(Node* n)
 		WalkLoad(First());
 		auto name = getFullId(First());
 		if (!First()->sym) {
-			/*
-			if (auto it = HostFunctions().find(name.toString()); it != HostFunctions().end()) {
-				NodeType = TypeFromValue(it->second->return_type);
-				type = 1;
+			if (First()->varType == VariableType::Function || First()->varType == VariableType::Undefined) {
+				type = 3;
 				goto function;
 			}
-			if (IntrinsicFunctions.find(name.toString()) != IntrinsicFunctions.end()) {
-				NodeType = IntrinsicFunctionTypes[name.toString()][0];
-				type = 2;
-				goto function;
-			}*/
-			type = 3; // @todo: This should be 4, fix 
+			type = 4;
 			goto function;
 		}
 		else if (First()->sym->Sym->Type != SymbolType::Function && First()->sym->Sym->Type == SymbolType::Variable) {
 			type = 3;
 			goto function;
 		}
-		else {
-			if (First()->sym->Sym->Type == SymbolType::Function) {
-			// @todo: Get return type for user functions
-
+		else if (First()->sym->Sym->Type == SymbolType::Function) {
+			auto fn = static_cast<FunctionSymbol*>(First()->sym->Sym->Data);
+			switch (fn->Type)
+			{
+			case FunctionType::User:
+				type = 0; 
+				break;
+			case FunctionType::Host:
+				type = 1; 
+				break;
+			case FunctionType::Intrinsic:
+				type = 2; 
+				break;
+			default:
+				Error("Function has no type");
+				break;
 			}
+			NodeType = fn->Return;
+		}
+		else {
+			Error("Cannot call unknown symbol, something went wrong");
+			break;
 		}
 		function:
 
@@ -1696,7 +1715,6 @@ void ASTWalker::WalkLoad(Node* n)
 
 uint8_t ASTWalker::WalkStore(Node* n) {
 	Function* f = CurrentFunction;
-	if (HasDebug) f->DebugLines[(int)n->line] = (int)InstructionList.size();
 	auto first_child = n->children.size() ? n->children.front() : nullptr;
 	auto last_child = n->children.size() ? n->children.back() : nullptr;
 	switch (n->type) {
@@ -1704,61 +1722,68 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 		Walk;
 		CompileSymbol* symbol = nullptr;
 		TName data(std::get<std::string>(n->data).c_str());
-		if (n->children.size() != 1) {
-			auto [fullname, globalSymbol] = FindSymbol(data);
-
-			if (fullname) {
-				symbol = FindOrCreateLocalSymbol(data);
-				symbol->Sym = globalSymbol;
-			}
+		if (CurrentScope && n->children.empty()) {
+			symbol = CurrentScope->FindSymbol(data);
 		}
-		else {
-			if (First()->sym) {
-				if (First()->sym->Sym->Type == SymbolType::Namespace) {
-					auto [fullName, globalSymbol] = FindSymbol(data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name));
-					if (fullName) {
-						symbol = FindOrCreateLocalSymbol(data);
-						symbol->Sym = globalSymbol;
-						symbol->EndLife = InstructionList.size();
-					}
-				}
-				else if (First()->sym->Sym->Type == SymbolType::Variable) {
+		if (!symbol) {
+			if (n->children.size() != 1) {
+				auto [fullname, globalSymbol] = FindSymbol(data);
 
-					size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
-					if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
-						auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
-						if (auto it = FindSymbol(objectName); it.second && it.second->Type == SymbolType::Object) {
-							n->varType = static_cast<UserDefinedType*>(it.second->Data)->GetFieldType(data);
+				if (fullname) {
+					symbol = FindOrCreateLocalSymbol(data);
+					symbol->Sym = globalSymbol;
+					if (globalSymbol->Type != SymbolType::Namespace)
+						symbol->NeedsLoading = true;
+				}
+			}
+			else {
+				if (First()->sym) {
+					if (First()->sym->Sym->Type == SymbolType::Namespace) {
+						auto [fullName, globalSymbol] = FindSymbol(data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name));
+						if (fullName) {
+							symbol = FindOrCreateLocalSymbol(data);
+							symbol->Sym = globalSymbol;
+							symbol->EndLife = InstructionList.size();
 						}
 					}
+					else if (First()->sym->Sym->Type == SymbolType::Variable) {
 
-					// @todo: Maybe type checking here?
+						size_t typeIndex = (size_t)First()->varType - (size_t)VariableType::Object;
+						if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
+							auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
+							if (auto it = FindSymbol(objectName); it.second && it.second->Type == SymbolType::Object) {
+								n->varType = static_cast<UserDefinedType*>(it.second->Data)->GetFieldType(data);
+							}
+						}
 
-					Op(StoreProperty);
-					In8 = First()->regTarget;
-					Out;
-					size_t index = 0;
-					auto it = std::find(CurrentFunction->PropertyTableSymbols.begin(), CurrentFunction->PropertyTableSymbols.end(), data);
-					if (it != CurrentFunction->PropertyTableSymbols.end()) {
-						index = it - CurrentFunction->PropertyTableSymbols.begin();
+						// @todo: Maybe type checking here?
+
+						Op(StoreProperty);
+						In8 = First()->regTarget;
+						Out;
+						size_t index = 0;
+						auto it = std::find(CurrentFunction->PropertyTableSymbols.begin(), CurrentFunction->PropertyTableSymbols.end(), data);
+						if (it != CurrentFunction->PropertyTableSymbols.end()) {
+							index = it - CurrentFunction->PropertyTableSymbols.begin();
+						}
+						else {
+							index = CurrentFunction->PropertyTableSymbols.size();
+							CurrentFunction->PropertyTableSymbols.push_back(data);
+						}
+
+						auto& arg = InstructionList.emplace_back();
+						arg.code = OpCodes::Noop;
+						arg.param = static_cast<uint16_t>(index);
+
+						return n->regTarget;
 					}
 					else {
-						index = CurrentFunction->PropertyTableSymbols.size();
-						CurrentFunction->PropertyTableSymbols.push_back(data);
+						Error("Unknown symbol: " + data.toString());
 					}
-
-					auto& arg = InstructionList.emplace_back();
-					arg.code = OpCodes::Noop;
-					arg.param = static_cast<uint16_t>(index);
-
-					return n->regTarget;
 				}
 				else {
 					Error("Unknown symbol: " + data.toString());
 				}
-			}
-			else {
-				Error("Unknown symbol: " + data.toString());
 			}
 		}
 		if (!symbol || (symbol && symbol->NeedsLoading)) {
@@ -1912,7 +1937,7 @@ void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 					FreeConstant(stmt);
 				}
 				catch (...) {
-					gError() << "Internal error occured!\n";
+					gError() << "Internal error occured!";
 				}
 			}
 			Instruction op;
@@ -1933,12 +1958,12 @@ void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 	}
 
 #ifdef DEBUG
-	gDebug() << "Function " << f->Name << '\n';
-	gLogger() << "----------------------------------\n";
+	gLogger() << "\n";
+	gDebug() << "Function " << f->Name;
+	gLogger() << "\n----------------------------------\n";
 	for (auto& in : InstructionList) {
 		printInstruction(in);
 	}
-	gLogger() << "\n\n";
 #endif // DEBUG
 
 	f->FunctionTable.resize(f->FunctionTableSymbols.size(), nullptr);

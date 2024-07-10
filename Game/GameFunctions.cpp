@@ -263,4 +263,4 @@ int random_in_range(int low, int high) {
 	return rand() % (high - low) + low;
 }
 
-EMI_REGISTER(Global, random, random_in_range);
+EMI_REGISTER(random, random_in_range);

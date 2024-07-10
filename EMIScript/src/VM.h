@@ -162,6 +162,5 @@ private:
 	std::vector<size_t> ReturnFreeList;
 
 	ankerl::unordered_dense::map<std::string, CompileUnit> Units;
-	ankerl::unordered_dense::set<Function*> ValidFunctions;
 	SymbolTable GlobalSymbols;
 };

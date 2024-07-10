@@ -19,7 +19,21 @@ bool EMI::_internal_register(_internal_function* func)
 	}
 	sym->Data = new FunctionSymbol{ FunctionType::Host, func, Variable{}, TypeFromValue(func->return_type) };
 
-	bool success = HostFunctions().AddName(func->name, sym);
+	TName fnname = toName(func->name);
+
+	TName space = fnname.Pop();
+	while (space.Length() > 0) {
+		auto res = HostFunctions().FindName(space);
+		if (!res.second && space.toString() != "Global") {
+			auto spaceSym = new Symbol();
+			spaceSym->setType(SymbolType::Namespace);
+			spaceSym->Data = new Namespace{space};
+			HostFunctions().AddName(space, spaceSym);
+		}
+		space = space.Pop();
+	}
+
+	bool success = HostFunctions().AddName(fnname, sym);
 	return success;
 }
 

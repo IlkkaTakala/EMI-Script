@@ -17,17 +17,17 @@ inline Logger& gLogger()
 
 inline Logger& gDebug()
 {
-	return gLogger() << LogLevel::Debug;
+	return gLogger() << '\n' << LogLevel::Debug;
 }
 
 inline Logger& gWarn()
 {
-	return gLogger() << LogLevel::Warning;
+	return gLogger() << '\n' << LogLevel::Warning;
 }
 
 inline Logger& gError()
 {
-	return gLogger() << LogLevel::Error;
+	return gLogger() << '\n' << LogLevel::Error;
 }
 
 #define X(x) x,

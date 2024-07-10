@@ -163,7 +163,9 @@ namespace EMI
 
 	CORE_API void UnregisterAllExternals();
 
-#define EMI_REGISTER(name, func) static inline bool _emi_reg_##name = EMI::RegisterFunction(#name, std::function{func});
+#define CONCAT(a, b, c) a##_##b##_##c
+#define EMI_MAKENAME(file, line) CONCAT(_emi_reg, file, line)
+#define EMI_REGISTER(name, func) static inline bool EMI_MAKENAME(__COUNTER__, __LINE__) = EMI::RegisterFunction(#name, std::function{func});
 
 	class CORE_API VMHandle
 	{

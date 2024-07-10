@@ -20,12 +20,13 @@ public:
 	TName(const char* text, TName parent = {});
 	~TName();
 
-	auto FullPath() const {
+	auto& FullPath() const {
 		return Path;
 	}
 	auto Length() const { return Size; }
 
 	TName Append(const TName& name, char off = 0) const;
+	TName Pop() const;
 	bool IsChildOf(const TName& name) const;
 
 	TName Get(char off);
@@ -74,6 +75,10 @@ inline Logger& operator<<(Logger& log, const TName& arg) {
 	log << arg.toString();
 	return log;
 }
+inline Logger& operator<<(Logger& log, const TNameQuery& arg) {
+	log << arg.GetTarget().toString();
+	return log;
+}
 
 template <>
 struct ankerl::unordered_dense::hash<TName> {
@@ -119,11 +124,15 @@ inline std::vector<std::string> splits(const std::string& s, char delim) {
 	return elems;
 }
 
-inline TName operator""_name(const char* src, size_t) {
+inline TName toName(const char* src) {
 	auto parts = splits(src, '.');
 	TName out;
 	for (auto p = parts.rbegin(); p != parts.rend(); p++) {
 		out = out.Append(p->c_str());
 	}
 	return out;
+}
+
+inline TName operator""_name(const char* src, size_t) {
+	return toName(src);
 }

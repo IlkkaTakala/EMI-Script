@@ -51,13 +51,13 @@ void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 	auto lastTime = std::filesystem::last_write_time(grammar);
 	size_t count = lastTime.time_since_epoch().count();
 	
-	gLogger() << LogLevel::Debug << "Initializing grammar...\n";
+	gDebug() << "Initializing grammar...";
 
 	if (count > CreateTime) {
 
 		std::fstream in(grammar, std::ios::in);
 		if (!in.is_open()) {
-			gLogger() << LogLevel::Debug << "No grammar found\n";
+			gDebug() << "No grammar found";
 			return;
 		}
 
@@ -109,7 +109,7 @@ void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 		}
 
 		if (Rules.size() != Data.size()) {
-			gLogger() << LogLevel::Debug << "Invalid grammar\n";
+			gDebug() << "Invalid grammar";
 			return;
 		}
 
@@ -119,7 +119,7 @@ void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 		Rules.clear();
 	}
 
-	gLogger()<< LogLevel::Debug << "Grammar compiled\n";
+	gDebug() << "Grammar compiled";
 #endif
 }
 
@@ -148,9 +148,9 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 {
 	auto fullPath = MakePath(options.Path);
 	if (options.Data.size() == 0) {
-		gDebug() << "Parsing file " << fullPath << '\n';
+		gDebug() << "Parsing file " << fullPath;
 		if (!std::filesystem::exists(options.Path)) {
-			gLogger() << LogLevel::Warning << fullPath << ": File not found\n";
+			gWarn() << fullPath << ": File not found";
 			options.CompileResult.set_value(false);
 			return;
 		}
@@ -158,16 +158,16 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	}
 	else {
 		if (options.Data.size() == 0) {
-			gError() << "No data given\n";
+			gError() << "No data given";
 			options.CompileResult.set_value(false);
 			return;
 		}
 	}
 
-	gDebug() << "Constructing AST\n";
+	gDebug() << "Constructing AST";
 	auto root = ConstructAST(options);
 	if (!root) {
-		gLogger() << LogLevel::Error << fullPath << ": Parse failed\n";
+		gError() << fullPath << ": Parse failed";
 		options.CompileResult.set_value(false);
 		return;
 	}
@@ -177,7 +177,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 #ifdef DEBUG
 	root->print("");
 #endif // DEBUG
-	gDebug() << "Walking AST\n";
+	gDebug() << "Walking AST";
 	ASTWalker ast(vm, root);
 	ast.Run();
 
@@ -186,7 +186,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 		options.CompileResult.set_value(true);
 	}
 	else {
-		gError() << "Errors present, compile failed: " << fullPath << "\n";
+		gError() << "Errors present, compile failed: " << fullPath;
 		options.CompileResult.set_value(false);
 	}
 }
@@ -206,7 +206,7 @@ Node* Parser::ConstructAST(CompileOptions& options)
 
 		}
 		else {
-			gLogger() << LogLevel::Warning << MakePath(options.Path) << ": Cannot open file\n";
+			gLogger() << LogLevel::Warning << MakePath(options.Path) << ": Cannot open file";
 		}
 	}
 

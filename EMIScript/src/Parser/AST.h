@@ -86,7 +86,7 @@ private:
 				return i;
 			}
 		}
-		gError() << "No free registers, this shouldn't happen\n";
+		gError() << "No free registers, this shouldn't happen";
 		HasError = true;
 		return 0;
 	}

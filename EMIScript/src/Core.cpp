@@ -6,8 +6,14 @@
 uint32_t Index = 0;
 ankerl::unordered_dense::map<uint32_t, VM*> VMs = {};
 
-std::unordered_set<std::string> Strings;
-std::mutex StringMutex;
+auto& Strings() {
+	static std::unordered_set<std::string> strs;
+	return strs;
+}
+auto& StrMutex() {
+	static std::mutex strmutex;
+	return strmutex;
+}
 
 uint32_t CreateVM()
 {
@@ -34,10 +40,10 @@ TName::TName() : Path({ 0 }), Size(0) {}
 TName::TName(const char* text, TName parent) : Path({ 0 }), Size(0)
 {
     if (text) {
-        std::unique_lock lk(StringMutex);
+        std::unique_lock lk(StrMutex());
 
-        if (auto it = Strings.find(text); it == Strings.end()) {
-            auto [str, success] = Strings.emplace(text);
+        if (auto it = Strings().find(text); it == Strings().end()) {
+            auto [str, success] = Strings().emplace(text);
             Path[0] = str->c_str();
             Size = 1;
         }
@@ -75,6 +81,15 @@ TName TName::Append(const TName& name, char off) const {
 	if (Size + name.Size > Path.size()) return out;
 	std::copy(name.Path.begin() + off, name.Path.begin() + name.Size, out.Path.begin() + Size);
 	out.Size += name.Size - off;
+	return out;
+}
+
+TName TName::Pop() const
+{
+	TName out;
+	if (Size == 0) return out;
+	std::copy(Path.begin() + 1, Path.begin() + Size, out.Path.begin());
+	out.Size = Size - 1;
 	return out;
 }
 
