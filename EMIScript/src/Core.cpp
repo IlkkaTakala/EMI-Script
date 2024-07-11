@@ -108,11 +108,11 @@ bool TName::IsChildOf(const TName& name) const {
 
 std::string TName::toString() const {
 	std::string out;
-	for (char i = 0; i < Size; i++) {
+	for (char i = Size - 1; i >= 0; i--) {
 		out += Path[i];
-		out += (i == Size - 1 ? "" : ".");
+		out += (i == 0 ? "" : ".");
 	}
-	return Path[0];
+	return out;
 }
 
 TName::operator const char* () const {

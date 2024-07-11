@@ -20,6 +20,11 @@ inline Logger& gDebug()
 	return gLogger() << '\n' << LogLevel::Debug;
 }
 
+inline Logger& gInfo()
+{
+	return gLogger() << '\n' << LogLevel::Info;
+}
+
 inline Logger& gWarn()
 {
 	return gLogger() << '\n' << LogLevel::Warning;

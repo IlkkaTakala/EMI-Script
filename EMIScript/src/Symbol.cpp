@@ -36,7 +36,8 @@ Symbol::~Symbol()
 	} break;
 	case SymbolType::Function: {
 		auto sym = static_cast<FunctionSymbol*>(Data);
-		delete static_cast<Function*>(sym->DirectPtr);
+		if (sym->Type == FunctionType::User)
+			delete static_cast<Function*>(sym->DirectPtr);
 		delete sym;
 	} break;
 	case SymbolType::Object: {

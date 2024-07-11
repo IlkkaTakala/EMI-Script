@@ -71,6 +71,17 @@ public:
 			}
 		}
 	}
+
+	void Clear() {
+		std::unique_lock lk(AllocLock);
+		for (auto ptr : PointerList) {
+			delete ptr;
+		}
+		PointerList.clear();
+		while (!FreeList.empty())
+			FreeList.pop();
+	}
+
 private:
 
 	std::mutex AllocLock;

@@ -47,7 +47,10 @@ void Parser::InitializeParser()
 void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 {
 #ifdef EMI_PARSE_GRAMMAR
-
+	if (!std::filesystem::exists(grammar)) {
+		gError() << "Grammar not found";
+		return;
+	}
 	auto lastTime = std::filesystem::last_write_time(grammar);
 	size_t count = lastTime.time_since_epoch().count();
 	
@@ -183,6 +186,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 
 	if (!ast.HasError) {
 		vm->AddNamespace(fullPath, ast.Global);
+		ast.Global.Table.clear();
 		options.CompileResult.set_value(true);
 	}
 	else {
@@ -351,8 +355,9 @@ Node* Parser::ConstructAST(CompileOptions& options)
 			const auto& c = lex.GetContext();
 			gError() << MakePath(options.Path) 
 				<< std::format(" ({}, {})", c.Row, c.Column) 
-				<< ": Critical error found '" << holder.data << "'. Expected one of: ";
+				<< ": Critical error found '" << holder.data << "'. ";
 #ifdef DEBUG
+			gLogger() << "Expected one of: ";
 			int idx = 0;
 			for (auto& state : ParseTable[currentState]) {
 				if (state.type != ERROR) {
@@ -361,7 +366,6 @@ Node* Parser::ConstructAST(CompileOptions& options)
 				idx++;
 			}
 #endif // DEBUG
-			gLogger() << '\n';
 			notDone = false;
 			break;
 		}

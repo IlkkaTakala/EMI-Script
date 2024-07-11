@@ -42,7 +42,6 @@ struct Symbol
 	SymbolFlags Flags = SymbolFlags::None;
 	VariableType VarType = VariableType::Undefined;
 	void* Data = nullptr;
-	bool Referenced = false;
 
 	void setType(SymbolType t);
 
@@ -51,13 +50,19 @@ struct Symbol
 
 struct CompileSymbol
 {
-	Symbol* Sym;
+	Symbol* Sym = nullptr;
 
+	bool Global = false;
 	bool Resolved = false;
-	uint8_t Register = 0;
 	bool NeedsLoading = false;
+	uint8_t Register = 0;
 	size_t StartLife = 0;
 	size_t EndLife = 0;
+
+	~CompileSymbol() {
+		if (!Global)
+			delete Sym;
+	}
 };
 
 struct FunctionSymbol

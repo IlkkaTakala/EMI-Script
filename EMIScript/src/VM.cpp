@@ -27,6 +27,12 @@ VM::VM()
 
 VM::~VM()
 {
+	while (!Units.empty()) {
+		RemoveUnit(Units.begin()->first);
+	}
+
+	GlobalSymbols.Table.clear();
+
 	CompileRunning = false;
 	VMRunning = false;
 	QueueNotify.notify_all();
@@ -37,6 +43,7 @@ VM::~VM()
 	for (auto& t : RunnerPool) {
 		t->SetRunning(false);
 	}
+	CallQueueNotify.notify_all();
 	for (auto& t : RunnerPool) {
 		t->Join();
 		delete t;
@@ -204,6 +211,7 @@ void VM::RemoveUnit(const std::string& unit)
 
 		for (auto& name : u.Symbols) {
 			Symbol* node = GlobalSymbols.Table[name];
+			if (!node) continue;
 			switch (node->Type)
 			{
 			case SymbolType::Object: {
@@ -252,8 +260,8 @@ void Runner::Join()
 }
 
 #define TARGET(Op) Op: 
-#define Error() gError() << current->FunctionPtr->Name << ":" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "> "
-#define Warn() gWarn() << current->FunctionPtr->Name << ":" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "> "
+#define Error() gError() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
+#define Warn() gWarn() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
 
 void Runner::Run()
 {

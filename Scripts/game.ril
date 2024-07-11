@@ -78,6 +78,7 @@ object Node{
 
 var Actions : array;
 var Target : Coord;
+var Exit : bool = true;
 
 const wall = 219;
 const wall2 = 178;
@@ -237,7 +238,7 @@ public def input() {
 	var topOffset = Top;
 	var leftOffset = Left;
 	
-	while (true) {
+	while (Exit) {
 		var inp : number = Input.WaitInput();
 		if (inp == -1) continue;
 		var in_x : number = Input.GetMouseX();
@@ -252,19 +253,28 @@ public def input() {
 			if (x >= 0 && x < x_size && y >= 0 && y < y_size) {
 				writepixel(in_x, in_y, empty, 0);
 			}
+		} else if (inp == 27) {
+			Exit = false;
 		}
 	}
 }
 
 public def renderFrame() {
-	while(true) {
+	while(Exit) {
 		render();
 		delay(50);
 	}
 }
 
+extend Test.Second:
+public def Tester() {
+	print("I was called");
+}
+
+extend Global:
+
 public def game() {
-	
+	Test.Second.Tester();
 	var charCoord : Coord;
 	var actions : array;
 	var actionIdx = 0;
@@ -280,7 +290,7 @@ public def game() {
 	var topOffset = Top;
 	var leftOffset = Left;
 	
-	setupconsole(2 * leftOffset + x_size, 2 * topOffset + y_size);
+	#setupconsole(2 * leftOffset + x_size, 2 * topOffset + y_size);
 	
 	for (x_size + 2) {
 		writepixel(leftOffset - 1 + _index_	, topOffset - 1				, wall, 0);
@@ -291,7 +301,7 @@ public def game() {
 		writepixel(leftOffset + x_size		, topOffset - 1 + _index_	, wall, 0);
 	}
 	
-	while(true) {
+	while(Exit) {
 		var size : number = Array.Size(actions);
 		if (actionIdx < size) {
 			writepixel(leftOffset + charCoord.x, topOffset + charCoord.y, empty, 0);
@@ -350,4 +360,6 @@ public def game() {
 			delay(50);
 		}
 	}
+	
+	return true;
 }

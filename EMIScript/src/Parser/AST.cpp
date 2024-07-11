@@ -435,7 +435,15 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n)
 
 ASTWalker::~ASTWalker()
 {
+	for (auto& n : Root->children) {
+		delete n->sym;
+	}
 	delete Root;
+
+	for (auto& [name, sym] : Global.Table) {
+		delete sym;
+	}
+	Global.Table.clear();
 }
 
 TName getFullId(Node* n) {
@@ -456,20 +464,29 @@ void ASTWalker::Run()
 		{
 		case Token::NamespaceDef:
 		{
-			CurrentNamespace = TName();
-			TName name(std::get<0>(c->data).c_str());
+			TName name = getFullId(c->children.front());
 			if (name.toString() != "Global") {
-				if (CurrentNamespace.Length() >= 5) {
+				if (CurrentNamespace.Length() + name.Length() >= 5) {
 					HasError = true;
 					gError() << "Maximum namespace depth reached with " << name << "!";
 				}
-				auto [n, sym] = FindOrCreateSymbol(name, SymbolType::Namespace);
-				if (sym && sym->Type == SymbolType::Namespace) {
-					CurrentNamespace = n;
-					Namespace* space = new Namespace();
-					space->Name = n;
-					sym->Data = space;
+
+				while (name.Length() > 0) {
+					if (name.toString() != "Global") {
+						auto [n, s] = FindSymbol(name);
+						if (!s) {
+							auto [nn, sym]= FindOrCreateSymbol(name, SymbolType::Namespace);
+							CurrentNamespace = nn;
+							Namespace* space = new Namespace();
+							space->Name = nn;
+							sym->Data = space;
+						}
+					}
+					name = name.Pop();
 				}
+			}
+			else {
+				CurrentNamespace = TName();
 			}
 		} break;
 		
@@ -566,9 +583,10 @@ void ASTWalker::Run()
 				functionSym->Type = FunctionType::User;
 				functionSym->DirectPtr = function;
 
-				function->Name = data;
+				function->Name = data.Append(CurrentNamespace);
 				function->IsPublic = c->type == Token::PublicFunctionDef || CurrentNamespace == TName();
 				c->sym = new CompileSymbol();
+				c->sym->Global = true;
 				c->sym->Sym = symbol;
 				functionList.emplace_back(c, function);
 				function->Types.resize(1);
@@ -631,7 +649,6 @@ void ASTWalker::Run()
 				}
 				Variable* variable = new Variable();
 
-				symbol->Referenced = false;
 				symbol->Data = variable;
 
 				switch (c->children[0]->type)
@@ -709,7 +726,7 @@ void ASTWalker::Run()
 
 	for (auto& [node, function] : functionList) {
 		HandleFunction(node, function, node->sym);
-		gDebug() << "Generated function '" << function->Name << "', used " << MaxRegister + 1 << " registers and " << function->Bytecode.size() << " instructions";
+		gInfo() << "Generated function '" << function->Name << "', used " << MaxRegister + 1 << " registers and " << function->Bytecode.size() << " instructions";
 
 	}
 }
@@ -999,8 +1016,10 @@ void ASTWalker::WalkLoad(Node* n)
 				if (fullname) {
 					symbol = FindOrCreateLocalSymbol(data);
 					symbol->Sym = globalSymbol;
+					symbol->Global = true;
 					if (globalSymbol->Type == SymbolType::Variable
-					 || globalSymbol->Type == SymbolType::Static)
+					 || globalSymbol->Type == SymbolType::Static
+					 || globalSymbol->Type == SymbolType::Function)
 						symbol->NeedsLoading = true;
 				}
 			}
@@ -1011,6 +1030,7 @@ void ASTWalker::WalkLoad(Node* n)
 						if (fullName) {
 							symbol = FindOrCreateLocalSymbol(data);
 							symbol->Sym = globalSymbol;
+							symbol->Global = true;
 							symbol->EndLife = InstructionList.size();
 						}
 					}
@@ -1732,6 +1752,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 				if (fullname) {
 					symbol = FindOrCreateLocalSymbol(data);
 					symbol->Sym = globalSymbol;
+					symbol->Global = true;
 					if (globalSymbol->Type != SymbolType::Namespace)
 						symbol->NeedsLoading = true;
 				}
@@ -1743,6 +1764,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 						if (fullName) {
 							symbol = FindOrCreateLocalSymbol(data);
 							symbol->Sym = globalSymbol;
+							symbol->Global = true;
 							symbol->EndLife = InstructionList.size();
 						}
 					}
@@ -1958,8 +1980,7 @@ void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 	}
 
 #ifdef DEBUG
-	gLogger() << "\n";
-	gDebug() << "Function " << f->Name;
+	gDebug() << "Function " << f->Name.toString();
 	gLogger() << "\n----------------------------------\n";
 	for (auto& in : InstructionList) {
 		printInstruction(in);
