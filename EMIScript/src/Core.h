@@ -12,6 +12,7 @@ class VM* GetVM(uint32_t handle);
 
 class TName
 {
+private:
 	std::array<const char*, 5> Path;
 	char Size;
 
@@ -24,9 +25,11 @@ public:
 		return Path;
 	}
 	auto Length() const { return Size; }
+	constexpr static size_t MaxLength() { return 5; }
 
 	TName Append(const TName& name, char off = 0) const;
 	TName Pop() const;
+	TName PopLast() const;
 	bool IsChildOf(const TName& name) const;
 
 	TName Get(char off);

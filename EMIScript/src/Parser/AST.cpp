@@ -466,24 +466,29 @@ void ASTWalker::Run()
 		{
 			TName name = getFullId(c->children.front());
 			if (name.toString() != "Global") {
-				if (CurrentNamespace.Length() + name.Length() >= 5) {
-					HasError = true;
-					gError() << "Maximum namespace depth reached with " << name << "!";
+
+				if (name.Get(name.Length() - 1).toString() == "Global") {
+					CurrentNamespace = TName();
+					name = name.PopLast();
 				}
 
-				while (name.Length() > 0) {
-					if (name.toString() != "Global") {
-						auto [n, s] = FindSymbol(name);
-						if (!s) {
-							auto [nn, sym]= FindOrCreateSymbol(name, SymbolType::Namespace);
-							CurrentNamespace = nn;
-							Namespace* space = new Namespace();
-							space->Name = nn;
-							sym->Data = space;
-						}
-					}
-					name = name.Pop();
+				if (CurrentNamespace.Length() + name.Length() > TName::MaxLength() - 1) {
+					HasError = true;
+					gError() << "Maximum namespace depth reached with " << name.Append(CurrentNamespace) << "!";
 				}
+
+				TName temp(name);
+				while (temp.Length() > 0) {
+					auto [n, s] = FindSymbol(temp);
+					if (!s) {
+						auto [nn, sym]= FindOrCreateSymbol(temp, SymbolType::Namespace);
+						Namespace* space = new Namespace();
+						space->Name = nn;
+						sym->Data = space;
+					}
+					temp= temp.Pop();
+				}
+				CurrentNamespace = name.Append(CurrentNamespace);
 			}
 			else {
 				CurrentNamespace = TName();
@@ -1026,12 +1031,16 @@ void ASTWalker::WalkLoad(Node* n)
 			else {
 				if (First()->sym) {
 					if (First()->sym->Sym->Type == SymbolType::Namespace) {
-						auto [fullName, globalSymbol] = FindSymbol(data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name));
+						TName full = data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name);
+						auto [fullName, globalSymbol] = FindSymbol(full);
 						if (fullName) {
-							symbol = FindOrCreateLocalSymbol(data);
+							symbol = FindOrCreateLocalSymbol(full);
 							symbol->Sym = globalSymbol;
 							symbol->Global = true;
 							symbol->EndLife = InstructionList.size();
+						}
+						else {
+							gWarn() << "Symbol not found during compile: " << data << ". Check script compile order.";
 						}
 					}
 					else if (First()->sym->Sym->Type == SymbolType::Variable) {
@@ -1654,6 +1663,9 @@ void ASTWalker::WalkLoad(Node* n)
 				Error("Function has no type");
 				break;
 			}
+			if (First()->instruction != 0 && InstructionList[First()->instruction].code == OpCodes::LoadSymbol) {
+				InstructionList[First()->instruction].data = 0;
+			}
 			NodeType = fn->Return;
 		}
 		else {
@@ -1753,16 +1765,18 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 					symbol = FindOrCreateLocalSymbol(data);
 					symbol->Sym = globalSymbol;
 					symbol->Global = true;
-					if (globalSymbol->Type != SymbolType::Namespace)
+					if (globalSymbol->Type == SymbolType::Variable
+					 || globalSymbol->Type == SymbolType::Static)
 						symbol->NeedsLoading = true;
 				}
 			}
 			else {
 				if (First()->sym) {
 					if (First()->sym->Sym->Type == SymbolType::Namespace) {
-						auto [fullName, globalSymbol] = FindSymbol(data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name));
+						TName full = data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name);
+						auto [fullName, globalSymbol] = FindSymbol(full);
 						if (fullName) {
-							symbol = FindOrCreateLocalSymbol(data);
+							symbol = FindOrCreateLocalSymbol(full);
 							symbol->Sym = globalSymbol;
 							symbol->Global = true;
 							symbol->EndLife = InstructionList.size();

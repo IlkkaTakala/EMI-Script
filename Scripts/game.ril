@@ -267,6 +267,8 @@ public def renderFrame() {
 }
 
 extend Test.Second:
+extend Some:
+extend Out.Last:
 public def Tester() {
 	print("I was called");
 }

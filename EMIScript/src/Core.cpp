@@ -93,6 +93,14 @@ TName TName::Pop() const
 	return out;
 }
 
+TName TName::PopLast() const
+{
+	TName out = *this;
+	if (Size == 0) return out;
+	out.Path[--out.Size] = nullptr;
+	return out;
+}
+
 bool TName::IsChildOf(const TName& name) const {
 	if (Path[Size] == name.Path[name.Size]) {
 		int j = Size;
