@@ -44,14 +44,14 @@ public:
 	UserDefinedType() {
 		Type = VariableType::Object;
 	}
-	void AddField(const std::string& name, Variable var, const Symbol& flags);
-	VariableType GetFieldType(const std::string& name) const;
+	void AddField(const TName& name, Variable var, const Symbol& flags);
+	VariableType GetFieldType(const TName& name) const;
 
 	VariableType Type;
 private:
 	friend class ObjectManager;
 
-	ankerl::unordered_dense::map<std::string, Symbol> FieldNames;
+	ankerl::unordered_dense::map<TName, Symbol> FieldNames;
 	std::vector<Variable> DefaultFields;
 };
 
@@ -60,19 +60,19 @@ class ObjectManager
 
 public:
 	ObjectManager() {}
-	VariableType AddType(const std::string& name, const UserDefinedType& obj);
-	void RemoveType(const std::string& name);
+	VariableType AddType(const TName& name, const UserDefinedType& obj);
+	void RemoveType(const TName& name);
 
 	Variable Make(VariableType type) const ;
 
-	bool GetType(UserDefinedType*& type, const std::string& name);
+	bool GetType(UserDefinedType*& type, const TName& name);
 
-	bool GetPropertyIndex(uint16_t& out, const std::string& name, VariableType type);
-	bool GetPropertySymbol(Symbol*& symbol, const std::string& name, VariableType type);
+	bool GetPropertyIndex(uint16_t& out, const TName& name, VariableType type);
+	bool GetPropertySymbol(Symbol*& symbol, const TName& name, VariableType type);
 
 private:
 	ankerl::unordered_dense::map<VariableType, UserDefinedType> BaseTypes;
-	ankerl::unordered_dense::map<std::string, VariableType> NameToType;
+	ankerl::unordered_dense::map<TName, VariableType> NameToType;
 	uint32_t TypeCounter = (uint32_t)VariableType::Object;
 };
 

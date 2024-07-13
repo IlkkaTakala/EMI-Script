@@ -247,20 +247,20 @@ void write_text_centered(int x, int y, const char* text, int color = 0)
 
 }
 
-EMI_REGISTER(Game, GetPixel, getPixel);
-EMI_REGISTER(Input, WaitInput, wait_for_input);
-EMI_REGISTER(Input, IsKeyDown, is_key_down);
-EMI_REGISTER(Input, IsMouseButtonDown, is_mouse_key_down);
-EMI_REGISTER(Input, GetMouseX, get_mouse_x);
-EMI_REGISTER(Input, GetMouseY, get_mouse_y);
-EMI_REGISTER(Global, setupconsole, setup_console);
-EMI_REGISTER(Global, writepixel, write_pixel);
-EMI_REGISTER(Global, writetext, write_text);
-EMI_REGISTER(Global, writetextCentered, write_text_centered);
-EMI_REGISTER(Global, render, render_frame);
+EMI_REGISTER(Game.GetPixel, getPixel);
+EMI_REGISTER(Input.WaitInput, wait_for_input);
+EMI_REGISTER(Input.IsKeyDown, is_key_down);
+EMI_REGISTER(Input.IsMouseButtonDown, is_mouse_key_down);
+EMI_REGISTER(Input.GetMouseX, get_mouse_x);
+EMI_REGISTER(Input.GetMouseY, get_mouse_y);
+EMI_REGISTER(setupconsole, setup_console);
+EMI_REGISTER(writepixel, write_pixel);
+EMI_REGISTER(writetext, write_text);
+EMI_REGISTER(writetextCentered, write_text_centered);
+EMI_REGISTER(render, render_frame);
 
 int random_in_range(int low, int high) {
 	return rand() % (high - low) + low;
 }
 
-EMI_REGISTER(Global, random, random_in_range);
+EMI_REGISTER(random, random_in_range);

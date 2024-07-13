@@ -1,51 +1,64 @@
 #include "EMI/EMI.h"
 #include "Core.h"
 #include "VM.h"
+#include "Helpers.h"
 
 using namespace EMI;
 
 bool EMI::_internal_register(_internal_function* func)
 {
-	if (ValidHostFunctions().find((uint64_t)func) != ValidHostFunctions().end()) return false;
 	std::string name;
-	if (func->space) {
-		name = std::string(func->space) + "." + func->name;
+	name = func->name;
+	auto sym = new Symbol();
+	sym->Type = SymbolType::Function;
+	sym->VarType = VariableType::Function;
+	std::vector<VariableType> types;
+	types.resize(func->arg_count);
+	for (int i = 0; i < types.size(); i++) {
+		types[i] = TypeFromValue(func->arg_types[i]);
 	}
-	else {
-		name = func->name;
+	sym->Data = new FunctionSymbol{ FunctionType::Host, func, Variable{}, TypeFromValue(func->return_type) };
+
+	TName fnname = toName(func->name);
+
+	TName space = fnname.Pop();
+	while (space.Length() > 0) {
+		auto res = HostFunctions().FindName(space);
+		if (!res.second && space.toString() != "Global") {
+			auto spaceSym = new Symbol();
+			spaceSym->setType(SymbolType::Namespace);
+			spaceSym->Data = new Namespace{space};
+			HostFunctions().AddName(space, spaceSym);
+		}
+		space = space.Pop();
 	}
-	auto& function = HostFunctions()[name];
-	if (function) return false;
-	function = func;
-	ValidHostFunctions().emplace((uint64_t)func);
-	return true;
+
+	bool success = HostFunctions().AddName(fnname, sym);
+	return success;
 }
 
-bool EMI::_internal_unregister(const char* space, const char* name)
+bool EMI::_internal_unregister(const char* name)
 {
 	auto& f = HostFunctions();
-	std::string strname;
-	if (space) {
-		strname = std::string(space) + "." + name;
+	std::string strname = name;
+	auto parts = splits(strname, '.');
+	TName out;
+	for (auto p = parts.rbegin(); p != parts.rend(); p++) {
+		out = out.Append(p->c_str());
 	}
-	else {
-		strname = name;
-	}
-	if (auto it = f.find(strname); it != f.end()) {
-		ValidHostFunctions().erase((uint64_t)it->second);
-		delete it->second;
-		f.erase(it);
+	if (auto it = f.FindName(out); it.first) {
+		delete it.second;
+		f.Table.erase(it.first);
 	}
 	return false;
 }
 
 CORE_API void EMI::UnregisterAllExternals()
 {
-	ValidHostFunctions().clear();
-	for (auto& f : HostFunctions()) {
+	for (auto& f : HostFunctions().Table) {
 		delete f.second;
 	}
-	HostFunctions().clear();
+	HostFunctions().Table.clear();
 }
 
 VMHandle EMI::CreateEnvironment()

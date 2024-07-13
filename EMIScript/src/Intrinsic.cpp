@@ -178,51 +178,28 @@ void mathsqrt(Variable& out, Variable* args, size_t argc) {
 
 
 
-
+#define FUNC(named, fn, ret) { named##_name, new Symbol{ SymbolType::Function, SymbolFlags::Typed, VariableType::Function, new FunctionSymbol{FunctionType::Intrinsic, fn, Variable{},VariableType::ret, 
+#define NAMESPACE(named) { named##_name, new Symbol{ SymbolType::Namespace, SymbolFlags::None, VariableType::Undefined, new Namespace{ named##_name } } },
 
 // @todo: Something better for these intrinsic definitions
-ankerl::unordered_dense::map<std::string, IntrinsicPtr> IntrinsicFunctions {
-	{ "print", print },
-	{ "println", printLn },
-	{ "delay", delay },
-	{ "Array.Size", arraySize },
-	{ "Array.Resize", arrayResize },
-	{ "Array.Push", arrayPush },
-	{ "Array.PushFront", arrayPushFront },
-	{ "Array.PushUnique", arrayPushUnique },
-	{ "Array.Pop", arrayPop },
-	{ "Array.Remove", arrayRemove },
-	{ "Array.RemoveIndex", arrayRemoveIdx },
-	{ "Array.Clear", arrayClear },
-	{ "Array.Find", arrayFind },
-	{ "Math.Sqrt", mathsqrt },
-	{ "Copy", copy },
+SymbolTable IntrinsicFunctions = { {
+	FUNC("print", print,						Undefined)		{} }}},
+	FUNC("println", printLn,					Undefined)		{} }}},
+	FUNC("delay", delay,						Undefined)		{ VariableType::Number } }}},
+	NAMESPACE("Array")
+	FUNC("Array.Size", arraySize,				Number)			{ VariableType::Array } }}},
+	FUNC("Array.Resize", arrayResize,			Number)			{ VariableType::Array, VariableType::Number, VariableType::Undefined } }}},
+	FUNC("Array.Push", arrayPush,				Undefined)		{ VariableType::Array, VariableType::Undefined } }}},
+	FUNC("Array.PushFront", arrayPushFront,		Undefined)		{ VariableType::Array, VariableType::Undefined } }}},
+	FUNC("Array.PushUnique", arrayPushUnique,	Number)			{ VariableType::Array, VariableType::Undefined } }}},
+	FUNC("Array.Pop", arrayPop,					Undefined)		{ VariableType::Array } }}},
+	FUNC("Array.Remove", arrayRemove,			Undefined)		{ VariableType::Array, VariableType::Undefined } }}},
+	FUNC("Array.RemoveIndex", arrayRemoveIdx,	Undefined)		{ VariableType::Array, VariableType::Number } }}},
+	FUNC("Array.Clear", arrayClear,				Undefined)		{ VariableType::Array } }}},
+	FUNC("Array.Find", arrayFind,				Number)			{ VariableType::Array } }}},
+	NAMESPACE("Math")
+	FUNC("Math.Sqrt", mathsqrt,					Number)			{ VariableType::Number } }}},
+	FUNC("Copy", copy,							Undefined)		{ VariableType::Undefined } }}},
+}};
 
-};
-
-ankerl::unordered_dense::map<std::string, std::vector<VariableType>> IntrinsicFunctionTypes {
-	{ "print", { VariableType::Undefined } },
-	{ "println", { VariableType::Undefined } },
-	{ "delay", { VariableType::Undefined, VariableType::Number } },
-	{ "Array.Size", { VariableType::Number, VariableType::Array } },
-	{ "Array.Resize", { VariableType::Number, VariableType::Array, VariableType::Number, VariableType::Undefined } },
-	{ "Array.Push", { VariableType::Undefined, VariableType::Array, VariableType::Undefined } },
-	{ "Array.PushFront", { VariableType::Undefined, VariableType::Array, VariableType::Undefined } },
-	{ "Array.PushUnique", { VariableType::Number, VariableType::Array, VariableType::Undefined } },
-	{ "Array.Pop", { VariableType::Undefined, VariableType::Array} },
-	{ "Array.Remove", { VariableType::Undefined, VariableType::Array, VariableType::Undefined } },
-	{ "Array.RemoveIndex", { VariableType::Undefined, VariableType::Array, VariableType::Number } },
-	{ "Array.Clear", { VariableType::Undefined, VariableType::Array } },
-	{ "Array.Find", { VariableType::Number, VariableType::Array } },
-	{ "Math.Sqrt", { VariableType::Number, VariableType::Number } },
-	{ "Copy", { VariableType::Undefined, VariableType::Undefined } },
-};
-
-std::vector<std::string> DefaultNamespaces = {
-	"Array",
-	"System",
-	"String",
-	"Function",
-	"Core",
-	"Math",
-};
+#undef FUNC

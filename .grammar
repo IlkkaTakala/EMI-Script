@@ -29,7 +29,7 @@ OExpr None
 
 FunctionDef Definition Id Lparenthesis MFunctionVar Rparenthesis OTypename Scope
 PublicFunctionDef Public FunctionDef
-NamespaceDef Extend Id Colon
+NamespaceDef Extend Identifier Colon
 MFunctionVar FunctionVar Comma MFunctionVar
 MFunctionVar FunctionVar
 MFunctionVar None

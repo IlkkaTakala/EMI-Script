@@ -4,13 +4,14 @@
 int main()
 {
 	srand(time(0));
+	printf("Waiting for compile...\n");
 	auto vm = EMI::CreateEnvironment();
-	EMI::SetLogLevel(4);
+	vm.ReinitializeGrammar("../../.grammar");
+	EMI::SetLogLevel(1);
 	auto result = vm.CompileScript("Scripts/game.ril");
 
-	printf("Waiting for compile...\n");
 	result.wait();
-	printf("Compile done\n");
+	printf("\nCompile done\n");
 	
 	EMI::FunctionHandle game = vm.GetFunctionHandle("game");
 	EMI::FunctionHandle input = vm.GetFunctionHandle("input");

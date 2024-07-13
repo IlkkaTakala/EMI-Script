@@ -2,6 +2,7 @@
 #include <variant>
 #include "ParseHelper.h"
 #include "Namespace.h"
+#include "Function.h"
 
 using NodeDataType = std::variant<std::string, double, bool>;
 
@@ -29,7 +30,7 @@ public:
 	size_t depth;
 	NodeDataType data;
 	std::vector<Node*> children;
-	Symbol* sym;
+	CompileSymbol* sym;
 	size_t instruction;
 
 	Variable ToVariable() const;
@@ -46,27 +47,30 @@ public:
 	ASTWalker(VM*, Node*);
 	~ASTWalker();
 	void Run();
-	ankerl::unordered_dense::map<std::string, Namespace> Namespaces;
+	SymbolTable Global;
 	bool HasError;
 private:
 	void WalkLoad(Node*);
 	uint8_t WalkStore(Node*);
-	Symbol* FindSymbol(const std::string& name, const std::string& space, bool& isNamespace);
+	CompileSymbol* FindLocalSymbol(const TName& name);
+	CompileSymbol* FindOrCreateLocalSymbol(const TName& name);
+	std::pair<TName, Symbol*> FindSymbol(const TNameQuery& name);
+	std::pair<TName, Symbol*> FindSymbol(const TName& name);
+	std::pair<TName, Symbol*> FindOrCreateSymbol(const TName& name, SymbolType type = SymbolType::None);
 
-	void HandleFunction(Node* n, Function* f, Symbol* s);
+	void HandleFunction(Node* n, Function* f, CompileSymbol* s);
 
 	bool HasDebug;
 	VM* Vm;
 	Node* Root;
-	Namespace* CurrentNamespace;
-
+	TName CurrentNamespace;
 
 	// Function parsing
 	Scoped* CurrentScope;
 	Function* CurrentFunction;
 	ankerl::unordered_dense::set<std::string> StringList;
 	std::vector<Instruction> InstructionList;
-	std::array<bool, 255> Registers;
+	std::array<bool, 256> Registers;
 	uint8_t MaxRegister;
 
 	void InitRegisters() {
@@ -82,14 +86,14 @@ private:
 				return i;
 			}
 		}
-		gError() << "No free registers, this shouldn't happen\n";
+		gError() << "No free registers, this shouldn't happen";
 		HasError = true;
 		return 0;
 	}
 
 	uint8_t GetLastFree() {
 		uint8_t idx = 254;
-		for (uint8_t i = 0; i < 255; i++) {
+		for (uint8_t i = 0; i < 254; i++) {
 			if (Registers[i]) {
 				idx = i;
 			}

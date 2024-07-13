@@ -117,13 +117,13 @@ Token Lexer::Analyse(std::string_view& Data)
 			switch (*(ptr))
 			{
 			case '}': {
-				if (*(ptr + 1) == '´') {
+				if (*(ptr + 1) == '`') {
 					InString = false;
 				}
 				else Current.Advance();
 			} break;
 
-			case '´': {
+			case '`': {
 				if (*(ptr + 1) == '{') {
 					InString = false;
 				}
@@ -141,12 +141,6 @@ Token Lexer::Analyse(std::string_view& Data)
 		}
 
 		token = Token::Literal;
-		//if (*(ptr + 1) == '´' && *(ptr + 2) == '{') {
-		//	endOffset = 0;
-		//}
-		//else {
-		//	endOffset = 1;
-		//}
 		InString = false;
 
 		Data = std::string_view(start, ptr - start - endOffset);
@@ -189,14 +183,14 @@ Token Lexer::Analyse(std::string_view& Data)
 		case ')': { token = Token::Rparenthesis; } break;
 		case '{': { token = Token::Lcurly; } break;
 		case '}': { 
-			if (*(ptr + 1) == '´') {
+			if (*(ptr + 1) == '`') {
 				token = Token::StrDelimiterR; 
 				Current.Advance(); 
 				InString = true;
 			}
 			else token = Token::Rcurly; 
 		} break;
-		case '´': {
+		case '`': {
 			if (*(ptr + 1) == '{') {
 				token = Token::StrDelimiterL;
 				Current.Advance();

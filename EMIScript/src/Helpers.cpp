@@ -262,7 +262,7 @@ String* toString(const Variable& in)
 	}
 	case VariableType::Boolean: return alloc->Make(in.as<bool>() ? "true" : "false");
 	case VariableType::String: return in.as<String>();
-	case VariableType::Function: return alloc->Make(in.as<FunctionObject>()->Name.c_str());
+	case VariableType::Function: return alloc->Make((const char*)in.as<FunctionObject>()->Name);
 	case VariableType::Array: {
 		std::string out = "[ ";
 		size_t index = 0;
@@ -291,7 +291,7 @@ std::string toStdString(const Variable& in)
 	}
 	case VariableType::Boolean: return in.as<bool>() ? "true" : "false";
 	case VariableType::String: return in.as<String>()->data();
-	case VariableType::Function: return in.as<FunctionObject>()->Name;
+	case VariableType::Function: return in.as<FunctionObject>()->Name.toString();
 	case VariableType::Array: {
 		std::string out = "[ ";
 		size_t index = 0; 

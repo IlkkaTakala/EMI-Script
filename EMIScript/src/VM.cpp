@@ -13,27 +13,8 @@ VM::VM()
 	auto counter = std::thread::hardware_concurrency();
 	CompileRunning = true;
 
-	for (auto& space : DefaultNamespaces) {
-		auto [it, success] = Namespaces.emplace(space, Namespace{});
-		auto sym = new Symbol();
-		sym->setType(SymbolType::Namespace);
-		sym->Resolved = true;
-		it->second.Sym = sym;
-	}
-	
-	// @todo: Fix this to be more dynamic
-	for (auto& [name, fn]: HostFunctions()) {
-		if (fn->space == nullptr) continue;
-		std::string nsname = fn->space;
-		auto it = Namespaces.find(nsname);
-		if (it == Namespaces.end()) {
-			auto [ns, success] = Namespaces.emplace(nsname, Namespace{});
-			auto sym = new Symbol();
-			sym->setType(SymbolType::Namespace);
-			sym->Resolved = true;
-			ns->second.Sym = sym;
-		}
-	}
+	GlobalSymbols.Table.insert(IntrinsicFunctions.Table.begin(), IntrinsicFunctions.Table.end());
+	GlobalSymbols.Table.insert(HostFunctions().Table.begin(), HostFunctions().Table.end());
 
 	VMRunning = true;
 	for (uint32_t i = 0; i < counter / 2; i++) {
@@ -46,6 +27,12 @@ VM::VM()
 
 VM::~VM()
 {
+	while (!Units.empty()) {
+		RemoveUnit(Units.begin()->first);
+	}
+
+	GlobalSymbols.Table.clear();
+
 	CompileRunning = false;
 	VMRunning = false;
 	QueueNotify.notify_all();
@@ -56,6 +43,7 @@ VM::~VM()
 	for (auto& t : RunnerPool) {
 		t->SetRunning(false);
 	}
+	CallQueueNotify.notify_all();
 	for (auto& t : RunnerPool) {
 		t->Join();
 		delete t;
@@ -105,16 +93,22 @@ void VM::Interrupt()
 
 }
 
-void* VM::GetFunctionID(const std::string& name)
+void* VM::GetFunctionID(const std::string& id)
 {
-	if (name.find('.') == std::string::npos) {
-		if (auto it = NameToFunctionMap.find("Global." + name); it != NameToFunctionMap.end()) {
-			return it->second;
+	TName name(id.c_str());
+	auto [fullName, symbol] = GlobalSymbols.FindName(name);
+	if (symbol && symbol->Type == SymbolType::Function) {
+		auto fn = static_cast<FunctionSymbol*>(symbol->Data);
+		if (fn->Type != FunctionType::User) {
+			gWarn() << "Symbol is not a script function";
+			return 0;
 		}
-		return 0;
-	}
-	if (auto it = NameToFunctionMap.find(name); it != NameToFunctionMap.end()) {
-		return it->second;
+		if (!static_cast<Function*>(fn->DirectPtr)->IsPublic) {
+			gWarn() << "Function is private";
+			return 0;
+		}
+
+		return fn->DirectPtr;
 	}
 	return 0;
 }
@@ -122,14 +116,8 @@ void* VM::GetFunctionID(const std::string& name)
 size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& args)
 {
 	Function* fn = (Function*)(void*)handle;
-	auto it = ValidFunctions.find(fn);
-	if (it == ValidFunctions.end()) {
-		gWarn() << "Invalid function handle\n";
-		return (size_t)-1;
-	}
-
-	if (!fn->IsPublic) {
-		gWarn() << "Function is private\n";
+	if (!fn) {
+		gWarn() << "Invalid function handle";
 		return (size_t)-1;
 	}
 
@@ -187,61 +175,32 @@ bool VM::WaitForResult(void* ptr)
 	return false;
 }
 
-Symbol* VM::FindSymbol(const std::string& name, const std::string& space, bool& isNamespace)
+std::pair<TName, Symbol*> VM::FindSymbol(const TNameQuery& name)
 {
-	if (auto it = Namespaces.find(name); it != Namespaces.end()) {
-		isNamespace = true;
-		return it->second.Sym;
-	}
-	isNamespace = false;
-	if (auto it = Namespaces.find(space); it != Namespaces.end()) {
-		auto res = it->second.FindSymbol(name);
-		if (res) return res;
-	}
-	auto res = Namespaces["Global"].FindSymbol(name);
-	if (res) return res;
-
-	return nullptr;
+	return GlobalSymbols.FindName(name);
 }
 
-void VM::AddNamespace(const std::string& path, ankerl::unordered_dense::map<std::string, Namespace>& space)
+void VM::AddNamespace(const std::string& path, const SymbolTable& space)
 {
 	std::unique_lock lk(MergeMutex);
-	for (auto& [name, s] : space) {
-		for (auto& [oname, obj] : s.Objects) {
-			std::string fullobjname;
-			if (name != "Global") {
-				fullobjname = name + '.' + oname;
-			}
-			else {
-				fullobjname = oname;
-			}
-			auto type = GetManager().AddType(fullobjname, obj);
-			s.ObjectTypes[oname] = type;
-			Units[path].Objects.push_back({ name, oname });
-		}
-		s.Objects.clear();
-		for (auto& [fname, func] : s.Functions) {
-			auto full = name + '.' + fname;
-			if (auto it = NameToFunctionMap.find(full); it != NameToFunctionMap.end()) {
-				gWarn() << "Multiple definitions for function " << full << '\n';
-			}
-			NameToFunctionMap[full] = func;
-			ValidFunctions.emplace(func);
-			Units[path].Functions.push_back({ name, fname });
-		}
-		for (auto& [vname, var] : s.Variables) {
-			Units[path].Variables.push_back({ name, vname });
-			GlobalVariables.emplace(name + '.' + vname, var);
-		}
+	Units[path].Symbols.reserve(space.Table.size());
+	for (auto& [name, s] : space.Table) {
+		Units[path].Symbols.push_back(name);
+		if (!s) continue;
 
-		if (auto it = Namespaces.find(name); it != Namespaces.end()) {
-			it->second.merge(s);
-		}
-		else {
-			Namespaces[name] = s;
+		switch (s->Type)
+		{
+		case SymbolType::Object: {
+			auto type = GetManager().AddType(name, *static_cast<UserDefinedType*>(s->Data));
+			s->VarType = type;
+			static_cast<UserDefinedType*>(s->Data)->Type = type;
+		} break;
+
+		default:
+			break;
 		}
 	}
+	GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
 }
 
 void VM::RemoveUnit(const std::string& unit)
@@ -249,32 +208,22 @@ void VM::RemoveUnit(const std::string& unit)
 	std::unique_lock lk(MergeMutex);
 	if (auto it = Units.find(unit); it != Units.end()) {
 		auto& u = it->second;
-		for (auto& [name, function] : u.Functions) {
-			Namespace& n = Namespaces[name];
 
-			n.Symbols.erase(function);
-			auto ptr = n.Functions[function.c_str()];
-			ValidFunctions.erase(ptr);
-			delete ptr;
-			n.Functions.erase(function.c_str());
-			auto full = name + '.' + function;
-			NameToFunctionMap.erase(full);
-			GlobalVariables.erase(full);
+		for (auto& name : u.Symbols) {
+			Symbol* node = GlobalSymbols.Table[name];
+			if (!node) continue;
+			switch (node->Type)
+			{
+			case SymbolType::Object: {
+				GetManager().RemoveType(name);
+			} break;
+			default:
+				break;
+			}
+			delete node;
+			GlobalSymbols.Table.erase(name);
 		}
-		for (auto& [name, obj] : u.Objects) {
-			GetManager().RemoveType(name + '.' + obj);
-			Namespace& n = Namespaces[name];
-			n.Objects.erase(obj);
-			n.ObjectTypes.erase(obj);
-			n.Symbols.erase(obj);
-		}
-		for (auto& [name, var] : u.Variables) {
-			Namespace& n = Namespaces[name];
-			n.Variables.erase(var);
-			n.Symbols.erase(var);
-			GlobalVariables.erase(name + '.' + var);
-		}
-		
+
 		Units.erase(unit);
 	}
 }
@@ -311,6 +260,8 @@ void Runner::Join()
 }
 
 #define TARGET(Op) Op: 
+#define Error() gError() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
+#define Warn() gWarn() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
 
 void Runner::Run()
 {
@@ -385,7 +336,7 @@ void Runner::Run()
 					auto& cmp = Registers[byte.in2];
 
 					if (index.getType() != VariableType::Number) {
-						gError() << "Index type does not match the expression\n";
+						Error() << "Index type does not match the expression";
 						goto start;
 					}
 					index = index.as<double>() + 1.0;
@@ -416,7 +367,7 @@ void Runner::Run()
 					auto& cmp = Registers[byte.in2];
 
 					if (index.getType() != VariableType::Number) {
-						gError() << "Index type does not match the expression\n";
+						Error() << "Index type does not match the expression";
 						goto start;
 					}
 					index = index.as<double>() + 1.0;
@@ -461,57 +412,30 @@ void Runner::Run()
 					auto& var = current->FunctionPtr->GlobalTable[byte.param];
 					if (var == nullptr) {
 						auto& name = current->FunctionPtr->GlobalTableSymbols[byte.param];
-						if (auto idx = Owner->GlobalVariables.find(name); idx != Owner->GlobalVariables.end()) {
-							var = &idx->second;
-						}
-						else if (auto intrfunc = IntrinsicFunctions.find(name); intrfunc != IntrinsicFunctions.end()) {
-							auto func = FunctionObject::GetAllocator()->Make(FunctionType::Intrinsic, name);
-							auto& v = Owner->GlobalVariables[name] = func;
-							func->Callee = intrfunc->second;
-							var = &v;
-						}
-						else if (auto hostfunc = HostFunctions().find(name); hostfunc != HostFunctions().end()) {
-							auto func = FunctionObject::GetAllocator()->Make(FunctionType::Host, name);
-							auto& v = Owner->GlobalVariables[name] = func;
-							func->Callee = hostfunc->second;
-							var = &v;
-						}
-						else if (auto userfunc = Owner->NameToFunctionMap.find(name); userfunc != Owner->NameToFunctionMap.end()) {
-							auto func = FunctionObject::GetAllocator()->Make(FunctionType::User, name);
-							auto& v = Owner->GlobalVariables[name] = func;
-							func->Callee = userfunc->second;
-							var = &v;
+						auto res = Owner->GlobalSymbols.FindName(name);
+						if (res.second) {
+							if (res.second->Type == SymbolType::Variable || res.second->Type == SymbolType::Static) {
+								var = static_cast<Variable*>(res.second->Data);
+							}
+							else if (res.second->Type == SymbolType::Function) {
+								auto f = static_cast<FunctionSymbol*>(res.second->Data);
+								auto func = FunctionObject::GetAllocator()->Make(f->Type, res.first);
+								switch (f->Type) {
+								case FunctionType::Intrinsic: func->Callee = static_cast<IntrinsicPtr>(f->DirectPtr); break;
+								case FunctionType::User: func->Callee = static_cast<Function*>(f->DirectPtr); break;
+								case FunctionType::Host: func->Callee = static_cast<EMI::_internal_function*>(f->DirectPtr); break;
+								}
+								f->Function = func;
+								var = &f->Function;
+							}
 						}
 						else {
-							std::string varname = current->FunctionPtr->Namespace + "." + name;
-							if (idx = Owner->GlobalVariables.find(varname); idx != Owner->GlobalVariables.end()) {
-								var = &idx->second;
-							}
-							else if (auto localintrfunc = IntrinsicFunctions.find(varname); localintrfunc != IntrinsicFunctions.end()) {
-								auto func = FunctionObject::GetAllocator()->Make(FunctionType::Intrinsic, varname);
-								auto& v = Owner->GlobalVariables[varname] = func;
-								func->Callee = localintrfunc->second;
-								var = &v;
-							}
-							else if (auto localhostfunc = HostFunctions().find(varname); localhostfunc != HostFunctions().end()) {
-								auto func = FunctionObject::GetAllocator()->Make(FunctionType::Host, varname);
-								auto& v = Owner->GlobalVariables[varname] = func;
-								func->Callee = localhostfunc->second;
-								var = &v;
-							}
-							else if (auto localuserfunc = Owner->NameToFunctionMap.find(varname); localuserfunc != Owner->NameToFunctionMap.end()) {
-								auto func = FunctionObject::GetAllocator()->Make(FunctionType::User, varname);
-								auto& v = Owner->GlobalVariables[varname] = func;
-								func->Callee = localuserfunc->second;
-								var = &v;
-							}
-							else {
-								gWarn() << "Variable does not exist: " << varname << "\n";
-								goto start;
-							}	
-						}
+							Warn() << "Variable does not exist: " << name;
+							goto start;
+						}	
 					}
 
+					if (var)
 					Registers[byte.target] = *var;
 
 				} goto start;
@@ -520,18 +444,13 @@ void Runner::Run()
 					auto& var = current->FunctionPtr->GlobalTable[byte.param];
 					if (var == nullptr) {
 						auto& name = current->FunctionPtr->GlobalTableSymbols[byte.param];
-						if (auto idx = Owner->GlobalVariables.find(name); idx != Owner->GlobalVariables.end()) {
-							var = &idx->second;
+						auto res = Owner->GlobalSymbols.FindName(name);
+						if (res.second && res.second->Type == SymbolType::Variable) {
+							var = static_cast<Variable*>(res.second->Data);
 						}
 						else {
-							std::string varname = current->FunctionPtr->Namespace + "." + name;
-							if (idx = Owner->GlobalVariables.find(varname); idx != Owner->GlobalVariables.end()) {
-								var = &idx->second;
-							}
-							else {
-								gWarn() << "Symbol does not exist: " << varname << "\n";
-								goto start;
-							}
+							Warn() << "Symbol does not exist: " << name;
+							goto start;
 						}
 					}
 
@@ -549,7 +468,7 @@ void Runner::Run()
 						uint16_t idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
-							gError() << "Property not found: " << name << ", in function " << current->FunctionPtr->Name << '\n';
+							Error() << "Property not found: " << name;
 							Registers[byte.target].setUndefined();
 							goto start;
 						}
@@ -559,7 +478,7 @@ void Runner::Run()
 					if (prop.getType() > VariableType::Object) {
 						UserObject* ptr = prop.as<UserObject>();
 						if (ptr->size() <= propertyIdx) {
-							gError() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param] << '\n';
+							Error() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param];
 							Registers[byte.target].setUndefined();
 							goto start;
 						}
@@ -578,7 +497,7 @@ void Runner::Run()
 						uint16_t idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
-							gError() << "Property not found: " << name << ", in function " << current->FunctionPtr->Name << '\n';
+							Error() << "Property not found: " << name;
 							goto start;
 						}
 						propertyIdx = idx;
@@ -587,7 +506,7 @@ void Runner::Run()
 					if (prop.getType() > VariableType::Object) {
 						UserObject* ptr = prop.as<UserObject>();
 						if (ptr->size() <= propertyIdx) {
-							gError() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param] << '\n';
+							Error() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param];
 							goto start;
 						}
 						(*ptr)[static_cast<uint16_t>(propertyIdx)] = Registers[byte.target];
@@ -624,28 +543,25 @@ void Runner::Run()
 					auto& fn = current->FunctionPtr->FunctionTable[data.data];
 					if (fn == nullptr) {
 						auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
-						if (auto idx = Owner->NameToFunctionMap.find(name); idx != Owner->NameToFunctionMap.end()) {
-							fn = idx->second;
-						}
-						else {
-							std::string fnname = current->FunctionPtr->Namespace + "." + name;
-							if (idx = Owner->NameToFunctionMap.find(fnname); idx != Owner->NameToFunctionMap.end()) {
-								fn = idx->second;
+						auto res = Owner->GlobalSymbols.FindName(name);
+						if (res.first && res.second->Type == SymbolType::Function) {
+							auto f = static_cast<FunctionSymbol*>(res.second->Data);
+							if (f->Type == FunctionType::User) {
+								fn = static_cast<Function*>(f->DirectPtr);
 							}
 							else {
-								gWarn() << "Function does not exist: " << fnname << "\n";
+								Warn() << "Function has unexpected location: " << name.GetTarget();
 								goto start;
 							}
 						}
+						else {
+							Warn() << "Function does not exist: " << name.GetTarget();
+							goto start;
+						}
 					}
-					//else if (Owner->ValidFunctions.find(fn) == Owner->ValidFunctions.end()) { // @todo: check is maybe required but very slow
-					//	current->FunctionPtr->FunctionTable[data.data] = nullptr;
-					//	gWarn() << "Cannot call deleted function\n";
-					//	goto start;
-					//}
 
-					if (!fn->IsPublic && current->FunctionPtr->NamespaceHash != fn->NamespaceHash) {
-						gWarn() << "Cannot call private function " << fn->Name << "\n";
+					if (!fn->IsPublic && fn->Name.IsChildOf(current->FunctionPtr->Name.Get(1))) {
+						Warn() << "Cannot call private function " << fn->Name;
 						goto start;
 					}
 
@@ -661,18 +577,20 @@ void Runner::Run()
 									if (real == VariableType::Undefined) {
 										auto& name = fn->TypeTableSymbols[typeidx];
 										UserDefinedType* usertype = nullptr;
-										if (GetManager().GetType(usertype, name)) {
+										auto res = Owner->GlobalSymbols.FindName(name);
+										if (res.second && res.second->Type == SymbolType::Object) {
+											usertype = static_cast<UserDefinedType*>(res.second->Data);
 											fn->TypeTable[typeidx] = real = usertype->Type;
 										}
 									}
 								}
 								else {
-									gError() << "Invalid type while calling " << fn->Name << "\n";
+									Error() << "Invalid type while calling " << fn->Name;
 								}
 							}
 
 							if (real != Registers[byte.in1 + (i - 1)].getType()) {
-								gWarn() << "Invalid argument types when calling " << fn->Name << " from " << current->FunctionPtr->Name << "\n";
+								Warn() << "Invalid argument types when calling " << fn->Name;
 								goto start;
 							}
 						}
@@ -691,7 +609,7 @@ void Runner::Run()
 					const Instruction& data = *(Instruction*)current->Ptr++;
 
 					if (Registers[data.target].getType() != VariableType::Function) {
-						gWarn() << "Variable does not contain a function\n";
+						Warn() << "Variable does not contain a function";
 						goto start;
 					}
 
@@ -701,8 +619,8 @@ void Runner::Run()
 					{
 					case FunctionType::User: {
 						if (auto ptr = std::get<Function*>(f->Callee)) { // @todo: Add finding function
-							if (!ptr->IsPublic && current->FunctionPtr->NamespaceHash != ptr->NamespaceHash) {
-								gWarn() << "Cannot call private function " << ptr->Name << "\n";
+							if (!ptr->IsPublic && ptr->Name.IsChildOf(current->FunctionPtr->Name.Get(1))) {
+								Warn() << "Cannot call private function " << ptr->Name;
 								goto start;
 							}
 
@@ -718,19 +636,20 @@ void Runner::Run()
 											real = ptr->TypeTable[typeidx];
 											if (real == VariableType::Undefined) {
 												auto& name = ptr->TypeTableSymbols[typeidx];
-												UserDefinedType* usertype = nullptr;
-												if (GetManager().GetType(usertype, name)) {
+												auto res = Owner->GlobalSymbols.FindName(name);
+												if (res.second && res.second->Type == SymbolType::Object) {
+													UserDefinedType* usertype = static_cast<UserDefinedType*>(res.second->Data);
 													ptr->TypeTable[typeidx] = real = usertype->Type;
 												}
 											}
 										}
 										else {
-											gError() << "Invalid type while calling " << ptr->Name << "\n";
+											Error() << "Invalid type while calling " << ptr->Name;
 										}
 									}
 
 									if (real != Registers[byte.in1 + (i - 1)].getType()) {
-										gWarn() << "Invalid argument types when calling " << ptr->Name << " from " << current->FunctionPtr->Name << "\n";
+										Warn() << "Invalid argument types when calling " << ptr->Name;
 										goto start;
 									}
 								}
@@ -781,19 +700,17 @@ void Runner::Run()
 					auto& fn = current->FunctionPtr->IntrinsicTable[data.data];
 					if (fn == nullptr) {
 						auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
-						if (auto idx = IntrinsicFunctions.find(name); idx != IntrinsicFunctions.end()) {
-							fn = idx->second;
+						auto res = Owner->GlobalSymbols.FindName(name);
+						if (res.second && res.second->Type == SymbolType::Function) {
+							auto f = static_cast<FunctionSymbol*>(res.second->Data);
+							if (f->Type == FunctionType::Intrinsic) {
+								fn = static_cast<IntrinsicPtr>(f->DirectPtr);
+							}
 						}
 						else {
-							std::string fnname = current->FunctionPtr->Namespace + "." + name;
-							if (idx = IntrinsicFunctions.find(fnname); idx != IntrinsicFunctions.end()) {
-								fn = idx->second;
-							}
-							else {
-								gWarn() << "Function does not exist: " << fnname << "\n";
-								goto start;
-								break;
-							}
+							Warn() << "Function does not exist: " << name;
+							goto start;
+							break;
 						}
 					}
 
@@ -806,19 +723,17 @@ void Runner::Run()
 					auto& fn = current->FunctionPtr->ExternalTable[data.data];
 					if (fn == nullptr) {
 						auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
-						if (auto idx = HostFunctions().find(name); idx != HostFunctions().end()) {
-							fn = idx->second;
+						auto res = Owner->GlobalSymbols.FindName(name);
+						if (res.second && res.second->Type == SymbolType::Function) {
+							auto f = static_cast<FunctionSymbol*>(res.second->Data);
+							if (f->Type == FunctionType::Host) {
+								fn = static_cast<EMI::_internal_function*>(f->DirectPtr);
+							}
 						}
 						else {
-							std::string fnname = current->FunctionPtr->Namespace + "." + name;
-							if (idx = HostFunctions().find(fnname); idx != HostFunctions().end()) {
-								fn = idx->second;
-							}
-							else {
-								gWarn() << "Function does not exist: " << fnname << "\n";
-								goto start;
-								break;
-							}
+							Warn() << "Function does not exist: " << name;
+							goto start;
+							break;
 						}
 					}
 
@@ -833,7 +748,7 @@ void Runner::Run()
 				} goto start;
 
 				TARGET(Call) {
-					gError() << "Unknown functions not implemented\n";
+					Error() << "Unknown functions not implemented";
 				} goto start;
 
 				TARGET(PushUndefined) {
@@ -852,12 +767,13 @@ void Runner::Run()
 					auto& type = current->FunctionPtr->TypeTable[byte.param];
 					if (type == VariableType::Undefined) {
 						auto& name = current->FunctionPtr->TypeTableSymbols[byte.param];
-						UserDefinedType* usertype = nullptr;
-						if (GetManager().GetType(usertype, name)) {
+						auto res = Owner->GlobalSymbols.FindName(name);
+						if (res.second && res.second->Type == SymbolType::Object) {
+							UserDefinedType* usertype = static_cast<UserDefinedType*>(res.second->Data);
 							type = usertype->Type;
 						}
 						else {
-							gError() << "Type not defined: " << name << "\n";
+							Error() << "Type not defined: " << name;
 							goto start;
 						}
 					}
@@ -871,12 +787,13 @@ void Runner::Run()
 					auto& type = current->FunctionPtr->TypeTable[data.param];
 					if (type == VariableType::Undefined) {
 						auto& name = current->FunctionPtr->TypeTableSymbols[data.param];
-						UserDefinedType* usertype = nullptr;
-						if (GetManager().GetType(usertype, name)) {
+						auto res = Owner->GlobalSymbols.FindName(name);
+						if (res.second && res.second->Type == SymbolType::Object) {
+							UserDefinedType* usertype = static_cast<UserDefinedType*>(res.second->Data);
 							type = usertype->Type;
 						}
 						else {
-							gError() << "Type not defined: " << name << "\n";
+							Error() << "Type not defined: " << name;
 							goto start;
 						}
 					}
@@ -902,13 +819,13 @@ void Runner::Run()
 						auto& arr = Registers[byte.in1].as<Array>()->data();
 						size_t idx = static_cast<size_t>(toNumber(Registers[byte.in2]));
 						if (arr.size() <= idx) {
-							gError() << "Array out of bounds: Size " << arr.size() << ", tried to access index " << idx << "\n";
+							Error() << "Array out of bounds: Size " << arr.size() << ", tried to access index " << idx;
 							goto start;
 						}
 						arr[idx] = Registers[byte.target];
 					}
 					else {
-						gWarn() << "Indexing target is not array\n";
+						Warn() << "Indexing target is not array";
 					}
 				} goto start;
 
@@ -920,12 +837,12 @@ void Runner::Run()
 							Registers[byte.target] = arr->data()[idx];
 						}
 						else {
-							gError() << "Array out of bounds: Size " << arr->size() << ", tried to access index " << idx << "\n";
+							Error() << "Array out of bounds: Size " << arr->size() << ", tried to access index " << idx;
 							goto start;
 						}
 					}
 					else {
-						gWarn() << "Indexing target is not array\n";
+						Warn() << "Indexing target is not array";
 					}
 				} goto start;
 

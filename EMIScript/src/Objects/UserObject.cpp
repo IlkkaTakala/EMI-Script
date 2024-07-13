@@ -1,6 +1,6 @@
 #include "UserObject.h"
 
-VariableType ObjectManager::AddType(const std::string& name, const UserDefinedType& obj)
+VariableType ObjectManager::AddType(const TName& name, const UserDefinedType& obj)
 {
 	if (auto it = NameToType.find(name); it == NameToType.end()) {
 		auto nextType = (VariableType)++TypeCounter;
@@ -13,7 +13,7 @@ VariableType ObjectManager::AddType(const std::string& name, const UserDefinedTy
 	}
 }
 
-void ObjectManager::RemoveType(const std::string& name)
+void ObjectManager::RemoveType(const TName& name)
 {
 	auto type = NameToType[name];
 	BaseTypes.erase(type);
@@ -40,7 +40,7 @@ Variable ObjectManager::Make(VariableType type) const
 	return Variable();
 }
 
-bool ObjectManager::GetType(UserDefinedType*& type, const std::string& name)
+bool ObjectManager::GetType(UserDefinedType*& type, const TName& name)
 {
 	auto it = NameToType.find(name);
 	if (it == NameToType.end()) {
@@ -50,7 +50,7 @@ bool ObjectManager::GetType(UserDefinedType*& type, const std::string& name)
 	return true;
 }
 
-bool ObjectManager::GetPropertyIndex(uint16_t& out, const std::string& name, VariableType type)
+bool ObjectManager::GetPropertyIndex(uint16_t& out, const TName& name, VariableType type)
 {
 	if (auto it = BaseTypes.find(type); it != BaseTypes.end()) {
 		auto& fields = it->second.FieldNames;
@@ -67,7 +67,7 @@ bool ObjectManager::GetPropertyIndex(uint16_t& out, const std::string& name, Var
 	return false;
 }
 
-bool ObjectManager::GetPropertySymbol(Symbol*& symbol, const std::string& name, VariableType type)
+bool ObjectManager::GetPropertySymbol(Symbol*& symbol, const TName& name, VariableType type)
 {
 	if (auto it = BaseTypes.find(type); it != BaseTypes.end()) {
 		auto& fields = it->second.FieldNames;
@@ -83,13 +83,13 @@ bool ObjectManager::GetPropertySymbol(Symbol*& symbol, const std::string& name, 
 	return false;
 }
 
-void UserDefinedType::AddField(const std::string& name, Variable var, const Symbol& flags)
+void UserDefinedType::AddField(const TName& name, Variable var, const Symbol& flags)
 {
 	DefaultFields.push_back(var);
 	FieldNames.emplace(name, flags); // @todo: might not work
 }
 
-VariableType UserDefinedType::GetFieldType(const std::string& name) const
+VariableType UserDefinedType::GetFieldType(const TName& name) const
 {
 	if (auto it = FieldNames.find(name); it != FieldNames.end()) {
 		return it->second.VarType;

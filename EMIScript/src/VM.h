@@ -104,17 +104,7 @@ private:
 };
 
 inline auto& HostFunctions() {
-	static ankerl::unordered_dense::map<std::string, _internal_function*> f;
-	return f;
-}
-
-inline auto& InternalFunctions() {
-	static ankerl::unordered_dense::map<std::string, IntrinsicPtr> f;
-	return f;
-}
-
-inline auto& ValidHostFunctions() {
-	static ankerl::unordered_dense::set<uint64_t> f;
+	static SymbolTable f;
 	return f;
 }
 
@@ -135,8 +125,8 @@ public:
 	InternalValue GetReturnValue(size_t index);
 	bool WaitForResult(void* ptr);
 
-	Symbol* FindSymbol(const std::string& name, const std::string& space, bool& isNamespace);
-	void AddNamespace(const std::string& path, ankerl::unordered_dense::map<std::string, Namespace>& space);
+	std::pair<TName, Symbol*> FindSymbol(const TNameQuery& name);
+	void AddNamespace(const std::string& path, const SymbolTable& space);
 
 	inline bool IsRunning() const { return VMRunning; }
 
@@ -172,9 +162,5 @@ private:
 	std::vector<size_t> ReturnFreeList;
 
 	ankerl::unordered_dense::map<std::string, CompileUnit> Units;
-	ankerl::unordered_dense::set<Function*> ValidFunctions;
-	ankerl::unordered_dense::map<std::string, Function*> NameToFunctionMap;
-	ankerl::unordered_dense::map<std::string, Namespace> Namespaces;
-
-	std::unordered_map<std::string, Variable> GlobalVariables;
+	SymbolTable GlobalSymbols;
 };

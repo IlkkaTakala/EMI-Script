@@ -46,11 +46,11 @@ union Instruction
 
 struct Scoped
 {
-	ankerl::unordered_dense::map<std::string, Symbol*> symbols;
+	ankerl::unordered_dense::map<TName, CompileSymbol*> symbols;
 	Scoped* parent = nullptr;
 	std::list<Scoped> children;
 
-	Symbol* FindSymbol(const std::string& name) {
+	CompileSymbol* FindSymbol(const TName& name) {
 		if (auto it = symbols.find(name); it != symbols.end()) {
 			return it->second;
 		}
@@ -58,10 +58,10 @@ struct Scoped
 		return parent->FindSymbol(name);
 	}
 
-	Symbol* addSymbol(const std::string& name) {
+	CompileSymbol* addSymbol(const TName& name) {
 		auto it = FindSymbol(name);
 		if (!it) {
-			auto s = symbols.emplace(name, new Symbol{});
+			auto s = symbols.emplace(name, new CompileSymbol{});
 			return s.first->second;
 		}
 		return nullptr;
@@ -76,9 +76,7 @@ struct Scoped
 
 struct Function
 {
-	std::string Name;
-	std::string Namespace;
-	size_t NamespaceHash;
+	TName Name;
 
 	std::vector<Variable> StringTable;
 	ankerl::unordered_dense::set<double> NumberTable;
@@ -91,10 +89,10 @@ struct Function
 	std::vector<int32_t> PropertyTable;
 	std::vector<VariableType> TypeTable;
 
-	std::vector<std::string> FunctionTableSymbols;
-	std::vector<std::string> PropertyTableSymbols;
-	std::vector<std::string> TypeTableSymbols;
-	std::vector<std::string> GlobalTableSymbols;
+	std::vector<TNameQuery> FunctionTableSymbols;
+	std::vector<TName> PropertyTableSymbols;
+	std::vector<TNameQuery> TypeTableSymbols;
+	std::vector<TNameQuery> GlobalTableSymbols;
 
 	ankerl::unordered_dense::map<int, int> DebugLines;
 
@@ -108,12 +106,11 @@ struct Function
 
 	std::vector<uint32_t> Bytecode;
 
-	Function() {
+	Function() : Name(nullptr) {
 		FunctionScope = nullptr;
 		ArgCount = 0;
 		RegisterCount = 0;
 		IsPublic = false;
-		NamespaceHash = 0;
 	}
 	~Function() {
 		delete FunctionScope;
