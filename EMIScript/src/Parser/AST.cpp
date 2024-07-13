@@ -6,11 +6,11 @@
 #include "VM.h"
 #include <charconv>
 
+#ifdef DEBUG
 constexpr unsigned char print_first[] = { 195, 196, 196, 0 };
 constexpr unsigned char print_last[] = { 192, 196, 196, 0 };
 constexpr unsigned char print_add[] = { 179, 32, 32, 32, 0 };
 
-#ifdef DEBUG
 #define X(x) { OpCodes::x, #x },
 std::unordered_map<OpCodes, std::string> OpcodeNames = {
 #include "Opcodes.h"

@@ -354,7 +354,7 @@ Node* Parser::ConstructAST(CompileOptions& options)
 		default: {
 			const auto& c = lex.GetContext();
 			gError() << MakePath(options.Path) 
-				<< std::format(" ({}, {})", c.Row, c.Column) 
+				<< " (" << c.Row << ", " << c.Column << ")"
 				<< ": Critical error found '" << holder.data << "'. ";
 #ifdef DEBUG
 			gLogger() << "Expected one of: ";

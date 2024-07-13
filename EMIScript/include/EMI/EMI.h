@@ -194,8 +194,8 @@ namespace EMI
 	};
 
 	CORE_API VMHandle CreateEnvironment();
-	CORE_API void SetLogLevel(int level);
 	CORE_API void ReleaseEnvironment(VMHandle handle);
+	CORE_API void SetLogLevel(int level);
 
 	template<typename T>
 	T ValueHandle::get() {

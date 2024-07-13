@@ -444,7 +444,7 @@ void CreateParser(ParseTable_t& ParseTable, RuleTable_t& RuleTable, std::vector<
 constexpr size_t CreateTime = )";
 
 	auto time = std::chrono::file_clock::now().time_since_epoch().count();
-	outh << time << "; \n\n";
+	outh << time << "u; \n\n";
 
 	outh << R"(extern ParseTable_t ParseTable;
 extern RuleTable_t RuleTable;

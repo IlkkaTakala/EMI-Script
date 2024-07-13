@@ -266,17 +266,9 @@ public def renderFrame() {
 	}
 }
 
-extend Test.Second:
-extend Some:
-extend Out.Last:
-public def Tester() {
-	print("I was called");
-}
-
 extend Global:
 
 public def game() {
-	Test.Second.Tester();
 	var charCoord : Coord;
 	var actions : array;
 	var actionIdx = 0;
@@ -292,7 +284,7 @@ public def game() {
 	var topOffset = Top;
 	var leftOffset = Left;
 	
-	#setupconsole(2 * leftOffset + x_size, 2 * topOffset + y_size);
+	setupconsole(2 * leftOffset + x_size, 2 * topOffset + y_size);
 	
 	for (x_size + 2) {
 		writepixel(leftOffset - 1 + _index_	, topOffset - 1				, wall, 0);
