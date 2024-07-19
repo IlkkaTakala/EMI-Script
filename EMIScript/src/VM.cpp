@@ -100,11 +100,11 @@ void* VM::GetFunctionID(const std::string& id)
 	if (symbol && symbol->Type == SymbolType::Function) {
 		auto fn = static_cast<FunctionSymbol*>(symbol->Data);
 		if (fn->Type != FunctionType::User) {
-			gWarn() << "Symbol is not a script function";
+			gRuntimeWarn() << "Symbol is not a script function";
 			return 0;
 		}
 		if (!static_cast<Function*>(fn->DirectPtr)->IsPublic) {
-			gWarn() << "Function is private";
+			gRuntimeWarn() << "Function is private";
 			return 0;
 		}
 
@@ -117,7 +117,7 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& a
 {
 	Function* fn = (Function*)(void*)handle;
 	if (!fn) {
-		gWarn() << "Invalid function handle";
+		gRuntimeWarn() << "Invalid function handle";
 		return (size_t)-1;
 	}
 
@@ -260,8 +260,8 @@ void Runner::Join()
 }
 
 #define TARGET(Op) Op: 
-#define Error() gError() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
-#define Warn() gWarn() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
+#define Error() gRuntimeError() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
+#define Warn() gRuntimeWarn() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
 
 void Runner::Run()
 {

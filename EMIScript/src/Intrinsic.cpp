@@ -14,14 +14,14 @@ void print(Variable&, Variable* args, size_t argc) {
 
 		// @todo: Add print formatting
 
-		gLogger() << format;
+		gScriptLogger() << format;
 	}
 }
 
 void printLn(Variable& out, Variable* args, size_t argc) {
 	if (argc > 0) {
 		print(out, args, argc);
-		gLogger() << '\n';
+		gScriptLogger() << '\n';
 	}
 }
 

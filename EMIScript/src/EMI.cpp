@@ -67,9 +67,41 @@ VMHandle EMI::CreateEnvironment()
 	return VMHandle(idx, GetVM(idx));
 }
 
-CORE_API void EMI::SetLogLevel(int level)
+CORE_API void EMI::SetCompileLogLevel(LogLevel level)
 {
-	gLogger().SetLogLevel(level);
+	gCompileLogger().SetLogLevel(level);
+}
+
+CORE_API void EMI::SetRuntimeLogLevel(LogLevel level)
+{
+	gRuntimeLogger().SetLogLevel(level);
+}
+
+CORE_API void EMI::SetScriptLogLevel(LogLevel level)
+{
+	gScriptLogger().SetLogLevel(level);
+}
+
+CORE_API void EMI::SetLogLevel(LogLevel level)
+{
+	gCompileLogger().SetLogLevel(level);
+	gRuntimeLogger().SetLogLevel(level);
+	gScriptLogger().SetLogLevel(level);
+}
+
+CORE_API void EMI::SetCompileLog(Logger* log)
+{
+	gCompileLogger().SetLogger(log);
+}
+
+CORE_API void EMI::SetRuntimeLog(Logger* log)
+{
+	gRuntimeLogger().SetLogger(log);
+}
+
+CORE_API void EMI::SetScriptLog(Logger* log)
+{
+	gScriptLogger().SetLogger(log);
 }
 
 EMI::VMHandle::VMHandle(unsigned int value, void* ptr) : Index(value), Vm(ptr)
