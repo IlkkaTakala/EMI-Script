@@ -57,6 +57,7 @@ public:
 		return Target;
 	}
 
+	auto& Paths() { return SearchPaths; }
 	auto& GetPaths() const { return SearchPaths; }
 	auto& GetTarget() const { return Target; }
 

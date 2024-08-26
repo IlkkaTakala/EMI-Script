@@ -494,6 +494,14 @@ void ASTWalker::Run()
 				CurrentNamespace = TName();
 			}
 		} break;
+
+		case Token::UsingDef: {
+
+			TName name = getFullId(c->children.front());
+
+			SearchPaths.push_back(name);
+
+		} break;
 		
 		case Token::ObjectDef:
 		{
@@ -1019,6 +1027,7 @@ void ASTWalker::WalkLoad(Node* n)
 				auto [fullname, globalSymbol] = FindSymbol(data);
 
 				if (fullname) {
+					data = fullname;
 					symbol = FindOrCreateLocalSymbol(data);
 					symbol->Sym = globalSymbol;
 					symbol->Global = true;
@@ -1081,8 +1090,8 @@ void ASTWalker::WalkLoad(Node* n)
 			}
 		}
 		if (!symbol || (symbol && symbol->NeedsLoading)) {
-			auto name = getFullId(n);
-			auto it = std::find(CurrentFunction->GlobalTableSymbols.begin(), CurrentFunction->GlobalTableSymbols.end(), name);
+			//auto data = getFullId(n);
+			auto it = std::find(CurrentFunction->GlobalTableSymbols.begin(), CurrentFunction->GlobalTableSymbols.end(), data);
 			size_t index = 0;
 
 			if (it != CurrentFunction->GlobalTableSymbols.end()) {
@@ -1090,7 +1099,7 @@ void ASTWalker::WalkLoad(Node* n)
 			}
 			else {
 				index = CurrentFunction->GlobalTableSymbols.size();
-				CurrentFunction->GlobalTableSymbols.push_back(name);
+				CurrentFunction->GlobalTableSymbols.push_back(data);
 				CurrentFunction->GlobalTable.push_back(nullptr);
 			}
 
@@ -1703,7 +1712,9 @@ void ASTWalker::WalkLoad(Node* n)
 		}
 		else {
 			index = CurrentFunction->FunctionTableSymbols.size();
-			CurrentFunction->FunctionTableSymbols.push_back(name);
+			TNameQuery query(name, { CurrentNamespace });
+			query.Paths().insert(query.Paths().end(), SearchPaths.begin(), SearchPaths.end());
+			CurrentFunction->FunctionTableSymbols.push_back(query);
 		}
 
 		Op(CallFunction);
@@ -1909,11 +1920,13 @@ CompileSymbol* ASTWalker::FindOrCreateLocalSymbol(const TName& name)
 std::pair<TName, Symbol*> ASTWalker::FindSymbol(const TNameQuery& name)
 {
 	if (!name) return { {}, nullptr };
+	TNameQuery query = name;
+	query.Paths().insert(query.Paths().end(), SearchPaths.begin(), SearchPaths.end());
 
-	auto res = Global.FindName(name);
+	auto res = Global.FindName(query);
 
 	if (!res.first) {
-		res = Vm->FindSymbol(name);
+		res = Vm->FindSymbol(query);
 	}
 	return res;
 }
@@ -1923,6 +1936,7 @@ std::pair<TName, Symbol*> ASTWalker::FindSymbol(const TName& name)
 	if (!name) return { name, nullptr };
 
 	TNameQuery query(name, { CurrentNamespace });
+	query.Paths().insert(query.Paths().end(), SearchPaths.begin(), SearchPaths.end());
 	auto res = Global.FindName(query);
 
 	if (!res.first) {

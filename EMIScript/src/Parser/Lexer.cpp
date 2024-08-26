@@ -23,6 +23,7 @@ ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
 	{"break", Token::Break },
 	{"continue", Token::Continue },
 	{"extend", Token::Extend },
+	{"using", Token::Using },
 	{"var", Token::Var },
 	{"set", Token::Set },
 	{"static", Token::Static },
