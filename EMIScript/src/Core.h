@@ -66,6 +66,10 @@ public:
 		SearchPaths = list;
 		Target = name;
 	}
+	TNameQuery(const TName& name, const std::vector<TName>& list) {
+		SearchPaths = list;
+		Target = name;
+	}
 
 	friend bool operator==(const TNameQuery& lhs, const TNameQuery& rhs) {
 		return lhs.Target == rhs.Target;

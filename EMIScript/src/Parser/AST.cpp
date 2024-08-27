@@ -429,6 +429,7 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n)
 	CurrentScope = nullptr;
 	HasError = false;
 	MaxRegister = 0;
+	SearchPaths.resize(1);
 
 	HasDebug = true; // @todo: disable debugs
 }
@@ -468,13 +469,13 @@ void ASTWalker::Run()
 			if (name.toString() != "Global") {
 
 				if (name.Get(name.Length() - 1).toString() == "Global") {
-					CurrentNamespace = TName();
+					SearchPaths[0] = TName();
 					name = name.PopLast();
 				}
 
-				if (CurrentNamespace.Length() + name.Length() > TName::MaxLength() - 1) {
+				if (SearchPaths[0].Length() + name.Length() > TName::MaxLength() - 1) {
 					HasError = true;
-					gError() << "Maximum namespace depth reached with " << name.Append(CurrentNamespace) << "!";
+					gError() << "Maximum namespace depth reached with " << name.Append(SearchPaths[0]) << "!";
 				}
 
 				TName temp(name);
@@ -488,10 +489,10 @@ void ASTWalker::Run()
 					}
 					temp= temp.Pop();
 				}
-				CurrentNamespace = name.Append(CurrentNamespace);
+				SearchPaths[0] = name.Append(SearchPaths[0]);
 			}
 			else {
-				CurrentNamespace = TName();
+				SearchPaths[0] = TName();
 			}
 		} break;
 
@@ -509,7 +510,7 @@ void ASTWalker::Run()
 			auto [name, s] = FindSymbol(data);
 			if (!s) {
 				auto symbol = new Symbol{};
-				TName addedName(data.Append(CurrentNamespace));
+				TName addedName(data.Append(SearchPaths[0]));
 				if (!Global.AddName(addedName, symbol)) {
 					delete symbol;
 					break;
@@ -587,7 +588,7 @@ void ASTWalker::Run()
 			auto [name, s] = FindSymbol(data);
 			if (!name) {
 				auto symbol = new Symbol{};
-				Global.AddName(data.Append(CurrentNamespace), symbol);
+				Global.AddName(data.Append(SearchPaths[0]), symbol);
 				symbol->setType(SymbolType::Function);
 				symbol->VarType = VariableType::Function;
 				FunctionSymbol* functionSym = new FunctionSymbol();
@@ -596,8 +597,8 @@ void ASTWalker::Run()
 				functionSym->Type = FunctionType::User;
 				functionSym->DirectPtr = function;
 
-				function->Name = data.Append(CurrentNamespace);
-				function->IsPublic = c->type == Token::PublicFunctionDef || CurrentNamespace == TName();
+				function->Name = data.Append(SearchPaths[0]);
+				function->IsPublic = c->type == Token::PublicFunctionDef || SearchPaths [0]== TName();
 				c->sym = new CompileSymbol();
 				c->sym->Global = true;
 				c->sym->Sym = symbol;
@@ -652,7 +653,7 @@ void ASTWalker::Run()
 			auto [name, s] = FindSymbol(data);
 			if (!name) {
 				auto symbol = new Symbol();
-				Global.AddName(data.Append(CurrentNamespace), symbol);
+				Global.AddName(data.Append(SearchPaths[0]), symbol);
 				switch (c->type)
 				{
 				case Token::Static: symbol->setType(SymbolType::Static); break;
@@ -837,7 +838,7 @@ void ASTWalker::WalkLoad(Node* n)
 		size_t index = 0;
 		if (it == CurrentFunction->TypeTableSymbols.end()) {
 			index = CurrentFunction->TypeTableSymbols.size();
-			CurrentFunction->TypeTableSymbols.push_back({ name });
+			CurrentFunction->TypeTableSymbols.push_back({ name, SearchPaths });
 		}
 		else {
 			index = it - CurrentFunction->TypeTableSymbols.begin();
@@ -1712,8 +1713,7 @@ void ASTWalker::WalkLoad(Node* n)
 		}
 		else {
 			index = CurrentFunction->FunctionTableSymbols.size();
-			TNameQuery query(name, { CurrentNamespace });
-			query.Paths().insert(query.Paths().end(), SearchPaths.begin(), SearchPaths.end());
+			TNameQuery query(name, SearchPaths);
 			CurrentFunction->FunctionTableSymbols.push_back(query);
 		}
 
@@ -1935,8 +1935,7 @@ std::pair<TName, Symbol*> ASTWalker::FindSymbol(const TName& name)
 {
 	if (!name) return { name, nullptr };
 
-	TNameQuery query(name, { CurrentNamespace });
-	query.Paths().insert(query.Paths().end(), SearchPaths.begin(), SearchPaths.end());
+	TNameQuery query(name, SearchPaths);
 	auto res = Global.FindName(query);
 
 	if (!res.first) {
@@ -1953,7 +1952,7 @@ std::pair<TName, Symbol*> ASTWalker::FindOrCreateSymbol(const TName& name, Symbo
 	auto symbol = new Symbol();
 	symbol->setType(type);
 
-	TName newName(name.Append(CurrentNamespace));
+	TName newName(name.Append(SearchPaths[0]));
 	if (Global.AddName(newName, symbol)) {
 		return { newName, symbol };
 	}
@@ -1965,7 +1964,7 @@ void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 {
 	InitRegisters();
 	CurrentFunction = f;
-	CurrentNamespace = f->Name.Get(1);
+	SearchPaths[0] = f->Name.Get(1);
 
 	for (auto& c : n->children) {
 		switch (c->type)

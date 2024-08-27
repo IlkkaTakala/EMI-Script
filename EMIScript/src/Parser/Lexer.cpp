@@ -14,6 +14,7 @@ extern ankerl::unordered_dense::map<Token, const char*> TokensToName = {
 ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
 	{"object", Token::Object },
 	{"def", Token::Definition },
+	{"defp", Token::PublicDef },
 	{"public", Token::Public },
 	{"return", Token::Return },
 	{"if", Token::If },
