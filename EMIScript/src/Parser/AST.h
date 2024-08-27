@@ -63,7 +63,7 @@ private:
 	bool HasDebug;
 	VM* Vm;
 	Node* Root;
-	TName CurrentNamespace;
+	std::vector<TName> SearchPaths;
 
 	// Function parsing
 	Scoped* CurrentScope;

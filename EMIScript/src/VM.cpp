@@ -551,12 +551,12 @@ void Runner::Run()
 								fn = static_cast<Function*>(f->DirectPtr);
 							}
 							else {
-								Warn() << "Function has unexpected location: " << name.GetTarget();
+								Warn() << "Function has unexpected location: " << name;
 								goto start;
 							}
 						}
 						else {
-							Warn() << "Function does not exist: " << name.GetTarget();
+							Warn() << "Function does not exist: " << name;
 							goto start;
 						}
 					}

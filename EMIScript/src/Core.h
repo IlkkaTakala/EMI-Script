@@ -57,11 +57,16 @@ public:
 		return Target;
 	}
 
+	auto& Paths() { return SearchPaths; }
 	auto& GetPaths() const { return SearchPaths; }
 	auto& GetTarget() const { return Target; }
 
 	TNameQuery() {}
 	TNameQuery(const TName& name, std::initializer_list<TName> list = {}) {
+		SearchPaths = list;
+		Target = name;
+	}
+	TNameQuery(const TName& name, const std::vector<TName>& list) {
 		SearchPaths = list;
 		Target = name;
 	}
