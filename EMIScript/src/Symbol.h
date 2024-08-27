@@ -24,7 +24,7 @@ enum class SymbolType : uint8_t
 	// ...
 };
 
-enum class FunctionType
+enum class FunctionType : uint8_t
 {
 	None,
 	User,
@@ -41,7 +41,7 @@ struct Symbol
 	SymbolType Type = SymbolType::Variable;
 	SymbolFlags Flags = SymbolFlags::None;
 	VariableType VarType = VariableType::Undefined;
-	void* Data = nullptr;
+	void* Data = nullptr; // Namespace, UserDefinedObject, Variable or FunctionSymbol
 
 	void setType(SymbolType t);
 

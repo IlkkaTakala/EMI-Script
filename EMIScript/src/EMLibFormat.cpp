@@ -1,4 +1,6 @@
 #include "EMLibFormat.h"
+#include "Function.h"
+#include "Objects/UserObject.h"
 
 void WriteString(std::ostream& out, const std::string& str) {
     out << (uint16_t)str.size();
@@ -19,6 +21,13 @@ void WriteArray(std::ostream& out, const A& arr, std::function<void(std::ostream
     for (const auto& item : arr) {
         pred(out, item);
     }
+}
+
+template <class A>
+void WriteArray(std::ostream& out, const A& arr) {
+    auto datasize = arr.size() * sizeof(typename A::value_type);
+    out << (uint16_t)datasize;
+    out.write((uint8_t*)arr.data(), datasize);
 }
 
 bool Library::Decode(std::istream& instream, SymbolTable& table)
@@ -55,11 +64,67 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream)
     outstream << EMI_VERSION;
 
     outstream << (uint16_t)table.Table.size();
-    for (auto& [name, symbol] : table.Table) {
-        WriteArray(outstream, table.Table, [](std::ostream& out, std::pair<TName, Symbol*> pair) {
-            WriteString(out, pair.first.toString());
-        });
-    }
+    WriteArray(outstream, table.Table, [](std::ostream& out, const std::pair<TName, Symbol*>& pair) {
+        // Writing symbol
+        auto symbol = pair.second;
+        WriteString(out, pair.first.toString());
+
+        out << (uint8_t)symbol->Type;
+        out << (uint16_t)symbol->Flags;
+        out << (uint16_t)symbol->VarType;
+
+        if (symbol->Data) {
+            switch (symbol->Type)
+            {
+            case SymbolType::Namespace: {
+                // Might need namespace
+            } break;
+            case SymbolType::Object: {
+
+            } break;
+            case SymbolType::Function: {
+                auto fn = static_cast<FunctionSymbol*>(symbol->Data);
+                out << (uint8_t)fn->Type;
+                out << (uint16_t)fn->Return;
+                WriteArray(out, fn->Arguments, [](std::ostream& out, VariableType type) {
+                    out << (uint16_t)type;
+                });
+
+                switch (fn->Type)
+                {
+                case FunctionType::User: {
+                    auto fnd = reinterpret_cast<Function*>(fn->DirectPtr);
+
+                    out << (uint8_t)fnd->ArgCount;
+                    out << (uint8_t)fnd->RegisterCount;
+                    out << (bool)fnd->IsPublic;
+
+                    std::vector<Variable> fnd->StringTable;
+
+                    WriteArray(out, fnd->NumberTable);
+                    WriteArray(out, fnd->JumpTable);
+                    WriteArray(out, fnd->DebugLines);
+                    WriteArray(out, fnd->Types);
+
+                    std::vector<TNameQuery> fnd->FunctionTableSymbols;
+                    std::vector<TName> fnd->PropertyTableSymbols;
+                    std::vector<TNameQuery> fnd->TypeTableSymbols;
+                    std::vector<TNameQuery> fnd->GlobalTableSymbols;
+                    
+                    WriteArray(out, fnd->Bytecode);
+                
+                } break;
+                default:
+                    gError() << "Invalid function in symbol table";
+                    break;
+                }
+
+            } break;
+            default:
+                break;
+            }
+        }
+    });
 
     return false;
 }
