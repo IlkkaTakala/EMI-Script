@@ -178,7 +178,7 @@ void mathsqrt(Variable& out, Variable* args, size_t argc) {
 
 
 
-#define FUNC(named, fn, ret) { named##_name, new Symbol{ SymbolType::Function, SymbolFlags::Typed, VariableType::Function, new FunctionSymbol{FunctionType::Intrinsic, fn, Variable{},VariableType::ret, 
+#define FUNC(named, fn, ret) { named##_name, new Symbol{ SymbolType::Function, SymbolFlags::Typed, VariableType::Function, new FunctionSymbol{FunctionType::Intrinsic, (void*)fn, Variable{},VariableType::ret, 
 #define NAMESPACE(named) { named##_name, new Symbol{ SymbolType::Namespace, SymbolFlags::None, VariableType::Undefined, new Namespace{ named##_name } } },
 
 // @todo: Something better for these intrinsic definitions

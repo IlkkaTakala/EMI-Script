@@ -63,7 +63,7 @@ TName::~TName()
 {
 }
 
-TName TName::Get(char off) {
+TName TName::Get(char off) const {
 	TName out;
 	std::copy(Path.begin() + off, Path.begin() + Size, out.Path.begin());
 	out.Size = Size - off;
