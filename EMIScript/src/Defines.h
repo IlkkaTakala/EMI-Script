@@ -9,6 +9,9 @@
 #undef EMI_PARSE_GRAMMAR
 #endif
 
+constexpr uint16_t EMI_VERSION = 10100; // Major 01 Minor 01 Patch 00;
+constexpr uint8_t FORMAT_VERSION = 1; // Major 01 Minor 01 Patch 00;
+
 inline Logger& gLogger()
 {
 	static Logger log;
