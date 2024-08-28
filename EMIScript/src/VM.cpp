@@ -6,6 +6,9 @@
 #include "Objects/ArrayObject.h"
 #include "Objects/FunctionObject.h"
 #include <math.h>
+#include <filesystem>
+#include <fstream>
+#include "EMLibFormat.h"
 
 VM::VM()
 {
@@ -91,6 +94,52 @@ void VM::CompileTemporary(const char* data)
 void VM::Interrupt()
 {
 
+}
+
+bool VM::Export(const char* path, const ExportOptions& options)
+{
+	ExportOptions ex = options;
+	std::filesystem::path fullpath(path);
+	if (!std::filesystem::is_directory(fullpath)) {
+		ex.CombineUnits = true;
+	}
+
+	if (ex.CombineUnits) {
+		std::ofstream file(fullpath, std::ios::out | std::ios::binary);
+		if (!file.is_open()) {
+			gError() << "Cannot open file for writing: " << fullpath;
+			return false;
+		}
+
+		if (!Library::Encode(GlobalSymbols, file)) {
+			gError() << "Writing library file failed";
+			return false;
+		}
+	}
+	else {
+		for (auto& [name, unit] : Units) {
+			auto fp = fullpath;
+			fp += std::filesystem::path(name).filename().replace_extension();
+			std::ofstream file(fp, std::ios::out | std::ios::binary);
+
+			if (!file.is_open()) {
+				gError() << "Cannot open file for writing: " << fullpath;
+				return false;
+			}
+
+			SymbolTable table;
+			for (auto& id : unit.Symbols) {
+				table.AddName(id, GlobalSymbols.Table[id]);
+			}
+
+			if (!Library::Encode(table, file)) {
+				gError() << "Writing library file failed";
+				return false;
+			}
+		}
+	}
+
+	return true;
 }
 
 void* VM::GetFunctionID(const std::string& id)

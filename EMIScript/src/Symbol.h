@@ -42,6 +42,7 @@ struct Symbol
 	SymbolFlags Flags = SymbolFlags::None;
 	VariableType VarType = VariableType::Undefined;
 	void* Data = nullptr; // Namespace, UserDefinedObject, Variable or FunctionSymbol
+	bool Builtin = false;
 
 	void setType(SymbolType t);
 

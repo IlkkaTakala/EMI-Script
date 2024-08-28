@@ -61,6 +61,12 @@ int main()
 		{"reinit", [](EMI::VMHandle& vm, const std::vector<std::string>&) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
 		{"emi", [](EMI::VMHandle&, const std::vector<std::string>&) { return 2; }},
 		{"loglevel", [](EMI::VMHandle&, const std::vector<std::string>& params) { if (params.size() > 1) EMI::SetLogLevel(std::atoi(params[1].c_str())); return 0; }},
+		{"export", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { 
+			if (params.size() > 1) {
+				vm.ExportVM(params[1].c_str());
+			}
+			return 0;
+		}},
 	};
 
 	auto vm = EMI::CreateEnvironment();

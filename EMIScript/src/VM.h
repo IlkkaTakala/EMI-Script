@@ -119,6 +119,8 @@ public:
 	void CompileTemporary(const char* data);
 	void Interrupt();
 
+	bool Export(const char* path, const ExportOptions& options);
+
 	void* GetFunctionID(const std::string& name);
 
 	size_t CallFunction(FunctionHandle handle, const std::span<InternalValue>& args);

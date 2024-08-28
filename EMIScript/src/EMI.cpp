@@ -12,6 +12,7 @@ bool EMI::_internal_register(_internal_function* func)
 	auto sym = new Symbol();
 	sym->Type = SymbolType::Function;
 	sym->VarType = VariableType::Function;
+	sym->Builtin = true;
 	std::vector<VariableType> types;
 	types.resize(func->arg_count);
 	for (int i = 0; i < types.size(); i++) {
@@ -28,6 +29,7 @@ bool EMI::_internal_register(_internal_function* func)
 			auto spaceSym = new Symbol();
 			spaceSym->setType(SymbolType::Namespace);
 			spaceSym->Data = new Namespace{space};
+			spaceSym->Builtin = true;
 			HostFunctions().AddName(space, spaceSym);
 		}
 		space = space.Pop();
@@ -109,6 +111,11 @@ bool EMI::VMHandle::_internal_wait(void* ptr)
 InternalValue EMI::VMHandle::GetReturn(ValueHandle handle)
 {
 	return ((VM*)Vm)->GetReturnValue(handle);
+}
+
+bool EMI::VMHandle::ExportVM(const char* path, const ExportOptions& options)
+{
+	return ((VM*)Vm)->Export(path, options);
 }
 
 void EMI::VMHandle::Interrupt()

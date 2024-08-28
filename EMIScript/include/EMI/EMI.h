@@ -80,6 +80,11 @@ namespace EMI
 	{
 	};
 
+	struct ExportOptions
+	{
+		bool CombineUnits;
+	};
+
 	// https://stackoverflow.com/a/65382619
 	struct _internal_function {
 		void* state = 0;
@@ -181,6 +186,8 @@ namespace EMI
 		bool _internal_wait(void*);
 
 		InternalValue GetReturn(ValueHandle handle);
+
+		bool ExportVM(const char* path, const ExportOptions& options = {});
 
 		void Interrupt();
 
