@@ -3,13 +3,27 @@
 #include "Objects/UserObject.h"
 #include "Objects/StringObject.h"
 
+template<typename T>
+void WriteValue(std::ostream& out, T t) {
+	out.write((char*)&t, sizeof(T));
+}
+template<typename T>
+void ReadValue(std::istream& out, T& t) {
+	out.read((char*)&t, sizeof(T));
+}
+template<typename T>
+void ReadValue(std::istream& out, T& t, size_t count) {
+	out.read((char*)&t, count);
+}
+
 void WriteString(std::ostream& out, const std::string& str) {
-	out << (uint16_t)str.size();
+	uint16_t data = (uint16_t)str.size();
+	WriteValue(out, data);
 	out.write(str.c_str(), str.size());
 }
 std::string ReadString(std::istream& in) {
 	uint16_t size = 0;
-	in >> size;
+	ReadValue(in, size);
 	std::string str;
 	str.resize(size + 1);
 	in.read(str.data(), size);
@@ -18,7 +32,8 @@ std::string ReadString(std::istream& in) {
 
 template <class A>
 void WriteArray(std::ostream& out, const A& arr, std::function<void(std::ostream&, const typename A::value_type&)> pred) {
-	out << (uint16_t)arr.size();
+	uint16_t size = (uint16_t)arr.size();
+	WriteValue(out, size);
 	for (const auto& item : arr) {
 		pred(out, item);
 	}
@@ -26,19 +41,37 @@ void WriteArray(std::ostream& out, const A& arr, std::function<void(std::ostream
 
 template <class A>
 void WriteArray(std::ostream& out, const A& arr) {
-	auto datasize = arr.size() * sizeof(typename A::value_type);
-	out << (uint16_t)datasize;
+	uint16_t datasize = uint16_t(arr.size() * sizeof(typename A::value_type));
+	WriteValue(out, datasize);
 	out.write(reinterpret_cast<const char*>(arr.data()), datasize);
 }
 
-bool Library::Decode(std::istream& instream, SymbolTable&)
+template <class A>
+void ReadArray(std::istream& in, A& arr, std::function<void(std::istream&, typename A::value_type&)> pred) {
+	uint16_t datasize;
+	ReadValue(in, datasize);
+	arr.resize(datasize);
+	for (auto& item : arr) {
+		pred(in, item);
+	}
+}
+
+template <class A>
+void ReadArray(std::istream& in, A& arr) {
+	uint16_t datasize;
+	ReadValue(in, datasize);
+	arr.resize(datasize / sizeof(typename A::value_type));
+	in.read(reinterpret_cast<char*>(arr.data()), datasize);
+}
+
+bool Library::Decode(std::istream& instream, SymbolTable& table)
 {
+	char identifier[4];
 	uint8_t format;
-	char identifier[3];
 	uint16_t version = 0;
-	instream >> identifier;
-	instream >> format;
-	instream >> version;
+	ReadValue(instream, identifier, 3);
+	ReadValue(instream, format);
+	ReadValue(instream, version);
 
 	if (strncmp(identifier, "EMI", 3) == 0 && version > EMI_VERSION || format > FORMAT_VERSION) {
 		gError() << "Not EMI library file or version is too new";
@@ -48,34 +81,150 @@ bool Library::Decode(std::istream& instream, SymbolTable&)
 	switch (format)
 	{
 	case 1: {
+		uint16_t datasize;
+		ReadValue(instream, datasize);
 
+		for (size_t i = 0; i < datasize; i++) {
+			// Writing symbol
+			auto symbol = new Symbol();
+
+			TName name = toName(ReadString(instream).c_str());
+			uint8_t data_u8;
+			uint16_t data_u16;
+
+			ReadValue(instream, data_u8);
+			symbol->Type = (SymbolType)data_u8;
+			ReadValue(instream, data_u16);
+			symbol->Flags = (SymbolFlags)data_u16;
+			ReadValue(instream, data_u16);
+			symbol->VarType = (VariableType)data_u16;
+
+			switch (symbol->Type)
+			{
+			case SymbolType::Namespace: {
+				symbol->Data = new Namespace{ name };
+			} break;
+			case SymbolType::Object: {
+				// todo
+			} break;
+			case SymbolType::Variable: {
+				symbol->Data = new Variable();
+			} break;
+			case SymbolType::Function: {
+				auto fn = new FunctionSymbol();
+				symbol->Data = fn;
+
+				ReadValue(instream, data_u8);
+				fn->Type = (FunctionType)data_u8;
+				ReadValue(instream, data_u16);
+				fn->Return = (VariableType)data_u16;
+				ReadArray(instream, fn->Arguments, [](std::istream& in, VariableType type) {
+					uint16_t data_u16;
+					ReadValue(in, data_u16);
+					type = (VariableType)data_u16;
+				});
+
+				switch (fn->Type)
+				{
+				case FunctionType::User: {
+					auto fnd = new Function();
+					fn->DirectPtr = fnd;
+
+					ReadValue(instream, fnd->ArgCount);
+					ReadValue(instream, fnd->RegisterCount);
+					ReadValue(instream, fnd->IsPublic);
+
+					ReadArray(instream, fnd->StringTable, [](std::istream& in, Variable& var) {
+						std::string str = ReadString(in);
+						var = String::GetAllocator()->Make(str.c_str());
+					});
+
+					std::vector<double> nums;
+					ReadArray(instream, nums);
+					fnd->NumberTable.insert(nums.begin(), nums.end());
+
+					std::vector<size_t> jumps;
+					ReadArray(instream, jumps);
+					fnd->JumpTable.insert(jumps.begin(), jumps.end());
+
+					std::vector<std::pair<int,int>> debug;
+					ReadArray(instream, debug);
+					fnd->DebugLines.insert(debug.begin(), debug.end());
+
+					ReadArray(instream, fnd->Types);
+
+					ReadArray(instream, fnd->FunctionTableSymbols, [](std::istream& in, TNameQuery& name) {
+						TNameQuery query(toName(ReadString(in).c_str()));
+						ReadArray(in, query.Paths(), [](std::istream& in, TName& path) { path = toName(ReadString(in).c_str()); });
+						name = query;
+					});
+					ReadArray(instream, fnd->PropertyTableSymbols, [](std::istream& in, TName& name) {
+						name = toName(ReadString(in).c_str());
+						});
+					ReadArray(instream, fnd->TypeTableSymbols, [](std::istream& in, TNameQuery& name) {
+						TNameQuery query(toName(ReadString(in).c_str()));
+						ReadArray(in, query.Paths(), [](std::istream& in, TName& path) { path = toName(ReadString(in).c_str()); });
+						name = query;	
+					});
+					ReadArray(instream, fnd->GlobalTableSymbols, [](std::istream& in, TNameQuery& name) {
+						TNameQuery query(toName(ReadString(in).c_str()));
+						ReadArray(in, query.Paths(), [](std::istream& in, TName& path) { path = toName(ReadString(in).c_str()); });
+						name = query;	
+					});
+
+					fnd->FunctionTable.resize(fnd->FunctionTableSymbols.size());
+					fnd->IntrinsicTable.resize(fnd->FunctionTableSymbols.size());
+					fnd->ExternalTable.resize(fnd->FunctionTableSymbols.size());
+					fnd->PropertyTable.resize(fnd->PropertyTableSymbols.size());
+					fnd->TypeTable.resize(fnd->TypeTableSymbols.size());
+					fnd->GlobalTable.resize(fnd->GlobalTableSymbols.size());
+
+					ReadArray(instream, fnd->Bytecode);
+
+				} break;
+				default:
+					break;
+				}
+
+			} break;
+			default:
+				break;
+			}
+
+			table.AddName(name, symbol);
+		}
 	} break;
 	default:
 		gError() << "Invalid file format";
 		return false;
 	}
 
-	return false;
+	return true;
 }
 
 bool Library::Encode(const SymbolTable& table, std::ostream& outstream)
 {
 	outstream << "EMI";
-	outstream << FORMAT_VERSION;
-	outstream << EMI_VERSION;
+	WriteValue(outstream, FORMAT_VERSION);
+	WriteValue(outstream, EMI_VERSION);
 
-	outstream << (uint16_t)table.Table.size();
-	WriteArray(outstream, table.Table, [](std::ostream& out, const std::pair<TName, Symbol*>& pair) {
+	SymbolTable outtable;
+	for (auto& [name, symbol] : table.Table) {
+		if (symbol->Builtin) continue;
+
+		outtable.AddName(name, symbol);
+	}
+
+	WriteArray(outstream, outtable.Table, [](std::ostream& out, const std::pair<TName, Symbol*>& pair) {
 		// Writing symbol
 		auto symbol = pair.second;
 
-		if (symbol->Builtin) return;
 
 		WriteString(out, pair.first.toString());
 
-		out << (uint8_t)symbol->Type;
-		out << (uint16_t)symbol->Flags;
-		out << (uint16_t)symbol->VarType;
+		WriteValue(out, (uint8_t)symbol->Type);
+		WriteValue(out, (uint16_t)symbol->Flags);
+		WriteValue(out, (uint16_t)symbol->VarType);
 
 		if (symbol->Data) {
 			switch (symbol->Type)
@@ -88,10 +237,10 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream)
 			} break;
 			case SymbolType::Function: {
 				auto fn = static_cast<FunctionSymbol*>(symbol->Data);
-				out << (uint8_t)fn->Type;
-				out << (uint16_t)fn->Return;
+				WriteValue(out, (uint8_t)fn->Type);
+				WriteValue(out, (uint16_t)fn->Return);
 				WriteArray(out, fn->Arguments, [](std::ostream& out, VariableType type) {
-					out << (uint16_t)type;
+					WriteValue(out, (uint16_t)type);
 				});
 
 				switch (fn->Type)
@@ -99,9 +248,9 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream)
 				case FunctionType::User: {
 					auto fnd = reinterpret_cast<Function*>(fn->DirectPtr);
 
-					out << (uint8_t)fnd->ArgCount;
-					out << (uint8_t)fnd->RegisterCount;
-					out << (bool)fnd->IsPublic;
+					WriteValue(out, (uint8_t)fnd->ArgCount);
+					WriteValue(out, (uint8_t)fnd->RegisterCount);
+					WriteValue(out, (bool)fnd->IsPublic);
 
 					WriteArray(out, fnd->StringTable, [](std::ostream& out, const Variable& var) {
 						WriteString(out, var.as<String>()->data());

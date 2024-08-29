@@ -4,7 +4,7 @@
 #include <vector>
 #include <Core.h>
 
-enum class SymbolFlags
+enum class SymbolFlags : uint16_t
 {
 	None = 0,
 	Assignable = 1,

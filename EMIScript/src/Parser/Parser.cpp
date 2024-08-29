@@ -8,6 +8,7 @@
 #include "AST.h"
 #include "Lexer.h"
 #include "ParseHelper.h"
+#include "EMLibFormat.h"
 
 #ifdef EMI_PARSE_GRAMMAR
 #include "ParseTable.h"
@@ -142,8 +143,21 @@ void Parser::ThreadedParse(VM* vm)
 			options = std::move(vm->CompileQueue.front());
 			vm->CompileQueue.pop();
 		}
-		if (options.Path != "")
-			Parse(vm, options);
+		if (options.Path != "") {
+			std::filesystem::path fp(options.Path);
+			if (fp.extension() == ".ril") {
+				Parse(vm, options);
+			}
+			else if (fp.extension() == ".eml") {
+				std::ifstream file(fp, std::ios::in | std::ios::binary);
+
+				SymbolTable table;
+				auto res = Library::Decode(file, table);
+				if (res) vm->AddNamespace(MakePath(options.Path), table);
+				options.CompileResult.set_value(res);
+
+			}
+		}
 	}
 }
 
