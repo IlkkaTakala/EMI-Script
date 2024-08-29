@@ -431,11 +431,16 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n)
 	MaxRegister = 0;
 	SearchPaths.resize(1);
 
+	InitFunction = new Function();
+	InitFunction->FunctionScope = new Scoped();
+
 	HasDebug = true; // @todo: disable debugs
 }
 
 ASTWalker::~ASTWalker()
 {
+	delete InitFunction;
+
 	for (auto& n : Root->children) {
 		delete n->sym;
 	}
@@ -460,6 +465,7 @@ TName getFullId(Node* n) {
 void ASTWalker::Run()
 {
 	std::vector<std::pair<Node*, Function*>> functionList;
+	CurrentFunction = InitFunction;
 	for (auto& c : Root->children) {
 		switch (c->type)
 		{
@@ -500,6 +506,7 @@ void ASTWalker::Run()
 
 			TName name = getFullId(c->children.front());
 
+			AllSearchPaths.emplace_back(c->line, name);
 			SearchPaths.push_back(name);
 
 		} break;
@@ -737,6 +744,8 @@ void ASTWalker::Run()
 			break;
 		}
 	}
+
+	HandleInit();
 
 	for (auto& [node, function] : functionList) {
 		HandleFunction(node, function, node->sym);
@@ -1964,7 +1973,13 @@ void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 {
 	InitRegisters();
 	CurrentFunction = f;
+	SearchPaths.resize(1);
 	SearchPaths[0] = f->Name.Get(1);
+	for (auto& [line, name] : AllSearchPaths) {
+		if (line < n->line) {
+			SearchPaths.push_back(name);
+		}
+	}
 
 	for (auto& c : n->children) {
 		switch (c->type)
@@ -2037,6 +2052,33 @@ void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 	// Cleanup
 	delete f->FunctionScope;
 	f->FunctionScope = nullptr;
+}
+
+void ASTWalker::HandleInit()
+{
+	InitRegisters();
+	CurrentFunction = InitFunction;
+	SearchPaths.resize(1);
+	SearchPaths[0] = TName();
+
+	for (auto& node : Root->children) {
+		switch (node->type)
+		{
+		case Token::UsingDef: {
+			SearchPaths.push_back(getFullId(node));
+		} break;
+
+		case Token::Const:
+		case Token::VarDeclare:
+		case Token::Static: {
+			WalkLoad(node);
+			FreeConstant(node);
+		} break;
+
+		default:
+			break;
+		}
+	}
 }
 
 void ASTWalker::PlaceBreaks(Node* n, size_t start, size_t end)

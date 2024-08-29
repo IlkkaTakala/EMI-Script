@@ -59,15 +59,18 @@ private:
 	std::pair<TName, Symbol*> FindOrCreateSymbol(const TName& name, SymbolType type = SymbolType::None);
 
 	void HandleFunction(Node* n, Function* f, CompileSymbol* s);
+	void HandleInit();
 
 	bool HasDebug;
 	VM* Vm;
 	Node* Root;
 	std::vector<TName> SearchPaths;
+	std::vector<std::pair<size_t, TName>> AllSearchPaths;
 
 	// Function parsing
 	Scoped* CurrentScope;
 	Function* CurrentFunction;
+	Function* InitFunction;
 	ankerl::unordered_dense::set<std::string> StringList;
 	std::vector<Instruction> InstructionList;
 	std::array<bool, 256> Registers;
