@@ -676,20 +676,14 @@ void ASTWalker::Run()
 				{
 				case Token::TypeNumber:
 					symbol->VarType = VariableType::Number;
-					if (c->children.size() == 2) *variable = VariantToFloat(c->children[1]);
-					else *variable = 0.0;
 					symbol->Flags = symbol->Flags | SymbolFlags::Typed;
 					break;
 				case Token::TypeBoolean:
 					symbol->VarType = VariableType::Boolean;
-					if (c->children.size() == 2) *variable = VariantToBool(c->children[1]);
-					else *variable = false;
 					symbol->Flags = symbol->Flags | SymbolFlags::Typed;
 					break;
 				case Token::TypeString:
 					symbol->VarType = VariableType::String;
-					if (c->children.size() == 2) *variable = String::GetAllocator()->Make(VariantToStr(c->children[1]).c_str());
-					else String::GetAllocator()->Make("");
 					symbol->Flags = symbol->Flags | SymbolFlags::Typed;
 					break;
 				case Token::Typename:
@@ -699,9 +693,6 @@ void ASTWalker::Run()
 					break;
 				case Token::TypeArray:
 					symbol->VarType = VariableType::Array;
-					if (c->children.size() == 2) *variable = Array::GetAllocator()->Make(c->children[1]->children.size());
-					else *variable = Array::GetAllocator()->Make(0);
-					// @todo: Initialize global array
 					symbol->Flags = symbol->Flags | SymbolFlags::Typed;
 					break;
 				case Token::AnyType:
@@ -710,24 +701,16 @@ void ASTWalker::Run()
 						{
 						case Token::Number:
 							symbol->VarType = VariableType::Number;
-							if (c->children.size() == 2) *variable = VariantToFloat(c->children[1]);
-							else *variable = 0.0;
 							break;
 						case Token::True:
 						case Token::False:
 							symbol->VarType = VariableType::Boolean;
-							if (c->children.size() == 2) *variable = VariantToBool(c->children[1]);
-							else *variable = c->children[1]->type == Token::True;
 							break;
 						case Token::Literal:
 							symbol->VarType = VariableType::String;
-							if (c->children.size() == 2) *variable = String::GetAllocator()->Make(VariantToStr(c->children[1]).c_str());
-							else *variable = String::GetAllocator()->Make("");
 							break;
 						case Token::Array:
 							symbol->VarType = VariableType::Array;
-							if (c->children.size() == 2) *variable = Array::GetAllocator()->Make(c->children[1]->children.size());
-							else *variable = Array::GetAllocator()->Make(0);
 							break;
 						default:
 							symbol->VarType = VariableType::Undefined;
@@ -1782,6 +1765,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 				auto [fullname, globalSymbol] = FindSymbol(data);
 
 				if (fullname) {
+					data = fullname;
 					symbol = FindOrCreateLocalSymbol(data);
 					symbol->Sym = globalSymbol;
 					symbol->Global = true;
@@ -1843,8 +1827,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 			}
 		}
 		if (!symbol || (symbol && symbol->NeedsLoading)) {
-			auto name = getFullId(n);
-			auto it = std::find(CurrentFunction->GlobalTableSymbols.begin(), CurrentFunction->GlobalTableSymbols.end(), name);
+			auto it = std::find(CurrentFunction->GlobalTableSymbols.begin(), CurrentFunction->GlobalTableSymbols.end(), data);
 			size_t index = 0;
 
 			if (it != CurrentFunction->GlobalTableSymbols.end()) {
@@ -1852,8 +1835,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 			}
 			else {
 				index = CurrentFunction->GlobalTableSymbols.size();
-				CurrentFunction->GlobalTableSymbols.push_back(name);
-				CurrentFunction->GlobalTable.push_back(nullptr);
+				CurrentFunction->GlobalTableSymbols.push_back(data);
 			}
 
 			if (symbol) {
@@ -2034,6 +2016,8 @@ void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 	f->IntrinsicTable.resize(f->FunctionTableSymbols.size(), nullptr);
 	f->PropertyTable.resize(f->PropertyTableSymbols.size(), -1);
 	f->TypeTable.resize(f->TypeTableSymbols.size(), VariableType::Undefined);
+	f->GlobalTable.resize(f->GlobalTableSymbols.size(), nullptr);
+
 
 
 	f->StringTable.reserve(StringList.size());
@@ -2058,12 +2042,16 @@ void ASTWalker::HandleInit()
 {
 	InitRegisters();
 	CurrentFunction = InitFunction;
+	CurrentScope = CurrentFunction->FunctionScope;
 	SearchPaths.resize(1);
 	SearchPaths[0] = TName();
 
 	for (auto& node : Root->children) {
 		switch (node->type)
 		{
+		case Token::NamespaceDef: {
+			SearchPaths[0] = getFullId(node);
+		} break;
 		case Token::UsingDef: {
 			SearchPaths.push_back(getFullId(node));
 		} break;
@@ -2071,14 +2059,63 @@ void ASTWalker::HandleInit()
 		case Token::Const:
 		case Token::VarDeclare:
 		case Token::Static: {
+			auto old = node->children[0];
+			Token type = old->type;
+			auto data = old->data;
+			old->type = Token::Id;
+			old->data = node->data;
+			node->type = Token::Assign;
 			WalkLoad(node);
 			FreeConstant(node);
+			old->type = type;
+			old->data = data;
+			node->sym = nullptr;
 		} break;
 
 		default:
 			break;
 		}
 	}
+	Instruction op;
+	op.code = OpCodes::Return;
+	op.in1 = 0;
+	InstructionList.emplace_back(op);
+
+	InitFunction->Bytecode.resize(InstructionList.size());
+	for (size_t i = 0; i < InstructionList.size(); i++) {
+		InitFunction->Bytecode[i] = InstructionList[i].data;
+	}
+
+#ifdef DEBUG
+	gDebug() << "Init Function";
+	gLogger() << "\n----------------------------------\n";
+	for (auto& in : InstructionList) {
+		printInstruction(in);
+	}
+#endif // DEBUG
+
+	InitFunction->FunctionTable.resize(InitFunction->FunctionTableSymbols.size(), nullptr);
+	InitFunction->ExternalTable.resize(InitFunction->FunctionTableSymbols.size(), nullptr);
+	InitFunction->IntrinsicTable.resize(InitFunction->FunctionTableSymbols.size(), nullptr);
+	InitFunction->PropertyTable.resize(InitFunction->PropertyTableSymbols.size(), -1);
+	InitFunction->TypeTable.resize(InitFunction->TypeTableSymbols.size(), VariableType::Undefined);
+	InitFunction->GlobalTable.resize(InitFunction->GlobalTableSymbols.size(), nullptr);
+
+	InitFunction->StringTable.reserve(StringList.size());
+	for (auto& str : StringList) {
+		InitFunction->StringTable.emplace_back(String::GetAllocator()->Make(str.c_str()));
+	}
+	StringList.clear();
+
+	InitFunction->RegisterCount = MaxRegister + 1;
+	InstructionList.clear();
+
+	CurrentFunction = nullptr;
+	CurrentScope = nullptr;
+
+	// Cleanup
+	delete InitFunction->FunctionScope;
+	InitFunction->FunctionScope = nullptr;
 }
 
 void ASTWalker::PlaceBreaks(Node* n, size_t start, size_t end)

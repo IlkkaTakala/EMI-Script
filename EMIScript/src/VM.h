@@ -128,7 +128,7 @@ public:
 	bool WaitForResult(void* ptr);
 
 	std::pair<TName, Symbol*> FindSymbol(const TNameQuery& name);
-	void AddNamespace(const std::string& path, const SymbolTable& space);
+	void AddNamespace(const std::string& path, const SymbolTable& space, Function* InitFunction);
 
 	inline bool IsRunning() const { return VMRunning; }
 

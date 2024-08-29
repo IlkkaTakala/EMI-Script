@@ -48,6 +48,7 @@ public:
 	~ASTWalker();
 	void Run();
 	SymbolTable Global;
+	Function* InitFunction;
 	bool HasError;
 private:
 	void WalkLoad(Node*);
@@ -70,7 +71,6 @@ private:
 	// Function parsing
 	Scoped* CurrentScope;
 	Function* CurrentFunction;
-	Function* InitFunction;
 	ankerl::unordered_dense::set<std::string> StringList;
 	std::vector<Instruction> InstructionList;
 	std::array<bool, 256> Registers;

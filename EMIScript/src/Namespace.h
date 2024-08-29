@@ -43,7 +43,9 @@ struct Namespace
 	TName Name;
 };
 
+struct Function;
 struct CompileUnit
 {
 	std::vector<TName> Symbols;
+	Function* InitFunction;
 };

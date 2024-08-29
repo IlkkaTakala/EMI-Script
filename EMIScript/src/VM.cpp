@@ -229,7 +229,7 @@ std::pair<TName, Symbol*> VM::FindSymbol(const TNameQuery& name)
 	return GlobalSymbols.FindName(name);
 }
 
-void VM::AddNamespace(const std::string& path, const SymbolTable& space)
+void VM::AddNamespace(const std::string& path, const SymbolTable& space, Function* InitFunction)
 {
 	std::unique_lock lk(MergeMutex);
 	Units[path].Symbols.reserve(space.Table.size());
@@ -249,7 +249,12 @@ void VM::AddNamespace(const std::string& path, const SymbolTable& space)
 			break;
 		}
 	}
+
+	Units[path].InitFunction = InitFunction;
 	GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
+
+	size_t idx = CallFunction(EMI::FunctionHandle{ InitFunction, nullptr }, {});
+	GetReturnValue(idx);
 }
 
 void VM::RemoveUnit(const std::string& unit)
@@ -272,7 +277,7 @@ void VM::RemoveUnit(const std::string& unit)
 			delete node;
 			GlobalSymbols.Table.erase(name);
 		}
-
+		delete Units[unit].InitFunction;
 		Units.erase(unit);
 	}
 }
@@ -332,6 +337,8 @@ void Runner::Run()
 		current->Ptr = current->FunctionPtr->Bytecode.data();
 		current->End = current->Ptr + current->FunctionPtr->Bytecode.size();
 		current->StackOffset = 0;
+
+		if (current->FunctionPtr->Bytecode.size() == 0) break;
 
 		Registers.reserve(current->FunctionPtr->RegisterCount);
 		Registers.to(0);

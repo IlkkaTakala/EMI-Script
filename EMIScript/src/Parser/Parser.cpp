@@ -152,8 +152,9 @@ void Parser::ThreadedParse(VM* vm)
 				std::ifstream file(fp, std::ios::in | std::ios::binary);
 
 				SymbolTable table;
-				auto res = Library::Decode(file, table);
-				if (res) vm->AddNamespace(MakePath(options.Path), table);
+				Function* Init;
+				auto res = Library::Decode(file, table, Init);
+				if (res) vm->AddNamespace(MakePath(options.Path), table, Init);
 				options.CompileResult.set_value(res);
 
 			}
@@ -199,7 +200,8 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	ast.Run();
 
 	if (!ast.HasError) {
-		vm->AddNamespace(fullPath, ast.Global);
+		vm->AddNamespace(fullPath, ast.Global, ast.InitFunction);
+		ast.InitFunction = nullptr;
 		ast.Global.Table.clear();
 		options.CompileResult.set_value(true);
 	}

@@ -64,7 +64,7 @@ void ReadArray(std::istream& in, A& arr) {
 	in.read(reinterpret_cast<char*>(arr.data()), datasize);
 }
 
-bool Library::Decode(std::istream& instream, SymbolTable& table)
+bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init)
 {
 	char identifier[4];
 	uint8_t format;
@@ -193,6 +193,11 @@ bool Library::Decode(std::istream& instream, SymbolTable& table)
 
 			table.AddName(name, symbol);
 		}
+
+		init = new Function();
+
+		// @todo: Read init function;
+
 	} break;
 	default:
 		gError() << "Invalid file format";
@@ -290,6 +295,8 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream)
 			}
 		}
 	});
+
+	// @todo: Write init function;
 
 	return true;
 }
