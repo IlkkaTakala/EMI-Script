@@ -2056,6 +2056,11 @@ void ASTWalker::HandleInit()
 			SearchPaths.push_back(getFullId(node));
 		} break;
 
+		case Token::PublicFunctionDef:
+		case Token::FunctionDef:
+		case Token::ObjectDef:
+			break;
+
 		case Token::Const:
 		case Token::VarDeclare:
 		case Token::Static: {
@@ -2073,6 +2078,8 @@ void ASTWalker::HandleInit()
 		} break;
 
 		default:
+			WalkLoad(node);
+			FreeConstant(node);
 			break;
 		}
 	}

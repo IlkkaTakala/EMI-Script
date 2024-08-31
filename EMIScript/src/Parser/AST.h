@@ -95,13 +95,12 @@ private:
 	}
 
 	uint8_t GetLastFree() {
-		uint8_t idx = 254;
+		uint8_t idx = 0;
 		for (uint8_t i = 0; i < 254; i++) {
 			if (Registers[i]) {
-				idx = i;
+				idx = i + 1;
 			}
 		}
-		idx++;
 		Registers[idx] = true;
 		MaxRegister = idx;
 		return idx;
