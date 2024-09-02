@@ -80,7 +80,6 @@ struct Function
 
 	std::vector<Variable> StringTable;
 	ankerl::unordered_dense::set<double> NumberTable;
-	ankerl::unordered_dense::set<size_t> JumpTable;
 
 	std::vector<Function*> FunctionTable;
 	std::vector<EMI::_internal_function*> ExternalTable;
@@ -115,4 +114,6 @@ struct Function
 	~Function() {
 		delete FunctionScope;
 	}
+
+	void Append(Function fn);
 };

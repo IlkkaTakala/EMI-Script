@@ -64,9 +64,91 @@ void ReadArray(std::istream& in, A& arr) {
 	in.read(reinterpret_cast<char*>(arr.data()), datasize);
 }
 
+void WriteFunction(std::ostream& out, const Function* fnd) {
+	
+	WriteValue(out, (uint8_t)fnd->ArgCount);
+	WriteValue(out, (uint8_t)fnd->RegisterCount);
+	WriteValue(out, (bool)fnd->IsPublic);
+
+	WriteArray(out, fnd->StringTable, [](std::ostream& out, const Variable& var) {
+		WriteString(out, var.as<String>()->data());
+		});
+
+	WriteArray(out, fnd->NumberTable.values());
+	WriteArray(out, fnd->DebugLines.values());
+	WriteArray(out, fnd->Types);
+
+	WriteArray(out, fnd->FunctionTableSymbols, [](std::ostream& out, const TNameQuery& name) {
+		WriteString(out, name.GetTarget().toString());
+		WriteArray(out, name.GetPaths(), [](std::ostream& out, const TName& path) { WriteString(out, path.toString()); });
+		});
+	WriteArray(out, fnd->PropertyTableSymbols, [](std::ostream& out, const TName& name) {
+		WriteString(out, name.toString());
+		});
+	WriteArray(out, fnd->TypeTableSymbols, [](std::ostream& out, const TNameQuery& name) {
+		WriteString(out, name.GetTarget().toString());
+		WriteArray(out, name.GetPaths(), [](std::ostream& out, const TName& path) { WriteString(out, path.toString()); });
+		});
+	WriteArray(out, fnd->GlobalTableSymbols, [](std::ostream& out, const TNameQuery& name) {
+		WriteString(out, name.GetTarget().toString());
+		WriteArray(out, name.GetPaths(), [](std::ostream& out, const TName& path) { WriteString(out, path.toString()); });
+		});
+
+	WriteArray(out, fnd->Bytecode);
+}
+
+void ReadFunction(std::istream& instream, Function* fnd) {
+	ReadValue(instream, fnd->ArgCount);
+	ReadValue(instream, fnd->RegisterCount);
+	ReadValue(instream, fnd->IsPublic);
+
+	ReadArray(instream, fnd->StringTable, [](std::istream& in, Variable& var) {
+		std::string str = ReadString(in);
+		var = String::GetAllocator()->Make(str.c_str());
+		});
+
+	std::vector<double> nums;
+	ReadArray(instream, nums);
+	fnd->NumberTable.insert(nums.begin(), nums.end());
+
+	std::vector<std::pair<int, int>> debug;
+	ReadArray(instream, debug);
+	fnd->DebugLines.insert(debug.begin(), debug.end());
+
+	ReadArray(instream, fnd->Types);
+
+	ReadArray(instream, fnd->FunctionTableSymbols, [](std::istream& in, TNameQuery& name) {
+		TNameQuery query(toName(ReadString(in).c_str()));
+		ReadArray(in, query.Paths(), [](std::istream& in, TName& path) { path = toName(ReadString(in).c_str()); });
+		name = query;
+		});
+	ReadArray(instream, fnd->PropertyTableSymbols, [](std::istream& in, TName& name) {
+		name = toName(ReadString(in).c_str());
+		});
+	ReadArray(instream, fnd->TypeTableSymbols, [](std::istream& in, TNameQuery& name) {
+		TNameQuery query(toName(ReadString(in).c_str()));
+		ReadArray(in, query.Paths(), [](std::istream& in, TName& path) { path = toName(ReadString(in).c_str()); });
+		name = query;
+		});
+	ReadArray(instream, fnd->GlobalTableSymbols, [](std::istream& in, TNameQuery& name) {
+		TNameQuery query(toName(ReadString(in).c_str()));
+		ReadArray(in, query.Paths(), [](std::istream& in, TName& path) { path = toName(ReadString(in).c_str()); });
+		name = query;
+		});
+
+	fnd->FunctionTable.resize(fnd->FunctionTableSymbols.size());
+	fnd->IntrinsicTable.resize(fnd->FunctionTableSymbols.size());
+	fnd->ExternalTable.resize(fnd->FunctionTableSymbols.size());
+	fnd->PropertyTable.resize(fnd->PropertyTableSymbols.size());
+	fnd->TypeTable.resize(fnd->TypeTableSymbols.size());
+	fnd->GlobalTable.resize(fnd->GlobalTableSymbols.size());
+
+	ReadArray(instream, fnd->Bytecode);
+}
+
 bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init)
 {
-	char identifier[4];
+	char identifier[4] = { 0 };
 	uint8_t format;
 	uint16_t version = 0;
 	ReadValue(instream, identifier, 3);
@@ -130,62 +212,12 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init
 					auto fnd = new Function();
 					fn->DirectPtr = fnd;
 
-					ReadValue(instream, fnd->ArgCount);
-					ReadValue(instream, fnd->RegisterCount);
-					ReadValue(instream, fnd->IsPublic);
-
-					ReadArray(instream, fnd->StringTable, [](std::istream& in, Variable& var) {
-						std::string str = ReadString(in);
-						var = String::GetAllocator()->Make(str.c_str());
-					});
-
-					std::vector<double> nums;
-					ReadArray(instream, nums);
-					fnd->NumberTable.insert(nums.begin(), nums.end());
-
-					std::vector<size_t> jumps;
-					ReadArray(instream, jumps);
-					fnd->JumpTable.insert(jumps.begin(), jumps.end());
-
-					std::vector<std::pair<int,int>> debug;
-					ReadArray(instream, debug);
-					fnd->DebugLines.insert(debug.begin(), debug.end());
-
-					ReadArray(instream, fnd->Types);
-
-					ReadArray(instream, fnd->FunctionTableSymbols, [](std::istream& in, TNameQuery& name) {
-						TNameQuery query(toName(ReadString(in).c_str()));
-						ReadArray(in, query.Paths(), [](std::istream& in, TName& path) { path = toName(ReadString(in).c_str()); });
-						name = query;
-					});
-					ReadArray(instream, fnd->PropertyTableSymbols, [](std::istream& in, TName& name) {
-						name = toName(ReadString(in).c_str());
-						});
-					ReadArray(instream, fnd->TypeTableSymbols, [](std::istream& in, TNameQuery& name) {
-						TNameQuery query(toName(ReadString(in).c_str()));
-						ReadArray(in, query.Paths(), [](std::istream& in, TName& path) { path = toName(ReadString(in).c_str()); });
-						name = query;	
-					});
-					ReadArray(instream, fnd->GlobalTableSymbols, [](std::istream& in, TNameQuery& name) {
-						TNameQuery query(toName(ReadString(in).c_str()));
-						ReadArray(in, query.Paths(), [](std::istream& in, TName& path) { path = toName(ReadString(in).c_str()); });
-						name = query;	
-					});
-
-					fnd->FunctionTable.resize(fnd->FunctionTableSymbols.size());
-					fnd->IntrinsicTable.resize(fnd->FunctionTableSymbols.size());
-					fnd->ExternalTable.resize(fnd->FunctionTableSymbols.size());
-					fnd->PropertyTable.resize(fnd->PropertyTableSymbols.size());
-					fnd->TypeTable.resize(fnd->TypeTableSymbols.size());
-					fnd->GlobalTable.resize(fnd->GlobalTableSymbols.size());
-
-					ReadArray(instream, fnd->Bytecode);
+					ReadFunction(instream, fnd);
 
 				} break;
 				default:
 					break;
 				}
-
 			} break;
 			default:
 				break;
@@ -196,7 +228,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init
 
 		init = new Function();
 
-		// @todo: Read init function;
+		ReadFunction(instream, init);
 
 	} break;
 	default:
@@ -207,7 +239,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init
 	return true;
 }
 
-bool Library::Encode(const SymbolTable& table, std::ostream& outstream)
+bool Library::Encode(const SymbolTable& table, std::ostream& outstream, Function* init)
 {
 	outstream << "EMI";
 	WriteValue(outstream, FORMAT_VERSION);
@@ -215,6 +247,7 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream)
 
 	SymbolTable outtable;
 	for (auto& [name, symbol] : table.Table) {
+		if (!symbol) continue;
 		if (symbol->Builtin) continue;
 
 		outtable.AddName(name, symbol);
@@ -246,44 +279,13 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream)
 				WriteValue(out, (uint16_t)fn->Return);
 				WriteArray(out, fn->Arguments, [](std::ostream& out, VariableType type) {
 					WriteValue(out, (uint16_t)type);
-				});
+					});
 
 				switch (fn->Type)
 				{
 				case FunctionType::User: {
 					auto fnd = reinterpret_cast<Function*>(fn->DirectPtr);
-
-					WriteValue(out, (uint8_t)fnd->ArgCount);
-					WriteValue(out, (uint8_t)fnd->RegisterCount);
-					WriteValue(out, (bool)fnd->IsPublic);
-
-					WriteArray(out, fnd->StringTable, [](std::ostream& out, const Variable& var) {
-						WriteString(out, var.as<String>()->data());
-					});
-
-					WriteArray(out, fnd->NumberTable.values());
-					WriteArray(out, fnd->JumpTable.values());
-					WriteArray(out, fnd->DebugLines.values());
-					WriteArray(out, fnd->Types);
-
-					WriteArray(out, fnd->FunctionTableSymbols, [](std::ostream& out, const TNameQuery& name){
-						WriteString(out, name.GetTarget().toString());
-						WriteArray(out, name.GetPaths(), [](std::ostream& out, const TName& path){ WriteString(out, path.toString()); });
-					});
-					WriteArray(out, fnd->PropertyTableSymbols, [](std::ostream& out, const TName& name){
-						WriteString(out, name.toString());
-					});
-					WriteArray(out, fnd->TypeTableSymbols, [](std::ostream& out, const TNameQuery& name){
-						WriteString(out, name.GetTarget().toString());
-						WriteArray(out, name.GetPaths(), [](std::ostream& out, const TName& path){ WriteString(out, path.toString()); });
-					});
-					WriteArray(out, fnd->GlobalTableSymbols, [](std::ostream& out, const TNameQuery& name){
-						WriteString(out, name.GetTarget().toString());
-						WriteArray(out, name.GetPaths(), [](std::ostream& out, const TName& path){ WriteString(out, path.toString()); });
-					});
-					
-					WriteArray(out, fnd->Bytecode);
-				
+					WriteFunction(out, fnd);
 				} break;
 				default:
 					break;
@@ -296,7 +298,7 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream)
 		}
 	});
 
-	// @todo: Write init function;
+	WriteFunction(outstream, init);
 
 	return true;
 }

@@ -165,4 +165,5 @@ private:
 
 	ankerl::unordered_dense::map<std::string, CompileUnit> Units;
 	SymbolTable GlobalSymbols;
+
 };

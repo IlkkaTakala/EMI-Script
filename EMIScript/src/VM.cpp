@@ -110,8 +110,17 @@ bool VM::Export(const char* path, const ExportOptions& options)
 			gError() << "Cannot open file for writing: " << fullpath;
 			return false;
 		}
+		if (Units.size() == 0) {
+			gError() << "No compiled scripts";
+			return false;
+		}
 
-		if (!Library::Encode(GlobalSymbols, file)) {
+		Function* fn = Units.values()[0].second.InitFunction;
+		for (int i = 1; i < Units.size(); i++) {
+			fn->Append(*Units.values()[i].second.InitFunction);
+		}
+
+		if (!Library::Encode(GlobalSymbols, file, fn)) {
 			gError() << "Writing library file failed";
 			return false;
 		}
@@ -132,7 +141,7 @@ bool VM::Export(const char* path, const ExportOptions& options)
 				table.AddName(id, GlobalSymbols.Table[id]);
 			}
 
-			if (!Library::Encode(table, file)) {
+			if (!Library::Encode(table, file, unit.InitFunction)) {
 				gError() << "Writing library file failed";
 				return false;
 			}
@@ -350,7 +359,6 @@ void Runner::Run()
 
 #define NUMS current->FunctionPtr->NumberTable.values()
 #define STRS current->FunctionPtr->StringTable
-#define JUMPS current->FunctionPtr->JumpTable.values()
 		out:
 		while (interrupt && Running) {
 
