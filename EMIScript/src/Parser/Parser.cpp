@@ -154,10 +154,13 @@ void Parser::ThreadedParse(VM* vm)
 				SymbolTable table;
 				Function* Init;
 				auto res = Library::Decode(file, table, Init);
-				if (res) vm->AddNamespace(MakePath(options.Path), table, Init);
+				if (res) vm->AddCompileUnit(MakePath(options.Path), table, Init);
 				options.CompileResult.set_value(res);
 
 			}
+		}
+		else if (!options.Data.empty()) {
+			ParseTemporary(vm, options);
 		}
 	}
 }
@@ -200,13 +203,44 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	ast.Run();
 
 	if (!ast.HasError) {
-		vm->AddNamespace(fullPath, ast.Global, ast.InitFunction);
+		vm->AddCompileUnit(fullPath, ast.Global, ast.InitFunction);
 		ast.InitFunction = nullptr;
 		ast.Global.Table.clear();
 		options.CompileResult.set_value(true);
 	}
 	else {
 		gError() << "Errors present, compile failed: " << fullPath;
+		options.CompileResult.set_value(false);
+	}
+}
+
+void Parser::ParseTemporary(VM* vm, CompileOptions& options)
+{
+	gDebug() << "Constructing AST";
+	auto root = ConstructAST(options);
+	if (!root) {
+		gError() << "Parse failed";
+		options.CompileResult.set_value(false);
+		return;
+	}
+
+	Desugar(root);
+
+#ifdef DEBUG
+	root->print("");
+#endif // DEBUG
+	gDebug() << "Walking AST";
+	ASTWalker ast(vm, root);
+	ast.Run();
+
+	if (!ast.HasError) {
+		vm->AddCompileUnit("__emi_temp_funcs", ast.Global, ast.InitFunction);
+		ast.InitFunction = nullptr;
+		ast.Global.Table.clear();
+		options.CompileResult.set_value(true);
+	}
+	else {
+		gError() << "Errors present, compile failed";
 		options.CompileResult.set_value(false);
 	}
 }

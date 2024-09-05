@@ -1,5 +1,6 @@
 #include "Function.h"
 
+// @todo: Fix this, doesn't work with sets!!!
 void Function::Append(Function fn)
 {
 	if (ArgCount != 0 || IsPublic != fn.IsPublic) {

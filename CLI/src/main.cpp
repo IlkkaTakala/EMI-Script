@@ -72,9 +72,11 @@ int main()
 	auto vm = EMI::CreateEnvironment();
 	vm.ReinitializeGrammar("../../.grammar");
 
+
 	bool run = true;
 	std::string input;
 	while (run) {
+		printf("\nemi: ");
 		std::getline(std::cin, input);
 
 		auto res = split(input, ' ');
@@ -86,7 +88,6 @@ int main()
 			result = it->second(vm, res);
 		}
 
-		printf("\n\n");
 		if (result == 0) continue;
 
 		switch (result)
@@ -95,7 +96,7 @@ int main()
 			bool runScriptMode = true;
 			while (runScriptMode)
 			{
-				printf(">> ");
+				printf("\n>> ");
 				std::getline(std::cin, input);
 				if (input == "quit") {
 					runScriptMode = false;
@@ -105,20 +106,19 @@ int main()
 				if (res.size() > 0) {
 					EMI::FunctionHandle h = vm.GetFunctionHandle(res[0].c_str());
 					auto handle = h(res.size() > 1 ? res[1].c_str() : "10");
-					/*if (handle.get<const char*>()) 
-						std::cout << handle.get<const char*>() << '\n';*/
+					handle.get<int>();
 				}
 			}
 			vm.Interrupt();
-			printf("Exiting script stage\n\n");
+			printf("\nExiting script stage\n\n");
 		} break;
 
 		case 2: {
-			printf("Running in scripting mode\n");
+			printf("\nRunning in scripting mode\n");
 			bool runScriptMode = true;
 			while (runScriptMode)
 			{
-				printf(">> ");
+				printf("\n>> ");
 				std::getline(std::cin, input);
 				if (input == "quit") {
 					runScriptMode = false;

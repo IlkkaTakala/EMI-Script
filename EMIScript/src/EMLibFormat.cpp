@@ -136,12 +136,12 @@ void ReadFunction(std::istream& instream, Function* fnd) {
 		name = query;
 		});
 
-	fnd->FunctionTable.resize(fnd->FunctionTableSymbols.size());
-	fnd->IntrinsicTable.resize(fnd->FunctionTableSymbols.size());
-	fnd->ExternalTable.resize(fnd->FunctionTableSymbols.size());
-	fnd->PropertyTable.resize(fnd->PropertyTableSymbols.size());
-	fnd->TypeTable.resize(fnd->TypeTableSymbols.size());
-	fnd->GlobalTable.resize(fnd->GlobalTableSymbols.size());
+	fnd->FunctionTable.resize(fnd->FunctionTableSymbols.size(), nullptr);
+	fnd->IntrinsicTable.resize(fnd->FunctionTableSymbols.size(), nullptr);
+	fnd->ExternalTable.resize(fnd->FunctionTableSymbols.size(), nullptr);
+	fnd->PropertyTable.resize(fnd->PropertyTableSymbols.size(), -1);
+	fnd->TypeTable.resize(fnd->TypeTableSymbols.size(), VariableType::Undefined);
+	fnd->GlobalTable.resize(fnd->GlobalTableSymbols.size(), nullptr);
 
 	ReadArray(instream, fnd->Bytecode);
 }
@@ -187,7 +187,17 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init
 				symbol->Data = new Namespace{ name };
 			} break;
 			case SymbolType::Object: {
-				// todo
+				auto ob = new UserDefinedType();
+				ReadValue(instream, ob->Type);
+				std::vector<int> data;
+				ReadArray(instream, data, [ob](std::istream& in, int&) {
+					auto name = toName(ReadString(in).c_str());
+					Symbol flags;
+					ReadValue(in, flags.Flags);
+					ReadValue(in, flags.VarType);
+					ob->AddField(name, {}, flags);
+				});
+				symbol->Data = ob;
 			} break;
 			case SymbolType::Variable: {
 				symbol->Data = new Variable();
@@ -271,7 +281,13 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream, Function
 				// Might need namespace
 			} break;
 			case SymbolType::Object: {
-
+				auto ob = static_cast<UserDefinedType*>(symbol->Data);
+				WriteValue(out, ob->Type);
+				WriteArray(out, ob->GetFields().values(), [](std::ostream& out, const auto& data) {
+					WriteString(out, data.first.toString());
+					WriteValue(out, data.second.Flags);
+					WriteValue(out, data.second.VarType);
+				});
 			} break;
 			case SymbolType::Function: {
 				auto fn = static_cast<FunctionSymbol*>(symbol->Data);

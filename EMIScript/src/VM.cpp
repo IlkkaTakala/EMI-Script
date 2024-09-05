@@ -238,7 +238,7 @@ std::pair<TName, Symbol*> VM::FindSymbol(const TNameQuery& name)
 	return GlobalSymbols.FindName(name);
 }
 
-void VM::AddNamespace(const std::string& path, const SymbolTable& space, Function* InitFunction)
+void VM::AddCompileUnit(const std::string& path, const SymbolTable& space, Function* InitFunction)
 {
 	std::unique_lock lk(MergeMutex);
 	Units[path].Symbols.reserve(space.Table.size());

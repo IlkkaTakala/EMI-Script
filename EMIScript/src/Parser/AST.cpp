@@ -579,7 +579,7 @@ void ASTWalker::Run()
 						gError() << "Parse error in object " << addedName;
 					}
 					TName fieldName(std::get<0>(field->data).c_str());
-					Global.AddName(fieldName.Append(addedName), nullptr);
+					//Global.AddName(fieldName.Append(addedName), nullptr); // @todo: is this necessary
 					object->AddField(fieldName, var, flags);
 				}
 			}
@@ -732,7 +732,7 @@ void ASTWalker::Run()
 
 	for (auto& [node, function] : functionList) {
 		HandleFunction(node, function, node->sym);
-		gInfo() << "Generated function '" << function->Name << "', used " << MaxRegister + 1 << " registers and " << function->Bytecode.size() << " instructions";
+		gInfo() << "Generated function '" << function->Name << "', used " << MaxRegister + 1 << " registers and " << function->Bytecode.size() << " instructions\n";
 
 	}
 }
