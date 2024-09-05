@@ -1,23 +1,26 @@
 #pragma once
 #include <ostream>
 #include <array>
+#include <sstream>
+#include "EMI/EMI.h"
 
-enum class LogLevel : uint8_t
-{
-	Debug,
-	Info,
-	Warning,
-	Error,
-	None,
-};
-
-class Logger
+class DefaultLogger : public EMI::Logger
 {
 public:
-	explicit Logger();
-	void SetLogLevel(int level);
+	void Print(const char*) override;
 
-	Logger& operator<<(LogLevel level)
+private:
+
+};
+
+class BaseLogger
+{
+public:
+	explicit BaseLogger();
+	void SetLogLevel(EMI::LogLevel level);
+	void SetLogger(EMI::Logger* log);
+
+	BaseLogger& operator<<(EMI::LogLevel level)
 	{
 		CurrentLevel = level;
 		*this << LogNames[(uint8_t)CurrentLevel];
@@ -25,23 +28,25 @@ public:
 	}
 
 	template<typename T>
-	friend Logger& operator<<(Logger& log, const T& arg) {
-		if (log.OutputLevel <= log.CurrentLevel)
-			log.Output << arg;
+	friend BaseLogger& operator<<(BaseLogger& log, const T& arg) {
+		if (log.OutputLevel > log.CurrentLevel) return log;
+		std::stringstream ss;
+		ss << arg;
+		log.Output->Print(ss.str().c_str());
 		return log;
 	}
 
 private:
-	std::ostream Output;
-	LogLevel CurrentLevel;
-	LogLevel OutputLevel;
+	EMI::Logger* Output;
+	EMI::LogLevel CurrentLevel;
+	EMI::LogLevel OutputLevel;
 
 	static constexpr std::array<const char*, 4> LogNames = { "[Debug] ", "[Info] ", "[Warning] ", "[Error] " };
 
-	bool operator=(const Logger & other) const = delete;
-	bool operator=(const Logger && other) const = delete;
-	Logger(const Logger& other) = delete;
-	Logger(const Logger&& other) = delete;
+	bool operator=(const BaseLogger & other) const = delete;
+	bool operator=(const BaseLogger && other) const = delete;
+	BaseLogger(const BaseLogger& other) = delete;
+	BaseLogger(const BaseLogger&& other) = delete;
 };
 
 std::string MakePath(const std::string& path);

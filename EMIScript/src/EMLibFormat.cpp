@@ -156,7 +156,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init
 	ReadValue(instream, version);
 
 	if (strncmp(identifier, "EMI", 3) == 0 && version > EMI_VERSION || format > FORMAT_VERSION) {
-		gError() << "Not EMI library file or version is too new";
+		gCompileError() << "Not EMI library file or version is too new";
 		return false;
 	}
 
@@ -242,7 +242,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init
 
 	} break;
 	default:
-		gError() << "Invalid file format";
+		gCompileError() << "Invalid file format";
 		return false;
 	}
 

@@ -49,19 +49,19 @@ void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 {
 #ifdef EMI_PARSE_GRAMMAR
 	if (!std::filesystem::exists(grammar)) {
-		gError() << "Grammar not found";
+		gCompileError() << "Grammar not found";
 		return;
 	}
 	auto lastTime = std::filesystem::last_write_time(grammar);
 	size_t count = lastTime.time_since_epoch().count();
 	
-	gDebug() << "Initializing grammar...";
+	gCompileDebug() << "Initializing grammar...";
 
 	if (count > CreateTime) {
 
 		std::fstream in(grammar, std::ios::in);
 		if (!in.is_open()) {
-			gDebug() << "No grammar found";
+			gCompileDebug() << "No grammar found";
 			return;
 		}
 
@@ -113,7 +113,7 @@ void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 		}
 
 		if (Rules.size() != Data.size()) {
-			gDebug() << "Invalid grammar";
+			gCompileDebug() << "Invalid grammar";
 			return;
 		}
 
@@ -123,7 +123,7 @@ void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 		Rules.clear();
 	}
 
-	gDebug() << "Grammar compiled";
+	gCompileDebug() << "Grammar compiled";
 #endif
 }
 
@@ -169,9 +169,9 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 {
 	auto fullPath = MakePath(options.Path);
 	if (options.Data.size() == 0) {
-		gDebug() << "Parsing file " << fullPath;
+		gCompileDebug() << "Parsing file " << fullPath;
 		if (!std::filesystem::exists(options.Path)) {
-			gWarn() << fullPath << ": File not found";
+			gCompileWarn() << fullPath << ": File not found";
 			options.CompileResult.set_value(false);
 			return;
 		}
@@ -179,16 +179,16 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	}
 	else {
 		if (options.Data.size() == 0) {
-			gError() << "No data given";
+			gCompileError() << "No data given";
 			options.CompileResult.set_value(false);
 			return;
 		}
 	}
 
-	gDebug() << "Constructing AST";
+	gCompileDebug() << "Constructing AST";
 	auto root = ConstructAST(options);
 	if (!root) {
-		gError() << fullPath << ": Parse failed";
+		gCompileError() << fullPath << ": Parse failed";
 		options.CompileResult.set_value(false);
 		return;
 	}
@@ -198,7 +198,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 #ifdef DEBUG
 	root->print("");
 #endif // DEBUG
-	gDebug() << "Walking AST";
+	gCompileDebug() << "Walking AST";
 	ASTWalker ast(vm, root);
 	ast.Run();
 
@@ -209,17 +209,17 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 		options.CompileResult.set_value(true);
 	}
 	else {
-		gError() << "Errors present, compile failed: " << fullPath;
+		gCompileError() << "Errors present, compile failed: " << fullPath;
 		options.CompileResult.set_value(false);
 	}
 }
 
 void Parser::ParseTemporary(VM* vm, CompileOptions& options)
 {
-	gDebug() << "Constructing AST";
+	gCompileDebug() << "Constructing AST";
 	auto root = ConstructAST(options);
 	if (!root) {
-		gError() << "Parse failed";
+		gCompileError() << "Parse failed";
 		options.CompileResult.set_value(false);
 		return;
 	}
@@ -229,7 +229,7 @@ void Parser::ParseTemporary(VM* vm, CompileOptions& options)
 #ifdef DEBUG
 	root->print("");
 #endif // DEBUG
-	gDebug() << "Walking AST";
+	gCompileDebug() << "Walking AST";
 	ASTWalker ast(vm, root);
 	ast.Run();
 
@@ -240,7 +240,7 @@ void Parser::ParseTemporary(VM* vm, CompileOptions& options)
 		options.CompileResult.set_value(true);
 	}
 	else {
-		gError() << "Errors present, compile failed";
+		gCompileError() << "Errors present, compile failed";
 		options.CompileResult.set_value(false);
 	}
 }
@@ -260,7 +260,7 @@ Node* Parser::ConstructAST(CompileOptions& options)
 
 		}
 		else {
-			gLogger() << LogLevel::Warning << MakePath(options.Path) << ": Cannot open file";
+			gCompileLogger() << EMI::LogLevel::Warning << MakePath(options.Path) << ": Cannot open file";
 		}
 	}
 
@@ -403,15 +403,15 @@ Node* Parser::ConstructAST(CompileOptions& options)
 		ERRORCASE:
 		default: {
 			const auto& c = lex.GetContext();
-			gError() << MakePath(options.Path) 
+			gCompileError() << MakePath(options.Path) 
 				<< " (" << c.Row << ", " << c.Column << ")"
 				<< ": Critical error found '" << holder.data << "'. ";
 #ifdef DEBUG
-			gLogger() << "Expected one of: ";
+			gCompileLogger() << "Expected one of: ";
 			int idx = 0;
 			for (auto& state : ParseTable[currentState]) {
 				if (state.type != ERROR) {
-					gLogger() << TokensToName[(Token)idx] << ", ";
+					gCompileLogger() << TokensToName[(Token)idx] << ", ";
 				}
 				idx++;
 			}

@@ -89,7 +89,7 @@ private:
 				return i;
 			}
 		}
-		gError() << "No free registers, this shouldn't happen";
+		gCompileError() << "No free registers, this shouldn't happen";
 		HasError = true;
 		return 0;
 	}

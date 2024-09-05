@@ -4,7 +4,7 @@
 void Function::Append(Function fn)
 {
 	if (ArgCount != 0 || IsPublic != fn.IsPublic) {
-		gWarn() << "Cannot append functions";
+		gCompileWarn() << "Cannot append functions";
 		return;
 	}
 

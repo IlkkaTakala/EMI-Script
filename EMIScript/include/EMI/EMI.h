@@ -27,6 +27,22 @@ inline void strcpy_s(char* dest, size_t size, const char* source) {
 
 namespace EMI
 {
+	enum class LogLevel : uint8_t
+	{
+		Debug,
+		Info,
+		Warning,
+		Error,
+		None,
+	};
+
+	class Logger
+	{
+	public:
+		virtual void Print(const char*) = 0;
+		virtual ~Logger() {}
+	};
+
 	class VMHandle;
 	class ScriptHandle {
 	public:
@@ -202,7 +218,13 @@ namespace EMI
 
 	CORE_API VMHandle CreateEnvironment();
 	CORE_API void ReleaseEnvironment(VMHandle handle);
-	CORE_API void SetLogLevel(int level);
+	CORE_API void SetCompileLogLevel(LogLevel level);
+	CORE_API void SetRuntimeLogLevel(LogLevel level);
+	CORE_API void SetScriptLogLevel(LogLevel level);
+	CORE_API void SetLogLevel(LogLevel level);
+	CORE_API void SetCompileLog(Logger* log);
+	CORE_API void SetRuntimeLog(Logger* log);
+	CORE_API void SetScriptLog(Logger* log);
 
 	template<typename T>
 	T ValueHandle::get() {

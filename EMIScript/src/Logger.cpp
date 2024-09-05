@@ -3,30 +3,30 @@
 #include <fstream>
 #include <filesystem>
 
-Logger::Logger() : Output(nullptr)
+BaseLogger::BaseLogger() : Output(nullptr)
 {
-	//std::ofstream out("../../log.txt");
-	Output.rdbuf(std::cout.rdbuf());
-	CurrentLevel = LogLevel::Info;
-	OutputLevel = LogLevel::Debug;
+	Output = new DefaultLogger();
+	CurrentLevel = EMI::LogLevel::Info;
+	OutputLevel = EMI::LogLevel::Debug;
 }
 
-void Logger::SetLogLevel(int level)
+void BaseLogger::SetLogLevel(EMI::LogLevel level)
 {
-	switch (level)
-	{
-	case 0: OutputLevel = LogLevel::Debug; break;
-	case 1: OutputLevel = LogLevel::Info; break;
-	case 2: OutputLevel = LogLevel::Warning; break;
-	case 3: OutputLevel = LogLevel::Error; break;
-	case 4: OutputLevel = LogLevel::None; break;
-	default:
-		OutputLevel = LogLevel::None;
-		break;
-	}
+	OutputLevel = level; 
+}
+
+void BaseLogger::SetLogger(EMI::Logger* log)
+{
+	if (Output) delete Output;
+	Output = log;
 }
 
 std::string MakePath(const std::string& path)
 {
 	return std::filesystem::absolute(path).string();
+}
+
+void DefaultLogger::Print(const char* str)
+{
+	std::cout << str;
 }

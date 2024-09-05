@@ -83,12 +83,16 @@ void* VM::Compile(const char* path, const Options& options)
 void VM::CompileTemporary(const char* data)
 {
 	CompileOptions fulloptions{};
+	std::future<bool>* future;
 	fulloptions.Data = data;
 	{
 		std::lock_guard lock(CompileMutex);
+		future = &CompileRequests.emplace_back(fulloptions.CompileResult.get_future());
 		CompileQueue.push(std::move(fulloptions));
 	}
 	QueueNotify.notify_one();
+
+	future->wait();
 }
 
 void VM::Interrupt()
@@ -107,11 +111,11 @@ bool VM::Export(const char* path, const ExportOptions& options)
 	if (ex.CombineUnits) {
 		std::ofstream file(fullpath, std::ios::out | std::ios::binary);
 		if (!file.is_open()) {
-			gError() << "Cannot open file for writing: " << fullpath;
+			gCompileError() << "Cannot open file for writing: " << fullpath;
 			return false;
 		}
 		if (Units.size() == 0) {
-			gError() << "No compiled scripts";
+			gCompileError() << "No compiled scripts";
 			return false;
 		}
 
@@ -121,7 +125,7 @@ bool VM::Export(const char* path, const ExportOptions& options)
 		}
 
 		if (!Library::Encode(GlobalSymbols, file, fn)) {
-			gError() << "Writing library file failed";
+			gCompileError() << "Writing library file failed";
 			return false;
 		}
 	}
@@ -132,7 +136,7 @@ bool VM::Export(const char* path, const ExportOptions& options)
 			std::ofstream file(fp, std::ios::out | std::ios::binary);
 
 			if (!file.is_open()) {
-				gError() << "Cannot open file for writing: " << fullpath;
+				gCompileError() << "Cannot open file for writing: " << fullpath;
 				return false;
 			}
 
@@ -142,7 +146,7 @@ bool VM::Export(const char* path, const ExportOptions& options)
 			}
 
 			if (!Library::Encode(table, file, unit.InitFunction)) {
-				gError() << "Writing library file failed";
+				gCompileError() << "Writing library file failed";
 				return false;
 			}
 		}
@@ -158,11 +162,11 @@ void* VM::GetFunctionID(const std::string& id)
 	if (symbol && symbol->Type == SymbolType::Function) {
 		auto fn = static_cast<FunctionSymbol*>(symbol->Data);
 		if (fn->Type != FunctionType::User) {
-			gWarn() << "Symbol is not a script function";
+			gRuntimeWarn() << "Symbol is not a script function";
 			return 0;
 		}
 		if (!static_cast<Function*>(fn->DirectPtr)->IsPublic) {
-			gWarn() << "Function is private";
+			gRuntimeWarn() << "Function is private";
 			return 0;
 		}
 
@@ -175,7 +179,7 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& a
 {
 	Function* fn = (Function*)(void*)handle;
 	if (!fn) {
-		gWarn() << "Invalid function handle";
+		gRuntimeWarn() << "Invalid function handle";
 		return (size_t)-1;
 	}
 
@@ -323,8 +327,8 @@ void Runner::Join()
 }
 
 #define TARGET(Op) Op: 
-#define Error() gError() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
-#define Warn() gWarn() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
+#define Error() gRuntimeError() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
+#define Warn() gRuntimeWarn() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
 
 void Runner::Run()
 {

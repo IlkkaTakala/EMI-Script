@@ -60,7 +60,7 @@ int main()
 		}},
 		{"reinit", [](EMI::VMHandle& vm, const std::vector<std::string>&) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
 		{"emi", [](EMI::VMHandle&, const std::vector<std::string>&) { return 2; }},
-		{"loglevel", [](EMI::VMHandle&, const std::vector<std::string>& params) { if (params.size() > 1) EMI::SetLogLevel(std::atoi(params[1].c_str())); return 0; }},
+		{"loglevel", [](EMI::VMHandle&, const std::vector<std::string>& params) { if (params.size() > 1) EMI::SetLogLevel((EMI::LogLevel)std::atoi(params[1].c_str())); return 0; }},
 		{"export", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { 
 			if (params.size() > 1) {
 				vm.ExportVM(params[1].c_str());
@@ -69,6 +69,8 @@ int main()
 		}},
 	};
 
+	//EMI::SetLogLevel(EMI::LogLevel::Warning);
+	EMI::SetScriptLogLevel(EMI::LogLevel::Info);
 	auto vm = EMI::CreateEnvironment();
 	vm.ReinitializeGrammar("../../.grammar");
 
@@ -93,24 +95,7 @@ int main()
 		switch (result)
 		{
 		case 1: {
-			bool runScriptMode = true;
-			while (runScriptMode)
-			{
-				printf("\n>> ");
-				std::getline(std::cin, input);
-				if (input == "quit") {
-					runScriptMode = false;
-					break;
-				}
-				res = split(input, ' ');
-				if (res.size() > 0) {
-					EMI::FunctionHandle h = vm.GetFunctionHandle(res[0].c_str());
-					auto handle = h(res.size() > 1 ? res[1].c_str() : "10");
-					handle.get<int>();
-				}
-			}
-			vm.Interrupt();
-			printf("\nExiting script stage\n\n");
+			
 		} break;
 
 		case 2: {

@@ -82,9 +82,9 @@ Variable Node::ToVariable() const
 #ifdef DEBUG
 void Node::print(const std::string& prefix, bool isLast)
 {
-	gLogger() << prefix;
-	gLogger() << (isLast ? (char*)print_last : (char*)print_first);
-	gLogger() << TokensToName[type] << ": " << VariantToStr(this) << "\n";
+	gCompileLogger() << prefix;
+	gCompileLogger() << (isLast ? (char*)print_last : (char*)print_first);
+	gCompileLogger() << TokensToName[type] << ": " << VariantToStr(this) << "\n";
 
 	for (auto& node : children) {
 		node->print(prefix + (isLast ? "    " : (char*)print_add), node == children.back());
@@ -481,7 +481,7 @@ void ASTWalker::Run()
 
 				if (SearchPaths[0].Length() + name.Length() > TName::MaxLength() - 1) {
 					HasError = true;
-					gError() << "Maximum namespace depth reached with " << name.Append(SearchPaths[0]) << "!";
+					gCompileError() << "Maximum namespace depth reached with " << name.Append(SearchPaths[0]) << "!";
 				}
 
 				TName temp(name);
@@ -568,7 +568,7 @@ void ASTWalker::Run()
 								flags.VarType = var.getType();
 							}
 							else {
-								gError() << "Trying to initialize with wrong type: In object " << addedName << ", field " << std::get<0>(field->data);
+								gCompileError() << "Trying to initialize with wrong type: In object " << addedName << ", field " << std::get<0>(field->data);
 							}
 						}
 						else {
@@ -576,7 +576,7 @@ void ASTWalker::Run()
 						}
 					} 
 					else {
-						gError() << "Parse error in object " << addedName;
+						gCompileError() << "Parse error in object " << addedName;
 					}
 					TName fieldName(std::get<0>(field->data).c_str());
 					//Global.AddName(fieldName.Append(addedName), nullptr); // @todo: is this necessary
@@ -584,7 +584,7 @@ void ASTWalker::Run()
 				}
 			}
 			else {
-				gError() << "Line " << c->line << ": Symbol '" << data << "' already defined";
+				gCompileError() << "Line " << c->line << ": Symbol '" << data << "' already defined";
 			}
 		} break;
 		
@@ -623,7 +623,7 @@ void ASTWalker::Run()
 						for (auto& v : node->children) {
 							auto [paramName, symParam] = FindSymbol(std::get<0>(v->data).c_str());
 							if (paramName) {
-								gError() << "Line " << node->line << ": Symbol '" << paramName << "' already defined";
+								gCompileError() << "Line " << node->line << ": Symbol '" << paramName << "' already defined";
 								HasError = true;
 								break;
 							}
@@ -648,7 +648,7 @@ void ASTWalker::Run()
 
 			}
 			else {
-				gError() << "Line " << c->line << ": Symbol '" << data << "' already defined";
+				gCompileError() << "Line " << c->line << ": Symbol '" << data << "' already defined";
 			}
 		} break;
 
@@ -732,14 +732,13 @@ void ASTWalker::Run()
 
 	for (auto& [node, function] : functionList) {
 		HandleFunction(node, function, node->sym);
-		gInfo() << "Generated function '" << function->Name << "', used " << MaxRegister + 1 << " registers and " << function->Bytecode.size() << " instructions\n";
-
+		gCompileInfo() << "Generated function '" << function->Name << "', used " << MaxRegister + 1 << " registers and " << function->Bytecode.size() << " instructions\n";
 	}
 }
 
 #ifdef DEBUG
 void printInstruction(const Instruction& in) {
-	gLogger() << "Target: " << (int)in.target << ", In: " << (int)in.in1 << ", In2: " << (int)in.in2 << ", Param: " << (int)in.param << ", \t" << "Code: " << OpcodeNames[in.code] << '\n';
+	gCompileLogger() << "Target: " << (int)in.target << ", In: " << (int)in.in1 << ", In2: " << (int)in.in2 << ", Param: " << (int)in.param << ", \t" << "Code: " << OpcodeNames[in.code] << '\n';
 }
 #endif // DEBUG
 
@@ -754,7 +753,7 @@ void printInstruction(const Instruction& in) {
 #define SetOut(n) n->regTarget = InstructionList[n->instruction].target
 #define First() first_child
 #define Last() last_child
-#define Error(text) gError() << "Line " << n->line << ": " << text; HasError = true;
+#define Error(text) gCompileError() << "Line " << n->line << ": " << text; HasError = true;
 #define Warn(text) gWarn() << "Line " << n->line << ": " << text;
 #define FreeConstant(n) if (!n->sym || (n->sym && n->sym->NeedsLoading) ) FreeRegister(n->regTarget);
 #define EnsureOperands if (n->children.size() != 2) { Error("Invalid number of operands") break; }
@@ -1042,7 +1041,7 @@ void ASTWalker::WalkLoad(Node* n)
 							symbol->EndLife = InstructionList.size();
 						}
 						else {
-							gWarn() << "Symbol not found during compile: " << data << ". Check script compile order.";
+							gCompileWarn() << "Symbol not found during compile: " << data << ". Check script compile order.";
 						}
 					}
 					else if (First()->sym->Sym->Type == SymbolType::Variable) {
@@ -1983,7 +1982,7 @@ void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 					FreeConstant(stmt);
 				}
 				catch (...) {
-					gError() << "Internal error occured!";
+					gCompileError() << "Internal error occured!";
 				}
 			}
 			Instruction op;
@@ -2004,8 +2003,8 @@ void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
 	}
 
 #ifdef DEBUG
-	gDebug() << "Function " << f->Name.toString();
-	gLogger() << "\n----------------------------------\n";
+	gCompileDebug() << "Function " << f->Name.toString();
+	gCompileLogger() << "\n----------------------------------\n";
 	for (auto& in : InstructionList) {
 		printInstruction(in);
 	}
@@ -2094,8 +2093,8 @@ void ASTWalker::HandleInit()
 	}
 
 #ifdef DEBUG
-	gDebug() << "Init Function";
-	gLogger() << "\n----------------------------------\n";
+	gCompileDebug() << "Init Function";
+	gCompileLogger() << "\n----------------------------------\n";
 	for (auto& in : InstructionList) {
 		printInstruction(in);
 	}
