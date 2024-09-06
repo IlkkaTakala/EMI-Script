@@ -61,6 +61,7 @@ private:
 
 	void HandleFunction(Node* n, Function* f, CompileSymbol* s);
 	void HandleInit();
+	void HandleObject(Node* n);
 
 	bool HasDebug;
 	VM* Vm;

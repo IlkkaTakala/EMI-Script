@@ -525,7 +525,10 @@ void ASTWalker::Run()
 				symbol->setType(SymbolType::Object);
 				auto object = new UserDefinedType{};
 				symbol->Data = object;
-				
+				c->sym = new CompileSymbol();
+				c->sym->Sym = symbol;
+				c->sym->Global = true;
+
 				for (auto& field : c->children) {
 					Symbol flags;
 					flags.Flags = SymbolFlags::None;
@@ -538,28 +541,28 @@ void ASTWalker::Run()
 						VariableType type = VariableType::Undefined;
 						switch (field->children.front()->type)
 						{
-							case Token::TypeNumber: {
-								type = VariableType::Number;
-							}break;
-							case Token::TypeBoolean: {
-								type = VariableType::Boolean;
-							}break;
-							case Token::TypeString: {
-								type = VariableType::String;
-							}break;
-							case Token::TypeArray: {
-								type = VariableType::Array;
-							}break;
-							case Token::TypeFunction: {
-								type = VariableType::Function;
-							}break;
-							case Token::AnyType: {
-								type = VariableType::Undefined;
-							}break;
-							case Token::Typename: {
-								type = VariableType::Object;
-							}break;
-							default: break;
+						case Token::TypeNumber: {
+							type = VariableType::Number;
+						}break;
+						case Token::TypeBoolean: {
+							type = VariableType::Boolean;
+						}break;
+						case Token::TypeString: {
+							type = VariableType::String;
+						}break;
+						case Token::TypeArray: {
+							type = VariableType::Array;
+						}break;
+						case Token::TypeFunction: {
+							type = VariableType::Function;
+						}break;
+						case Token::AnyType: {
+							type = VariableType::Undefined;
+						}break;
+						case Token::Typename: {
+							type = VariableType::Object;
+						}break;
+						default: break;
 						}
 						flags.VarType = type;
 						if (IsConstant(field->children.back()->type)) {
@@ -572,14 +575,14 @@ void ASTWalker::Run()
 							}
 						}
 						else {
+							gCompileWarn() << "Cannot initialize with non-constant values. Reverting to default";
 							var = GetTypeDefault(type);
 						}
-					} 
+					}
 					else {
 						gCompileError() << "Parse error in object " << addedName;
 					}
 					TName fieldName(std::get<0>(field->data).c_str());
-					//Global.AddName(fieldName.Append(addedName), nullptr); // @todo: is this necessary
 					object->AddField(fieldName, var, flags);
 				}
 			}
