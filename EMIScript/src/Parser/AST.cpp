@@ -525,9 +525,6 @@ void ASTWalker::Run()
 				symbol->setType(SymbolType::Object);
 				auto object = new UserDefinedType{};
 				symbol->Data = object;
-				c->sym = new CompileSymbol();
-				c->sym->Sym = symbol;
-				c->sym->Global = true;
 
 				for (auto& field : c->children) {
 					Symbol flags;
@@ -574,8 +571,8 @@ void ASTWalker::Run()
 								gCompileError() << "Trying to initialize with wrong type: In object " << addedName << ", field " << std::get<0>(field->data);
 							}
 						}
-						else {
-							gCompileWarn() << "Cannot initialize with non-constant values. Reverting to default";
+						else if (field->children.back()->type != Token::OExpr && field->children.back()->type != Token::Null){
+							gCompileWarn() << "Cannot initialize fields with non-constant values. Reverting to default";
 							var = GetTypeDefault(type);
 						}
 					}
@@ -1026,6 +1023,7 @@ void ASTWalker::WalkLoad(Node* n)
 					symbol = FindOrCreateLocalSymbol(data);
 					symbol->Sym = globalSymbol;
 					symbol->Global = true;
+					n->varType = globalSymbol->VarType;
 					if (globalSymbol->Type == SymbolType::Variable
 					 || globalSymbol->Type == SymbolType::Static
 					 || globalSymbol->Type == SymbolType::Function)
@@ -1038,10 +1036,16 @@ void ASTWalker::WalkLoad(Node* n)
 						TName full = data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name);
 						auto [fullName, globalSymbol] = FindSymbol(full);
 						if (fullName) {
+							data = fullName;
 							symbol = FindOrCreateLocalSymbol(full);
+							n->varType = globalSymbol->VarType;
 							symbol->Sym = globalSymbol;
 							symbol->Global = true;
 							symbol->EndLife = InstructionList.size();
+							if (globalSymbol->Type == SymbolType::Variable
+								|| globalSymbol->Type == SymbolType::Static
+								|| globalSymbol->Type == SymbolType::Function)
+								symbol->NeedsLoading = true;
 						}
 						else {
 							gCompileWarn() << "Symbol not found during compile: " << data << ". Check script compile order.";
@@ -1360,7 +1364,8 @@ void ASTWalker::WalkLoad(Node* n)
 			FreeRegister(c->regTarget);
 		}
 
-		auto it = std::find(CurrentFunction->TypeTableSymbols.begin(), CurrentFunction->TypeTableSymbols.end(), name);
+		TNameQuery query = { name, SearchPaths };
+		auto it = std::find(CurrentFunction->TypeTableSymbols.begin(), CurrentFunction->TypeTableSymbols.end(), query);
 		size_t index = 0;
 
 		if (it != CurrentFunction->TypeTableSymbols.end()) {
@@ -1368,7 +1373,7 @@ void ASTWalker::WalkLoad(Node* n)
 		}
 		else {
 			index = CurrentFunction->TypeTableSymbols.size();
-			CurrentFunction->TypeTableSymbols.push_back(name);
+			CurrentFunction->TypeTableSymbols.push_back(query);
 		}
 		Op(InitObject);
 
@@ -1771,6 +1776,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 					symbol = FindOrCreateLocalSymbol(data);
 					symbol->Sym = globalSymbol;
 					symbol->Global = true;
+					n->varType = globalSymbol->VarType;
 					if (globalSymbol->Type == SymbolType::Variable
 					 || globalSymbol->Type == SymbolType::Static)
 						symbol->NeedsLoading = true;
@@ -1786,6 +1792,11 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 							symbol->Sym = globalSymbol;
 							symbol->Global = true;
 							symbol->EndLife = InstructionList.size();
+							n->varType = globalSymbol->VarType;
+							if (globalSymbol->Type == SymbolType::Variable
+								|| globalSymbol->Type == SymbolType::Static
+								|| globalSymbol->Type == SymbolType::Function)
+								symbol->NeedsLoading = true;
 						}
 					}
 					else if (First()->sym->Sym->Type == SymbolType::Variable) {
