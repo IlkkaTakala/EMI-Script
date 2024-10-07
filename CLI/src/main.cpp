@@ -60,15 +60,25 @@ int main()
 		}},
 		{"reinit", [](EMI::VMHandle& vm, const std::vector<std::string>&) { vm.ReinitializeGrammar("../../.grammar"); return 0; }},
 		{"emi", [](EMI::VMHandle&, const std::vector<std::string>&) { return 2; }},
-		{"loglevel", [](EMI::VMHandle&, const std::vector<std::string>& params) { if (params.size() > 1) EMI::SetLogLevel(std::atoi(params[1].c_str())); return 0; }},
+		{"loglevel", [](EMI::VMHandle&, const std::vector<std::string>& params) { if (params.size() > 1) EMI::SetLogLevel((EMI::LogLevel)std::atoi(params[1].c_str())); return 0; }},
+		{"export", [](EMI::VMHandle& vm, const std::vector<std::string>& params) { 
+			if (params.size() > 1) {
+				vm.ExportVM(params[1].c_str());
+			}
+			return 0;
+		}},
 	};
 
+	EMI::SetLogLevel(EMI::LogLevel::Warning);
+	EMI::SetScriptLogLevel(EMI::LogLevel::Info);
 	auto vm = EMI::CreateEnvironment();
 	vm.ReinitializeGrammar("../../.grammar");
+
 
 	bool run = true;
 	std::string input;
 	while (run) {
+		printf("\nemi: ");
 		std::getline(std::cin, input);
 
 		auto res = split(input, ' ');
@@ -80,39 +90,20 @@ int main()
 			result = it->second(vm, res);
 		}
 
-		printf("\n\n");
 		if (result == 0) continue;
 
 		switch (result)
 		{
 		case 1: {
-			bool runScriptMode = true;
-			while (runScriptMode)
-			{
-				printf(">> ");
-				std::getline(std::cin, input);
-				if (input == "quit") {
-					runScriptMode = false;
-					break;
-				}
-				res = split(input, ' ');
-				if (res.size() > 0) {
-					EMI::FunctionHandle h = vm.GetFunctionHandle(res[0].c_str());
-					auto handle = h(res.size() > 1 ? res[1].c_str() : "10");
-					/*if (handle.get<const char*>()) 
-						std::cout << handle.get<const char*>() << '\n';*/
-				}
-			}
-			vm.Interrupt();
-			printf("Exiting script stage\n\n");
+			
 		} break;
 
 		case 2: {
-			printf("Running in scripting mode\n");
+			printf("\nRunning in scripting mode\n");
 			bool runScriptMode = true;
 			while (runScriptMode)
 			{
-				printf(">> ");
+				printf("\n>> ");
 				std::getline(std::cin, input);
 				if (input == "quit") {
 					runScriptMode = false;

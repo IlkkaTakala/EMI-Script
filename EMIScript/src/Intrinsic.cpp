@@ -14,14 +14,14 @@ void print(Variable&, Variable* args, size_t argc) {
 
 		// @todo: Add print formatting
 
-		gLogger() << format;
+		gScriptLogger() << format;
 	}
 }
 
 void printLn(Variable& out, Variable* args, size_t argc) {
 	if (argc > 0) {
 		print(out, args, argc);
-		gLogger() << '\n';
+		gScriptLogger() << '\n';
 	}
 }
 
@@ -179,27 +179,27 @@ void mathsqrt(Variable& out, Variable* args, size_t argc) {
 
 
 #define FUNC(named, fn, ret) { named##_name, new Symbol{ SymbolType::Function, SymbolFlags::Typed, VariableType::Function, new FunctionSymbol{FunctionType::Intrinsic, (void*)fn, Variable{},VariableType::ret, 
-#define NAMESPACE(named) { named##_name, new Symbol{ SymbolType::Namespace, SymbolFlags::None, VariableType::Undefined, new Namespace{ named##_name } } },
+#define NAMESPACE(named) { named##_name, new Symbol{ SymbolType::Namespace, SymbolFlags::None, VariableType::Undefined, new Namespace{ named##_name }, true } },
 
 // @todo: Something better for these intrinsic definitions
 SymbolTable IntrinsicFunctions = { {
-	FUNC("print", print,						Undefined)		{} }}},
-	FUNC("println", printLn,					Undefined)		{} }}},
-	FUNC("delay", delay,						Undefined)		{ VariableType::Number } }}},
+	FUNC("print", print,						Undefined)		{} }, true}},
+	FUNC("println", printLn,					Undefined)		{} }, true}},
+	FUNC("delay", delay,						Undefined)		{ VariableType::Number } }, true}},
 	NAMESPACE("Array")
-	FUNC("Array.Size", arraySize,				Number)			{ VariableType::Array } }}},
-	FUNC("Array.Resize", arrayResize,			Number)			{ VariableType::Array, VariableType::Number, VariableType::Undefined } }}},
-	FUNC("Array.Push", arrayPush,				Undefined)		{ VariableType::Array, VariableType::Undefined } }}},
-	FUNC("Array.PushFront", arrayPushFront,		Undefined)		{ VariableType::Array, VariableType::Undefined } }}},
-	FUNC("Array.PushUnique", arrayPushUnique,	Number)			{ VariableType::Array, VariableType::Undefined } }}},
-	FUNC("Array.Pop", arrayPop,					Undefined)		{ VariableType::Array } }}},
-	FUNC("Array.Remove", arrayRemove,			Undefined)		{ VariableType::Array, VariableType::Undefined } }}},
-	FUNC("Array.RemoveIndex", arrayRemoveIdx,	Undefined)		{ VariableType::Array, VariableType::Number } }}},
-	FUNC("Array.Clear", arrayClear,				Undefined)		{ VariableType::Array } }}},
-	FUNC("Array.Find", arrayFind,				Number)			{ VariableType::Array } }}},
+	FUNC("Array.Size", arraySize,				Number)			{ VariableType::Array } }, true}},
+	FUNC("Array.Resize", arrayResize,			Number)			{ VariableType::Array, VariableType::Number, VariableType::Undefined } }, true}},
+	FUNC("Array.Push", arrayPush,				Undefined)		{ VariableType::Array, VariableType::Undefined } }, true}},
+	FUNC("Array.PushFront", arrayPushFront,		Undefined)		{ VariableType::Array, VariableType::Undefined } }, true}},
+	FUNC("Array.PushUnique", arrayPushUnique,	Number)			{ VariableType::Array, VariableType::Undefined } }, true}},
+	FUNC("Array.Pop", arrayPop,					Undefined)		{ VariableType::Array } }, true}},
+	FUNC("Array.Remove", arrayRemove,			Undefined)		{ VariableType::Array, VariableType::Undefined } }, true}},
+	FUNC("Array.RemoveIndex", arrayRemoveIdx,	Undefined)		{ VariableType::Array, VariableType::Number } }, true}},
+	FUNC("Array.Clear", arrayClear,				Undefined)		{ VariableType::Array } }, true}},
+	FUNC("Array.Find", arrayFind,				Number)			{ VariableType::Array } }, true}},
 	NAMESPACE("Math")
-	FUNC("Math.Sqrt", mathsqrt,					Number)			{ VariableType::Number } }}},
-	FUNC("Copy", copy,							Undefined)		{ VariableType::Undefined } }}},
+	FUNC("Math.Sqrt", mathsqrt,					Number)			{ VariableType::Number } }, true}},
+	FUNC("Copy", copy,							Undefined)		{ VariableType::Undefined } }, true}},
 }};
 
 #undef FUNC

@@ -9,30 +9,73 @@
 #undef EMI_PARSE_GRAMMAR
 #endif
 
-inline Logger& gLogger()
+constexpr uint16_t EMI_VERSION = 10100; // Major 01 Minor 01 Patch 00;
+constexpr uint8_t FORMAT_VERSION = 1; // Major 01 Minor 01 Patch 00;
+
+inline BaseLogger& gCompileLogger()
 {
-	static Logger log;
+	static BaseLogger log;
 	return log;
 }
-
-inline Logger& gDebug()
+inline BaseLogger& gCompileDebug()
 {
-	return gLogger() << '\n' << LogLevel::Debug;
+	return gCompileLogger() << '\n' << EMI::LogLevel::Debug;
+}
+inline BaseLogger& gCompileInfo()
+{
+	return gCompileLogger() << '\n' << EMI::LogLevel::Info;
+}
+inline BaseLogger& gCompileWarn()
+{
+	return gCompileLogger() << '\n' << EMI::LogLevel::Warning;
+}
+inline BaseLogger& gCompileError()
+{
+	return gCompileLogger() << '\n' << EMI::LogLevel::Error;
 }
 
-inline Logger& gInfo()
+inline BaseLogger& gRuntimeLogger()
 {
-	return gLogger() << '\n' << LogLevel::Info;
+	static BaseLogger log;
+	return log;
+}
+inline BaseLogger& gRuntimeDebug()
+{
+	return gRuntimeLogger() << '\n' << EMI::LogLevel::Debug;
+}
+inline BaseLogger& gRuntimeInfo()
+{
+	return gRuntimeLogger() << '\n' << EMI::LogLevel::Info;
+}
+inline BaseLogger& gRuntimeWarn()
+{
+	return gRuntimeLogger() << '\n' << EMI::LogLevel::Warning;
+}
+inline BaseLogger& gRuntimeError()
+{
+	return gRuntimeLogger() << '\n' << EMI::LogLevel::Error;
 }
 
-inline Logger& gWarn()
+inline BaseLogger& gScriptLogger()
 {
-	return gLogger() << '\n' << LogLevel::Warning;
+	static BaseLogger log;
+	return log;
 }
-
-inline Logger& gError()
+inline BaseLogger& gScriptDebug()
 {
-	return gLogger() << '\n' << LogLevel::Error;
+	return gScriptLogger() << '\n' << EMI::LogLevel::Debug;
+}
+inline BaseLogger& gScriptInfo()
+{
+	return gScriptLogger() << '\n' << EMI::LogLevel::Info;
+}
+inline BaseLogger& gScriptWarn()
+{
+	return gScriptLogger() << '\n' << EMI::LogLevel::Warning;
+}
+inline BaseLogger& gScriptError()
+{
+	return gScriptLogger() << '\n' << EMI::LogLevel::Error;
 }
 
 #define X(x) x,

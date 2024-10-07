@@ -79,11 +79,11 @@ public:
 	}
 };
 
-inline Logger& operator<<(Logger& log, const TName& arg) {
+inline BaseLogger& operator<<(BaseLogger& log, const TName& arg) {
 	log << arg.toString();
 	return log;
 }
-inline Logger& operator<<(Logger& log, const TNameQuery& arg) {
+inline BaseLogger& operator<<(BaseLogger& log, const TNameQuery& arg) {
 	log << arg.GetTarget().toString();
 	return log;
 }

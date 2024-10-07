@@ -6,6 +6,9 @@
 #include "Objects/ArrayObject.h"
 #include "Objects/FunctionObject.h"
 #include <math.h>
+#include <filesystem>
+#include <fstream>
+#include "EMLibFormat.h"
 
 VM::VM()
 {
@@ -80,17 +83,76 @@ void* VM::Compile(const char* path, const Options& options)
 void VM::CompileTemporary(const char* data)
 {
 	CompileOptions fulloptions{};
+	std::future<bool>* future;
 	fulloptions.Data = data;
 	{
 		std::lock_guard lock(CompileMutex);
+		future = &CompileRequests.emplace_back(fulloptions.CompileResult.get_future());
 		CompileQueue.push(std::move(fulloptions));
 	}
 	QueueNotify.notify_one();
+
+	future->wait();
 }
 
 void VM::Interrupt()
 {
 
+}
+
+bool VM::Export(const char* path, const ExportOptions& options)
+{
+	ExportOptions ex = options;
+	std::filesystem::path fullpath(path);
+	if (!std::filesystem::is_directory(fullpath)) {
+		ex.CombineUnits = true;
+	}
+
+	if (ex.CombineUnits) {
+		std::ofstream file(fullpath, std::ios::out | std::ios::binary);
+		if (!file.is_open()) {
+			gCompileError() << "Cannot open file for writing: " << fullpath;
+			return false;
+		}
+		if (Units.size() == 0) {
+			gCompileError() << "No compiled scripts";
+			return false;
+		}
+
+		Function* fn = Units.values()[0].second.InitFunction;
+		for (int i = 1; i < Units.size(); i++) {
+			fn->Append(*Units.values()[i].second.InitFunction);
+		}
+
+		if (!Library::Encode(GlobalSymbols, file, fn)) {
+			gCompileError() << "Writing library file failed";
+			return false;
+		}
+	}
+	else {
+		for (auto& [name, unit] : Units) {
+			auto fp = fullpath;
+			fp += std::filesystem::path(name).filename().replace_extension();
+			std::ofstream file(fp, std::ios::out | std::ios::binary);
+
+			if (!file.is_open()) {
+				gCompileError() << "Cannot open file for writing: " << fullpath;
+				return false;
+			}
+
+			SymbolTable table;
+			for (auto& id : unit.Symbols) {
+				table.AddName(id, GlobalSymbols.Table[id]);
+			}
+
+			if (!Library::Encode(table, file, unit.InitFunction)) {
+				gCompileError() << "Writing library file failed";
+				return false;
+			}
+		}
+	}
+
+	return true;
 }
 
 void* VM::GetFunctionID(const std::string& id)
@@ -100,11 +162,11 @@ void* VM::GetFunctionID(const std::string& id)
 	if (symbol && symbol->Type == SymbolType::Function) {
 		auto fn = static_cast<FunctionSymbol*>(symbol->Data);
 		if (fn->Type != FunctionType::User) {
-			gWarn() << "Symbol is not a script function";
+			gRuntimeWarn() << "Symbol is not a script function";
 			return 0;
 		}
 		if (!static_cast<Function*>(fn->DirectPtr)->IsPublic) {
-			gWarn() << "Function is private";
+			gRuntimeWarn() << "Function is private";
 			return 0;
 		}
 
@@ -117,7 +179,7 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& a
 {
 	Function* fn = (Function*)(void*)handle;
 	if (!fn) {
-		gWarn() << "Invalid function handle";
+		gRuntimeWarn() << "Invalid function handle";
 		return (size_t)-1;
 	}
 
@@ -180,7 +242,7 @@ std::pair<TName, Symbol*> VM::FindSymbol(const TNameQuery& name)
 	return GlobalSymbols.FindName(name);
 }
 
-void VM::AddNamespace(const std::string& path, const SymbolTable& space)
+void VM::AddCompileUnit(const std::string& path, const SymbolTable& space, Function* InitFunction)
 {
 	std::unique_lock lk(MergeMutex);
 	Units[path].Symbols.reserve(space.Table.size());
@@ -200,7 +262,12 @@ void VM::AddNamespace(const std::string& path, const SymbolTable& space)
 			break;
 		}
 	}
+
+	Units[path].InitFunction = InitFunction;
 	GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
+
+	size_t idx = CallFunction(EMI::FunctionHandle{ InitFunction, nullptr }, {});
+	GetReturnValue(idx);
 }
 
 void VM::RemoveUnit(const std::string& unit)
@@ -223,7 +290,7 @@ void VM::RemoveUnit(const std::string& unit)
 			delete node;
 			GlobalSymbols.Table.erase(name);
 		}
-
+		delete Units[unit].InitFunction;
 		Units.erase(unit);
 	}
 }
@@ -260,8 +327,8 @@ void Runner::Join()
 }
 
 #define TARGET(Op) Op: 
-#define Error() gError() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
-#define Warn() gWarn() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
+#define Error() gRuntimeError() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
+#define Warn() gRuntimeWarn() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
 
 void Runner::Run()
 {
@@ -284,6 +351,8 @@ void Runner::Run()
 		current->End = current->Ptr + current->FunctionPtr->Bytecode.size();
 		current->StackOffset = 0;
 
+		if (current->FunctionPtr->Bytecode.size() == 0) break;
+
 		Registers.reserve(current->FunctionPtr->RegisterCount);
 		Registers.to(0);
 
@@ -294,7 +363,6 @@ void Runner::Run()
 
 #define NUMS current->FunctionPtr->NumberTable.values()
 #define STRS current->FunctionPtr->StringTable
-#define JUMPS current->FunctionPtr->JumpTable.values()
 		out:
 		while (interrupt && Running) {
 

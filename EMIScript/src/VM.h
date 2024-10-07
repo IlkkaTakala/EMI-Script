@@ -119,6 +119,8 @@ public:
 	void CompileTemporary(const char* data);
 	void Interrupt();
 
+	bool Export(const char* path, const ExportOptions& options);
+
 	void* GetFunctionID(const std::string& name);
 
 	size_t CallFunction(FunctionHandle handle, const std::span<InternalValue>& args);
@@ -126,7 +128,7 @@ public:
 	bool WaitForResult(void* ptr);
 
 	std::pair<TName, Symbol*> FindSymbol(const TNameQuery& name);
-	void AddNamespace(const std::string& path, const SymbolTable& space);
+	void AddCompileUnit(const std::string& path, const SymbolTable& space, Function* InitFunction);
 
 	inline bool IsRunning() const { return VMRunning; }
 
@@ -163,4 +165,5 @@ private:
 
 	ankerl::unordered_dense::map<std::string, CompileUnit> Units;
 	SymbolTable GlobalSymbols;
+
 };
