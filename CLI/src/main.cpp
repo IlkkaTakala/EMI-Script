@@ -69,7 +69,7 @@ int main()
 		}},
 	};
 
-	EMI::SetLogLevel(EMI::LogLevel::Warning);
+	EMI::SetLogLevel(EMI::LogLevel::Debug);
 	EMI::SetScriptLogLevel(EMI::LogLevel::Info);
 	auto vm = EMI::CreateEnvironment();
 	vm.ReinitializeGrammar("../../.grammar");

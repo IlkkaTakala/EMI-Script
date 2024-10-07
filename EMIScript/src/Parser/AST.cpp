@@ -465,6 +465,7 @@ TName getFullId(Node* n) {
 void ASTWalker::Run()
 {
 	std::vector<std::pair<Node*, Function*>> functionList;
+	std::vector<std::string> ImportList;
 	CurrentFunction = InitFunction;
 	for (auto& c : Root->children) {
 		switch (c->type)
@@ -508,6 +509,13 @@ void ASTWalker::Run()
 
 			AllSearchPaths.emplace_back(c->line, name);
 			SearchPaths.push_back(name);
+
+		} break;
+
+		case Token::ImportDef: {
+
+			std::string path = std::get<std::string>(c->data);
+			ImportList.push_back(path);
 
 		} break;
 		
