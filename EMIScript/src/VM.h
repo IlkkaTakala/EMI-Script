@@ -132,6 +132,8 @@ public:
 
 	void RemoveUnit(const std::string& unit);
 
+	auto GetSymbols() const { return GlobalSymbols.Table; }
+
 private:
 	friend class Parser;
 	friend class Runner;

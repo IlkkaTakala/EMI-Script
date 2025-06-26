@@ -421,7 +421,7 @@ void Runner::Run()
 								auto f = static_cast<FunctionSymbol*>(res.second->Data);
 								auto func = FunctionObject::GetAllocator()->Make(f->Type, res.first);
 								switch (f->Type) {
-								case FunctionType::Intrinsic: func->Callee = static_cast<IntrinsicPtr>(f->DirectPtr); break;
+								case FunctionType::Intrinsic: func->Callee = reinterpret_cast<IntrinsicPtr>(f->DirectPtr); break;
 								case FunctionType::User: func->Callee = static_cast<Function*>(f->DirectPtr); break;
 								case FunctionType::Host: func->Callee = static_cast<EMI::_internal_function*>(f->DirectPtr); break;
 								}
@@ -704,7 +704,7 @@ void Runner::Run()
 						if (res.second && res.second->Type == SymbolType::Function) {
 							auto f = static_cast<FunctionSymbol*>(res.second->Data);
 							if (f->Type == FunctionType::Intrinsic) {
-								fn = static_cast<IntrinsicPtr>(f->DirectPtr);
+								fn = reinterpret_cast<IntrinsicPtr>(f->DirectPtr);
 							}
 						}
 						else {

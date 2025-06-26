@@ -32,7 +32,8 @@ public:
 	TName PopLast() const;
 	bool IsChildOf(const TName& name) const;
 
-	TName Get(char off);
+	TName Get(char off) const;
+	TName GetLast() const;
 
 	TName& operator<<(const TName& name);
 	bool operator<(const TName& rhs) const {

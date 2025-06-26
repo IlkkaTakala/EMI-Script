@@ -29,25 +29,27 @@ void Symbol::setType(SymbolType t)
 
 Symbol::~Symbol()
 {
-	switch (Type)
-	{
-	case SymbolType::Namespace: {
-		delete static_cast<Namespace*>(Data);
-	} break;
-	case SymbolType::Function: {
-		auto sym = static_cast<FunctionSymbol*>(Data);
-		if (sym->Type == FunctionType::User)
-			delete static_cast<Function*>(sym->DirectPtr);
-		delete sym;
-	} break;
-	case SymbolType::Object: {
-		delete static_cast<UserDefinedType*>(Data);
-	} break;
-	case SymbolType::Variable: {
-		delete static_cast<Variable*>(Data);
-	} break;
-	default:
-		break;
+	if (Data) {
+		switch (Type)
+		{
+		case SymbolType::Namespace: {
+			delete static_cast<Namespace*>(Data);
+		} break;
+		case SymbolType::Function: {
+			auto sym = static_cast<FunctionSymbol*>(Data);
+			if (sym->Type == FunctionType::User)
+				delete static_cast<Function*>(sym->DirectPtr);
+			delete sym;
+		} break;
+		case SymbolType::Object: {
+			delete static_cast<UserDefinedType*>(Data);
+		} break;
+		case SymbolType::Variable: {
+			delete static_cast<Variable*>(Data);
+		} break;
+		default:
+			break;
+		}
 	}
 	Data = nullptr;
 }
