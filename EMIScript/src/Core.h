@@ -58,11 +58,16 @@ public:
 		return Target;
 	}
 
+	auto& Paths() { return SearchPaths; }
 	auto& GetPaths() const { return SearchPaths; }
 	auto& GetTarget() const { return Target; }
 
 	TNameQuery() {}
 	TNameQuery(const TName& name, std::initializer_list<TName> list = {}) {
+		SearchPaths = list;
+		Target = name;
+	}
+	TNameQuery(const TName& name, const std::vector<TName>& list) {
 		SearchPaths = list;
 		Target = name;
 	}
@@ -75,11 +80,11 @@ public:
 	}
 };
 
-inline Logger& operator<<(Logger& log, const TName& arg) {
+inline BaseLogger& operator<<(BaseLogger& log, const TName& arg) {
 	log << arg.toString();
 	return log;
 }
-inline Logger& operator<<(Logger& log, const TNameQuery& arg) {
+inline BaseLogger& operator<<(BaseLogger& log, const TNameQuery& arg) {
 	log << arg.GetTarget().toString();
 	return log;
 }

@@ -46,6 +46,8 @@ public:
 	}
 	void AddField(const TName& name, Variable var, const Symbol& flags);
 	VariableType GetFieldType(const TName& name) const;
+	auto& GetFields() { return FieldNames; }
+	auto& GetDefaults() { return DefaultFields; }
 
 	VariableType Type;
 private:

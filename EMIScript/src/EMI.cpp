@@ -12,6 +12,7 @@ bool EMI::_internal_register(_internal_function* func)
 	auto sym = new Symbol();
 	sym->Type = SymbolType::Function;
 	sym->VarType = VariableType::Function;
+	sym->Builtin = true;
 	std::vector<VariableType> types;
 	types.resize(func->arg_count);
 	for (int i = 0; i < types.size(); i++) {
@@ -28,6 +29,7 @@ bool EMI::_internal_register(_internal_function* func)
 			auto spaceSym = new Symbol();
 			spaceSym->setType(SymbolType::Namespace);
 			spaceSym->Data = new Namespace{space};
+			spaceSym->Builtin = true;
 			HostFunctions().AddName(space, spaceSym);
 		}
 		space = space.Pop();
@@ -67,9 +69,41 @@ VMHandle EMI::CreateEnvironment()
 	return VMHandle(idx, GetVM(idx));
 }
 
-CORE_API void EMI::SetLogLevel(int level)
+CORE_API void EMI::SetCompileLogLevel(LogLevel level)
 {
-	gLogger().SetLogLevel(level);
+	gCompileLogger().SetLogLevel(level);
+}
+
+CORE_API void EMI::SetRuntimeLogLevel(LogLevel level)
+{
+	gRuntimeLogger().SetLogLevel(level);
+}
+
+CORE_API void EMI::SetScriptLogLevel(LogLevel level)
+{
+	gScriptLogger().SetLogLevel(level);
+}
+
+CORE_API void EMI::SetLogLevel(LogLevel level)
+{
+	gCompileLogger().SetLogLevel(level);
+	gRuntimeLogger().SetLogLevel(level);
+	gScriptLogger().SetLogLevel(level);
+}
+
+CORE_API void EMI::SetCompileLog(Logger* log)
+{
+	gCompileLogger().SetLogger(log);
+}
+
+CORE_API void EMI::SetRuntimeLog(Logger* log)
+{
+	gRuntimeLogger().SetLogger(log);
+}
+
+CORE_API void EMI::SetScriptLog(Logger* log)
+{
+	gScriptLogger().SetLogger(log);
 }
 
 EMI::VMHandle::VMHandle(unsigned int value, void* ptr) : Index(value), Vm(ptr)
@@ -109,6 +143,11 @@ bool EMI::VMHandle::_internal_wait(void* ptr)
 InternalValue EMI::VMHandle::GetReturn(ValueHandle handle)
 {
 	return ((VM*)Vm)->GetReturnValue(handle);
+}
+
+bool EMI::VMHandle::ExportVM(const char* path, const ExportOptions& options)
+{
+	return ((VM*)Vm)->Export(path, options);
 }
 
 void EMI::VMHandle::Interrupt()

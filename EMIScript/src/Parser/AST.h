@@ -48,6 +48,7 @@ public:
 	~ASTWalker();
 	void Run();
 	SymbolTable Global;
+	Function* InitFunction;
 	bool HasError;
 private:
 	void WalkLoad(Node*);
@@ -59,11 +60,14 @@ private:
 	std::pair<TName, Symbol*> FindOrCreateSymbol(const TName& name, SymbolType type = SymbolType::None);
 
 	void HandleFunction(Node* n, Function* f, CompileSymbol* s);
+	void HandleInit();
+	void HandleObject(Node* n);
 
 	bool HasDebug;
 	VM* Vm;
 	Node* Root;
-	TName CurrentNamespace;
+	std::vector<TName> SearchPaths;
+	std::vector<std::pair<size_t, TName>> AllSearchPaths;
 
 	// Function parsing
 	Scoped* CurrentScope;
@@ -86,19 +90,18 @@ private:
 				return i;
 			}
 		}
-		gError() << "No free registers, this shouldn't happen";
+		gCompileError() << "No free registers, this shouldn't happen";
 		HasError = true;
 		return 0;
 	}
 
 	uint8_t GetLastFree() {
-		uint8_t idx = 254;
+		uint8_t idx = 0;
 		for (uint8_t i = 0; i < 254; i++) {
 			if (Registers[i]) {
-				idx = i;
+				idx = i + 1;
 			}
 		}
-		idx++;
 		Registers[idx] = true;
 		MaxRegister = idx;
 		return idx;

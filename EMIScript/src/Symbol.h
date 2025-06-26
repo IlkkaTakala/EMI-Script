@@ -4,7 +4,7 @@
 #include <vector>
 #include <Core.h>
 
-enum class SymbolFlags
+enum class SymbolFlags : uint16_t
 {
 	None = 0,
 	Assignable = 1,
@@ -24,7 +24,7 @@ enum class SymbolType : uint8_t
 	// ...
 };
 
-enum class FunctionType
+enum class FunctionType : uint8_t
 {
 	None,
 	User,
@@ -41,7 +41,8 @@ struct Symbol
 	SymbolType Type = SymbolType::Variable;
 	SymbolFlags Flags = SymbolFlags::None;
 	VariableType VarType = VariableType::Undefined;
-	void* Data = nullptr;
+	void* Data = nullptr; // Namespace, UserDefinedObject, Variable or FunctionSymbol
+	bool Builtin = false;
 
 	void setType(SymbolType t);
 
