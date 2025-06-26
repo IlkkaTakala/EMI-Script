@@ -70,6 +70,15 @@ TName TName::Get(char off) const {
 	return out;
 }
 
+TName TName::GetLast() const
+{
+	if (Size == 0) return TName();
+	TName out;
+	out.Path[0] = Path[Size - 1];
+	out.Size = 1;
+	return out;
+}
+
 TName& TName::operator<<(const TName& name) {
 	std::copy(name.Path.begin(), name.Path.begin() + name.Size, Path.begin() + Size);
 	Size += name.Size;

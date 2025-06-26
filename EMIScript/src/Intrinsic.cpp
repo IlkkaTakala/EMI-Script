@@ -183,9 +183,10 @@ void mathsqrt(Variable& out, Variable* args, size_t argc) {
 
 // @todo: Something better for these intrinsic definitions
 SymbolTable IntrinsicFunctions = { {
-	FUNC("print", print,						Undefined)		{} }, true}},
-	FUNC("println", printLn,					Undefined)		{} }, true}},
+	FUNC("print", print,						Undefined)		{ VariableType::Undefined } }, true}},
+	FUNC("println", printLn,					Undefined)		{ VariableType::Undefined } }, true}},
 	FUNC("delay", delay,						Undefined)		{ VariableType::Number } }, true}},
+
 	NAMESPACE("Array")
 	FUNC("Array.Size", arraySize,				Number)			{ VariableType::Array } }, true}},
 	FUNC("Array.Resize", arrayResize,			Number)			{ VariableType::Array, VariableType::Number, VariableType::Undefined } }, true}},
