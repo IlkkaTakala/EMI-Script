@@ -35,22 +35,39 @@ VM* GetVM(uint32_t handle)
     return VMs[handle];
 }
 
-TName::TName() : Path({ 0 }), Size(0) {}
+NameType::NameType() : Name(nullptr)
+{
+}
 
-TName::TName(const char* text, TName parent) : Path({ 0 }), Size(0)
+NameType::NameType(const char* text)
+{
+	if (text) {
+		std::unique_lock lk(StrMutex());
+
+		if (auto it = Strings().find(text); it == Strings().end()) {
+			auto [str, success] = Strings().emplace(text);
+			Name = str->c_str();
+		}
+		else {
+			Name = it->c_str();
+		}
+	}
+	else {
+		Name = nullptr;
+	}
+}
+
+NameType::~NameType()
+{
+}
+
+PathType::PathType() : Path({ 0 }), Size(0) {}
+
+PathType::PathType(const char* text, PathType parent) : Path({ 0 }), Size(0)
 {
     if (text) {
-        std::unique_lock lk(StrMutex());
-
-        if (auto it = Strings().find(text); it == Strings().end()) {
-            auto [str, success] = Strings().emplace(text);
-            Path[0] = str->c_str();
-            Size = 1;
-        }
-        else {
-            Path[0] = it->c_str();
-            Size = 1;
-        }
+        Path[0] = text;
+        Size = 1;
 
         if (parent) {
             std::copy(parent.Path.begin(), parent.Path.end(), Path.begin() + 1);
@@ -59,49 +76,62 @@ TName::TName(const char* text, TName parent) : Path({ 0 }), Size(0)
     }
 }
 
-TName::~TName()
+PathType::PathType(NameType text, PathType parent)
+{
+	if (text) {
+		Path[0] = text;
+		Size = 1;
+
+		if (parent) {
+			std::copy(parent.Path.begin(), parent.Path.end(), Path.begin() + 1);
+			Size += parent.Size;
+		}
+	}
+}
+
+PathType::~PathType()
 {
 }
 
-TName TName::Get(char off) const {
-	TName out;
+PathType PathType::Get(char off) const {
+	PathType out;
 	std::copy(Path.begin() + off, Path.begin() + Size, out.Path.begin());
 	out.Size = Size - off;
 	return out;
 }
 
-TName& TName::operator<<(const TName& name) {
+PathType& PathType::operator<<(const PathType& name) {
 	std::copy(name.Path.begin(), name.Path.begin() + name.Size, Path.begin() + Size);
 	Size += name.Size;
 	return *this;
 }
 
-TName TName::Append(const TName& name, char off) const {
-	TName out = *this;
+PathType PathType::Append(const PathType& name, char off) const {
+	PathType out = *this;
 	if (Size + name.Size > Path.size()) return out;
 	std::copy(name.Path.begin() + off, name.Path.begin() + name.Size, out.Path.begin() + Size);
 	out.Size += name.Size - off;
 	return out;
 }
 
-TName TName::Pop() const
+PathType PathType::Pop() const
 {
-	TName out;
+	PathType out;
 	if (Size == 0) return out;
 	std::copy(Path.begin() + 1, Path.begin() + Size, out.Path.begin());
 	out.Size = Size - 1;
 	return out;
 }
 
-TName TName::PopLast() const
+PathType PathType::PopLast() const
 {
-	TName out = *this;
+	PathType out = *this;
 	if (Size == 0) return out;
 	out.Path[--out.Size] = nullptr;
 	return out;
 }
 
-bool TName::IsChildOf(const TName& name) const {
+bool PathType::IsChildOf(const PathType& name) const {
 	if (Path[Size] == name.Path[name.Size]) {
 		int j = Size;
 		for (int i = name.Size; i >= 0 && j >= 0; i--, j--) {
@@ -114,7 +144,7 @@ bool TName::IsChildOf(const TName& name) const {
 	return false;
 }
 
-std::string TName::toString() const {
+std::string PathType::toString() const {
 	std::string out;
 	for (char i = Size - 1; i >= 0; i--) {
 		out += Path[i];
@@ -123,14 +153,30 @@ std::string TName::toString() const {
 	return out;
 }
 
-TName::operator const char* () const {
+PathType::operator const char* () const {
 	return Path[0];
 }
 
-TName::operator size_t() const {
-	return reinterpret_cast<size_t>(Path[0]);
+PathType::operator size_t() const {
+	return reinterpret_cast<size_t>(Path[0].GetName());
 }
 
-TName::operator bool() const {
-	return Path[0] != nullptr;
+PathType::operator bool() const {
+	return Path[0].GetName() != nullptr && Size > 0;
+}
+
+NameType::operator const char* () const {
+	return Name;
+}
+
+NameType::operator size_t() const {
+	return reinterpret_cast<size_t>(Name);
+}
+
+NameType::operator bool() const {
+	return Name != nullptr;
+}
+
+std::string NameType::toString() const {
+	return Name;
 }

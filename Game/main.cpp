@@ -7,7 +7,7 @@ int main()
 	printf("Waiting for compile...\n");
 	auto vm = EMI::CreateEnvironment();
 	vm.ReinitializeGrammar("../../.grammar");
-	EMI::SetLogLevel(EMI::LogLevel::Debug);
+	EMI::SetLogLevel(EMI::LogLevel::Warning);
 	auto result = vm.CompileScript("Scripts/game.ril");
 
 	result.wait();

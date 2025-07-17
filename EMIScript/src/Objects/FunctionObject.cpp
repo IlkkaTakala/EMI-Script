@@ -1,6 +1,6 @@
 #include "FunctionObject.h"
 
-FunctionObject::FunctionObject(FunctionType type, const TName& name)
+FunctionObject::FunctionObject(FunctionType type, const PathType& name)
 	: InternalType(type), Name(name)
 {
 	Type = VariableType::Function;

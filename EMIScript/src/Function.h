@@ -44,13 +44,13 @@ union Instruction
 #pragma pack(pop)
 #endif
 
-struct Scoped
+struct ScopeType
 {
-	ankerl::unordered_dense::map<TName, CompileSymbol*> symbols;
-	Scoped* parent = nullptr;
-	std::list<Scoped> children;
+	ankerl::unordered_dense::map<PathType, CompileSymbol*> symbols;
+	ScopeType* parent = nullptr;
+	std::list<ScopeType> children;
 
-	CompileSymbol* FindSymbol(const TName& name) {
+	CompileSymbol* FindSymbol(const PathType& name) {
 		if (auto it = symbols.find(name); it != symbols.end()) {
 			return it->second;
 		}
@@ -58,7 +58,7 @@ struct Scoped
 		return parent->FindSymbol(name);
 	}
 
-	CompileSymbol* addSymbol(const TName& name) {
+	CompileSymbol* addSymbol(const PathType& name) {
 		auto it = FindSymbol(name);
 		if (!it) {
 			auto s = symbols.emplace(name, new CompileSymbol{});
@@ -67,7 +67,7 @@ struct Scoped
 		return nullptr;
 	}
 
-	~Scoped() {
+	~ScopeType() {
 		for (auto& [name, s] : symbols) {
 			delete s;
 		}
@@ -76,7 +76,7 @@ struct Scoped
 
 struct Function
 {
-	TName Name;
+	PathType Name;
 
 	std::vector<Variable> StringTable;
 	ankerl::unordered_dense::set<double> NumberTable;
@@ -88,14 +88,14 @@ struct Function
 	std::vector<int32_t> PropertyTable;
 	std::vector<VariableType> TypeTable;
 
-	std::vector<TNameQuery> FunctionTableSymbols;
-	std::vector<TName> PropertyTableSymbols;
-	std::vector<TNameQuery> TypeTableSymbols;
-	std::vector<TNameQuery> GlobalTableSymbols;
+	std::vector<PathTypeQuery> FunctionTableSymbols;
+	std::vector<NameType> PropertyTableSymbols;
+	std::vector<PathTypeQuery> TypeTableSymbols;
+	std::vector<PathTypeQuery> GlobalTableSymbols;
 
 	ankerl::unordered_dense::map<int, int> DebugLines;
 
-	Scoped* FunctionScope;
+	ScopeType* FunctionScope;
 
 	std::vector<VariableType> Types;
 

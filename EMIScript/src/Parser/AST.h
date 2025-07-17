@@ -53,11 +53,11 @@ public:
 private:
 	void WalkLoad(Node*);
 	uint8_t WalkStore(Node*);
-	CompileSymbol* FindLocalSymbol(const TName& name);
-	CompileSymbol* FindOrCreateLocalSymbol(const TName& name);
-	std::pair<TName, Symbol*> FindSymbol(const TNameQuery& name);
-	std::pair<TName, Symbol*> FindSymbol(const TName& name);
-	std::pair<TName, Symbol*> FindOrCreateSymbol(const TName& name, SymbolType type = SymbolType::None);
+	CompileSymbol* FindLocalSymbol(const PathType& name);
+	CompileSymbol* FindOrCreateLocalSymbol(const PathType& name);
+	std::pair<PathType, Symbol*> FindSymbol(const PathTypeQuery& name);
+	std::pair<PathType, Symbol*> FindSymbol(const PathType& name);
+	std::pair<PathType, Symbol*> FindOrCreateSymbol(const PathType& name, SymbolType type = SymbolType::None);
 
 	void HandleFunction(Node* n, Function* f, CompileSymbol* s);
 	void HandleInit();
@@ -66,11 +66,11 @@ private:
 	bool HasDebug;
 	VM* Vm;
 	Node* Root;
-	std::vector<TName> SearchPaths;
-	std::vector<std::pair<size_t, TName>> AllSearchPaths;
+	std::vector<PathType> SearchPaths;
+	std::vector<std::pair<size_t, PathType>> AllSearchPaths;
 
 	// Function parsing
-	Scoped* CurrentScope;
+	ScopeType* CurrentScope;
 	Function* CurrentFunction;
 	ankerl::unordered_dense::set<std::string> StringList;
 	std::vector<Instruction> InstructionList;

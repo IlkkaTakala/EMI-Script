@@ -20,9 +20,9 @@ bool EMI::_internal_register(_internal_function* func)
 	}
 	sym->Data = new FunctionSymbol{ FunctionType::Host, func, Variable{}, TypeFromValue(func->return_type) };
 
-	TName fnname = toName(func->name);
+	PathType fnname = toPath(func->name);
 
-	TName space = fnname.Pop();
+	PathType space = fnname.Pop();
 	while (space.Length() > 0) {
 		auto res = HostFunctions().FindName(space);
 		if (!res.second && space.toString() != "Global") {
@@ -44,7 +44,7 @@ bool EMI::_internal_unregister(const char* name)
 	auto& f = HostFunctions();
 	std::string strname = name;
 	auto parts = splits(strname, '.');
-	TName out;
+	PathType out;
 	for (auto p = parts.rbegin(); p != parts.rend(); p++) {
 		out = out.Append(p->c_str());
 	}
