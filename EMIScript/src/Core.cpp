@@ -100,6 +100,15 @@ PathType PathType::Get(char off) const {
 	return out;
 }
 
+PathType PathType::GetLast() const
+{
+	if (Size == 0) return PathType();
+	PathType out;
+	out.Path[0] = Path[Size - 1];
+	out.Size = 1;
+	return out;
+}
+
 PathType& PathType::operator<<(const PathType& name) {
 	std::copy(name.Path.begin(), name.Path.begin() + name.Size, Path.begin() + Size);
 	Size += name.Size;

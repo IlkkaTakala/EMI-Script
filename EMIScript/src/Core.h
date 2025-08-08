@@ -71,6 +71,7 @@ public:
 
 	NameType GetFirst() const { return Path[0]; }
 	PathType Get(char off) const;
+	PathType GetLast() const;
 
 	PathType& operator<<(const PathType& name);
 	bool operator<(const PathType& rhs) const {
