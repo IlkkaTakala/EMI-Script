@@ -1,4 +1,5 @@
 #include "UserObject.h"
+#include "Helpers.h"
 
 VariableType ObjectManager::AddType(const PathType& name, const UserDefinedType& obj)
 {
@@ -28,8 +29,20 @@ Variable ObjectManager::Make(VariableType type) const
 		object->RefCount++;
 
 		uint16_t idx = 0;
-		for (auto& field : it->second.DefaultFields) {
-			(*object)[idx] = field;
+		for (int i = 0; i < it->second.DefaultFields.size(); ++i) {
+			auto& field = it->second.DefaultFields[i];
+			auto& deftype = it->second.DefaultTypes[i];
+			if (deftype > VariableType::Boolean) {
+				if (field.getType() == VariableType::Undefined) {
+					(*object)[idx] = GetTypeDefault(deftype);
+				}
+				else {
+					(*object)[idx] = CopyVariable(field);
+				}
+			}
+			else {
+				(*object)[idx] = field;
+			}
 			idx++;
 		}
 
@@ -86,6 +99,7 @@ bool ObjectManager::GetPropertySymbol(Symbol*& symbol, const NameType& name, Var
 void UserDefinedType::AddField(const NameType& name, Variable var, const Symbol& flags)
 {
 	DefaultFields.push_back(var);
+	DefaultTypes.push_back(flags.VarType);
 	FieldNames.emplace(name, flags); // @todo: might not work
 }
 
@@ -102,6 +116,16 @@ UserObject::UserObject(VariableType type, uint16_t count)
 	Type = type;
 	Data = new Variable[count];
 	DataCount = count;
+}
+
+UserObject::UserObject(const UserObject& object)
+{
+	Type = object.Type;
+	DataCount = object.DataCount;
+	Data = new Variable[DataCount];
+	for (int i = 0; i < DataCount; ++i) {
+		Data[i] = CopyVariable(object.Data[i]);
+	}
 }
 
 UserObject::~UserObject()

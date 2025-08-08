@@ -10,7 +10,6 @@ public:
 	Object() : Type(VariableType::Undefined), RefCount(0) {};
 	virtual ~Object() {}
 
-	Object(const Object&) = delete;
 	Object(Object&&) noexcept = delete;
 	Object & operator=(const Object&) = delete;
 	Object & operator=(Object&&) noexcept = delete;
@@ -54,6 +53,11 @@ public:
 
 			return obj;
 		}
+	}
+
+	template <typename ...Args>
+	T* Copy(T* object) {
+		return Make(*object);
 	}
 
 	void Free() {

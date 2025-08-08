@@ -13,6 +13,7 @@ public:
 	FunctionObject(const PathType& name) : FunctionObject(FunctionType::None, name) {}
 	FunctionObject(FunctionType type, const PathType& name);
 	FunctionObject() : FunctionObject(FunctionType::None, "") {}
+	FunctionObject(const FunctionObject& object);
 
 	static Allocator<FunctionObject>* GetAllocator();
 

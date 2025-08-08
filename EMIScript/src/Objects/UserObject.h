@@ -17,6 +17,7 @@ public:
 	}
 
 	UserObject(VariableType type, uint16_t count);
+	UserObject(const UserObject& object);
 	~UserObject();
 
 	void Clear();
@@ -55,6 +56,7 @@ private:
 
 	ankerl::unordered_dense::map<NameType, Symbol> FieldNames;
 	std::vector<Variable> DefaultFields;
+	std::vector<VariableType> DefaultTypes;
 };
 
 class ObjectManager

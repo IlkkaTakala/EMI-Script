@@ -7,6 +7,13 @@ Array::Array(size_t s)
 	Data.reserve(s);
 }
 
+Array::Array(const Array& array)
+{
+	Type = VariableType::Array;
+	Data.clear();
+	Data = array.Data;
+}
+
 Array::~Array()
 {
 	Data.clear();

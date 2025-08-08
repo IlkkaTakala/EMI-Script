@@ -421,7 +421,7 @@ void TypeConverter(NodeDataType& n, const TokenHolder& h)
 	}
 }
 
-ASTWalker::ASTWalker(VM* in_vm, Node* n)
+ASTWalker::ASTWalker(VM* in_vm, Node* n, const std::string& file)
 {
 	Vm = in_vm;
 	Root = n;
@@ -430,6 +430,7 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n)
 	HasError = false;
 	MaxRegister = 0;
 	SearchPaths.resize(1);
+	Filename = file;
 
 	InitFunction = new Function();
 	InitFunction->FunctionScope = new ScopeType();
@@ -581,7 +582,7 @@ void ASTWalker::Run()
 						}
 						else if (field->children.back()->type != Token::OExpr && field->children.back()->type != Token::Null){
 							gCompileWarn() << "Cannot initialize fields with non-constant values. Reverting to default";
-							var = GetTypeDefault(type);
+							var.setUndefined();
 						}
 					}
 					else {
@@ -761,7 +762,7 @@ void printInstruction(const Instruction& in) {
 #define SetOut(n) n->regTarget = InstructionList[n->instruction].target
 #define First() first_child
 #define Last() last_child
-#define Error(text) gCompileError() << "Line " << n->line << ": " << text; HasError = true;
+#define Error(text) gCompileError() << Filename << "@" << n->line << ": " << text; HasError = true;
 #define Warn(text) gWarn() << "Line " << n->line << ": " << text;
 #define FreeConstant(n) if (!n->sym || (n->sym && n->sym->NeedsLoading) ) FreeRegister(n->regTarget);
 #define EnsureOperands if (n->children.size() != 2) { Error("Invalid number of operands") break; }

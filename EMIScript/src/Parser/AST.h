@@ -44,7 +44,7 @@ class VM;
 class ASTWalker
 {
 public:
-	ASTWalker(VM*, Node*);
+	ASTWalker(VM*, Node*, const std::string&);
 	~ASTWalker();
 	void Run();
 	SymbolTable Global;
@@ -63,6 +63,7 @@ private:
 	void HandleInit();
 	void HandleObject(Node* n);
 
+	std::string Filename;
 	bool HasDebug;
 	VM* Vm;
 	Node* Root;
