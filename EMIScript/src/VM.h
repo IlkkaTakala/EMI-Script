@@ -127,7 +127,7 @@ public:
 	InternalValue GetReturnValue(size_t index);
 	bool WaitForResult(void* ptr);
 
-	std::pair<TName, Symbol*> FindSymbol(const TNameQuery& name);
+	std::pair<PathType, Symbol*> FindSymbol(const PathTypeQuery& name);
 	void AddCompileUnit(const std::string& path, const SymbolTable& space, Function* InitFunction);
 
 	inline bool IsRunning() const { return VMRunning; }

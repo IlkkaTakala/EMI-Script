@@ -157,7 +157,7 @@ bool VM::Export(const char* path, const ExportOptions& options)
 
 void* VM::GetFunctionID(const std::string& id)
 {
-	TName name(id.c_str());
+	PathType name(id.c_str());
 	auto [fullName, symbol] = GlobalSymbols.FindName(name);
 	if (symbol && symbol->Type == SymbolType::Function) {
 		auto fn = static_cast<FunctionSymbol*>(symbol->Data);
@@ -237,7 +237,7 @@ bool VM::WaitForResult(void* ptr)
 	return false;
 }
 
-std::pair<TName, Symbol*> VM::FindSymbol(const TNameQuery& name)
+std::pair<PathType, Symbol*> VM::FindSymbol(const PathTypeQuery& name)
 {
 	return GlobalSymbols.FindName(name);
 }
@@ -514,7 +514,7 @@ void Runner::Run()
 					if (var == nullptr) {
 						auto& name = current->FunctionPtr->GlobalTableSymbols[byte.param];
 						auto res = Owner->GlobalSymbols.FindName(name);
-						if (res.second && res.second->Type == SymbolType::Variable) {
+						if (res.second && (res.second->Type == SymbolType::Variable || res.second->Type == SymbolType::Static)) {
 							var = static_cast<Variable*>(res.second->Data);
 						}
 						else {
@@ -537,7 +537,7 @@ void Runner::Run()
 						uint16_t idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
-							Error() << "Property not found: " << name;
+							Error() << "Property not found: " << name.GetName();
 							Registers[byte.target].setUndefined();
 							goto start;
 						}
@@ -547,7 +547,7 @@ void Runner::Run()
 					if (prop.getType() > VariableType::Object) {
 						UserObject* ptr = prop.as<UserObject>();
 						if (ptr->size() <= propertyIdx) {
-							Error() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param];
+							Error() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param].GetName();
 							Registers[byte.target].setUndefined();
 							goto start;
 						}
@@ -566,7 +566,7 @@ void Runner::Run()
 						uint16_t idx;
 						if (!GetManager().GetPropertyIndex(idx, name, prop.getType())) {
 							propertyIdx = -1;
-							Error() << "Property not found: " << name;
+							Error() << "Property not found: " << name.GetName();
 							goto start;
 						}
 						propertyIdx = idx;
@@ -575,7 +575,7 @@ void Runner::Run()
 					if (prop.getType() > VariableType::Object) {
 						UserObject* ptr = prop.as<UserObject>();
 						if (ptr->size() <= propertyIdx) {
-							Error() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param];
+							Error() << "Invalid property " << current->FunctionPtr->PropertyTableSymbols[data.param].GetName();
 							goto start;
 						}
 						(*ptr)[static_cast<uint16_t>(propertyIdx)] = Registers[byte.target];

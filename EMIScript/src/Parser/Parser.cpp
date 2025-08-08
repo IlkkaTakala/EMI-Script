@@ -196,10 +196,10 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	Desugar(root);
 
 #ifdef DEBUG
-	root->print("");
+	//root->print("");
 #endif // DEBUG
 	gCompileDebug() << "Walking AST";
-	ASTWalker ast(vm, root);
+	ASTWalker ast(vm, root, fullPath);
 	ast.Run();
 
 	if (!ast.HasError) {
@@ -230,7 +230,7 @@ void Parser::ParseTemporary(VM* vm, CompileOptions& options)
 	root->print("");
 #endif // DEBUG
 	gCompileDebug() << "Walking AST";
-	ASTWalker ast(vm, root);
+	ASTWalker ast(vm, root, "console");
 	ast.Run();
 
 	if (!ast.HasError) {

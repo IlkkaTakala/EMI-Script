@@ -10,6 +10,7 @@ InternalValue moveOwnershipToHost(const Variable& var);
 InternalValue makeHostArg(const Variable& var);
 
 Variable GetTypeDefault(VariableType type);
+Variable CopyVariable(const Variable& var);
 
 VariableType TypeFromValue(ValueType type);
 

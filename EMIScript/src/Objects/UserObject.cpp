@@ -1,6 +1,7 @@
 #include "UserObject.h"
+#include "Helpers.h"
 
-VariableType ObjectManager::AddType(const TName& name, const UserDefinedType& obj)
+VariableType ObjectManager::AddType(const PathType& name, const UserDefinedType& obj)
 {
 	if (auto it = NameToType.find(name); it == NameToType.end()) {
 		auto nextType = (VariableType)++TypeCounter;
@@ -13,7 +14,7 @@ VariableType ObjectManager::AddType(const TName& name, const UserDefinedType& ob
 	}
 }
 
-void ObjectManager::RemoveType(const TName& name)
+void ObjectManager::RemoveType(const PathType& name)
 {
 	auto type = NameToType[name];
 	BaseTypes.erase(type);
@@ -28,8 +29,20 @@ Variable ObjectManager::Make(VariableType type) const
 		object->RefCount++;
 
 		uint16_t idx = 0;
-		for (auto& field : it->second.DefaultFields) {
-			(*object)[idx] = field;
+		for (int i = 0; i < it->second.DefaultFields.size(); ++i) {
+			auto& field = it->second.DefaultFields[i];
+			auto& deftype = it->second.DefaultTypes[i];
+			if (deftype > VariableType::Boolean) {
+				if (field.getType() == VariableType::Undefined) {
+					(*object)[idx] = GetTypeDefault(deftype);
+				}
+				else {
+					(*object)[idx] = CopyVariable(field);
+				}
+			}
+			else {
+				(*object)[idx] = field;
+			}
 			idx++;
 		}
 
@@ -40,7 +53,7 @@ Variable ObjectManager::Make(VariableType type) const
 	return Variable();
 }
 
-bool ObjectManager::GetType(UserDefinedType*& type, const TName& name)
+bool ObjectManager::GetType(UserDefinedType*& type, const PathType& name)
 {
 	auto it = NameToType.find(name);
 	if (it == NameToType.end()) {
@@ -50,7 +63,7 @@ bool ObjectManager::GetType(UserDefinedType*& type, const TName& name)
 	return true;
 }
 
-bool ObjectManager::GetPropertyIndex(uint16_t& out, const TName& name, VariableType type)
+bool ObjectManager::GetPropertyIndex(uint16_t& out, const NameType& name, VariableType type)
 {
 	if (auto it = BaseTypes.find(type); it != BaseTypes.end()) {
 		auto& fields = it->second.FieldNames;
@@ -67,7 +80,7 @@ bool ObjectManager::GetPropertyIndex(uint16_t& out, const TName& name, VariableT
 	return false;
 }
 
-bool ObjectManager::GetPropertySymbol(Symbol*& symbol, const TName& name, VariableType type)
+bool ObjectManager::GetPropertySymbol(Symbol*& symbol, const NameType& name, VariableType type)
 {
 	if (auto it = BaseTypes.find(type); it != BaseTypes.end()) {
 		auto& fields = it->second.FieldNames;
@@ -83,13 +96,14 @@ bool ObjectManager::GetPropertySymbol(Symbol*& symbol, const TName& name, Variab
 	return false;
 }
 
-void UserDefinedType::AddField(const TName& name, Variable var, const Symbol& flags)
+void UserDefinedType::AddField(const NameType& name, Variable var, const Symbol& flags)
 {
 	DefaultFields.push_back(var);
+	DefaultTypes.push_back(flags.VarType);
 	FieldNames.emplace(name, flags); // @todo: might not work
 }
 
-VariableType UserDefinedType::GetFieldType(const TName& name) const
+VariableType UserDefinedType::GetFieldType(const NameType& name) const
 {
 	if (auto it = FieldNames.find(name); it != FieldNames.end()) {
 		return it->second.VarType;
@@ -102,6 +116,16 @@ UserObject::UserObject(VariableType type, uint16_t count)
 	Type = type;
 	Data = new Variable[count];
 	DataCount = count;
+}
+
+UserObject::UserObject(const UserObject& object)
+{
+	Type = object.Type;
+	DataCount = object.DataCount;
+	Data = new Variable[DataCount];
+	for (int i = 0; i < DataCount; ++i) {
+		Data[i] = CopyVariable(object.Data[i]);
+	}
 }
 
 UserObject::~UserObject()

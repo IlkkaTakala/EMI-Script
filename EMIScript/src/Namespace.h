@@ -4,10 +4,10 @@
 
 struct SymbolTable
 {
-	ankerl::unordered_dense::map<TName, Symbol*> Table;
+	ankerl::unordered_dense::map<PathType, Symbol*> Table;
 
-	std::pair<TName, Symbol*> FindName(const TNameQuery& name) const {
-		TName searchName;
+	std::pair<PathType, Symbol*> FindName(const PathTypeQuery& name) const {
+		PathType searchName;
 		for (auto& p : name.GetPaths()) {
 			for (char i = 0; i < p.Length(); i++) {
 				searchName = name.GetTarget().Append(p, i);
@@ -22,14 +22,14 @@ struct SymbolTable
 		return { {}, nullptr };
 	}
 
-	Symbol* FindNameFromObject(const TName& name, const TName& path) const {
+	Symbol* FindNameFromObject(const PathType& name, const PathType& path) const {
 		if (auto it = Table.find(name.Append(path)); it != Table.end()) {
 			return it->second;
 		}
 		return nullptr;
 	}
 
-	bool AddName(TName name, Symbol* symbol) {
+	bool AddName(PathType name, Symbol* symbol) {
 		if (auto it = Table.find(name); it == Table.end()) {
 			Table.emplace(name, symbol);
 			return true;
@@ -40,12 +40,12 @@ struct SymbolTable
 
 struct Namespace
 {
-	TName Name;
+	PathType Name;
 };
 
 struct Function;
 struct CompileUnit
 {
-	std::vector<TName> Symbols;
+	std::vector<PathType> Symbols;
 	Function* InitFunction;
 };

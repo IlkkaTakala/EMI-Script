@@ -89,9 +89,29 @@ Variable GetTypeDefault(VariableType type)
 	case VariableType::Array:
 		return Array::GetAllocator()->Make();
 	case VariableType::Object:
-		return Variable();
 	default:
-		return Variable();
+		return GetManager().Make(type);
+	}
+}
+
+Variable CopyVariable(const Variable& var)
+{
+	switch (var.getType())
+	{
+	case VariableType::Undefined:
+	case VariableType::Number:
+	case VariableType::Boolean:
+	case VariableType::External:
+		return var;
+	case VariableType::String:
+		return String::GetAllocator()->Copy(var.as<String>());
+	case VariableType::Function:
+		return FunctionObject::GetAllocator()->Copy(var.as<FunctionObject>());
+	case VariableType::Array:
+		return Array::GetAllocator()->Copy(var.as<Array>());
+	case VariableType::Object:
+	default:
+		return UserObject::GetAllocator()->Copy(var.as<UserObject>());
 	}
 }
 

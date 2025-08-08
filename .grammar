@@ -9,6 +9,7 @@ RProgram FunctionDef
 RProgram PublicFunctionDef
 RProgram NamespaceDef
 RProgram UsingDef
+RProgram ImportDef
 RProgram VarDeclare Semi
 RProgram Stmt
 
@@ -33,6 +34,7 @@ PublicFunctionDef Public FunctionDef
 PublicFunctionDef PublicDef Id Lparenthesis MFunctionVar Rparenthesis OTypename Scope
 NamespaceDef Extend Identifier Colon
 UsingDef Using Identifier Colon
+ImportDef Import Id Colon
 MFunctionVar FunctionVar Comma MFunctionVar
 MFunctionVar FunctionVar
 MFunctionVar None
@@ -162,6 +164,7 @@ None None FunctionDef
 None None PublicFunctionDef
 None None NamespaceDef
 None None UsingDef
+None None ImportDef
 None None VarDeclare
 None None Stmt
 
@@ -184,6 +187,7 @@ None None Expr
 Id
 None PublicFunctionDef FunctionDef
 Id PublicFunctionDef
+Id
 Id
 Id
 None CallParams MFunctionVar

@@ -9,6 +9,7 @@ public:
 	String(const char* str) : String(str, strlen(str) + 1) {}
 	String(size_t s) : String(nullptr, s) {};
 	String() : String("", 1) {}
+	String(const String& str);
 
 	void Realloc(const char* str) { Realloc(str, strlen(str) + 1); }
 	void Realloc(size_t s) { Realloc(nullptr, s); };

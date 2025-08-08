@@ -10,6 +10,15 @@ String::String(const char* str, size_t s)
 	Capacity = Size;
 }
 
+String::String(const String& str)
+{
+	Type = VariableType::String;
+	Size = str.Size;
+	Data = new char[Size]();
+	memcpy(Data, str.Data, Size);
+	Capacity = Size;
+}
+
 Allocator<String>* String::GetAllocator()
 {
 	static Allocator<String> alloc;
