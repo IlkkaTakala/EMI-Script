@@ -43,9 +43,9 @@ struct Namespace
 	PathType Name;
 };
 
-struct Function;
+struct ScriptFunction;
 struct CompileUnit
 {
 	std::vector<PathType> Symbols;
-	Function* InitFunction;
+	ScriptFunction* InitFunction;
 };

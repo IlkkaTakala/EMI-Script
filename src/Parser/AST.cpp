@@ -432,7 +432,7 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n, const std::string& file)
 	SearchPaths.resize(1);
 	Filename = file;
 
-	InitFunction = new Function();
+	InitFunction = new ScriptFunction();
 	InitFunction->FunctionScope = new ScopeType();
 
 	HasDebug = true; // @todo: disable debugs
@@ -465,7 +465,7 @@ PathType getFullId(Node* n) {
 
 void ASTWalker::Run()
 {
-	std::vector<std::pair<Node*, Function*>> functionList;
+	std::vector<std::pair<Node*, ScriptFunction*>> functionList;
 	std::vector<std::string> ImportList;
 	CurrentFunction = InitFunction;
 	for (auto& c : Root->children) {
@@ -609,7 +609,7 @@ void ASTWalker::Run()
 				symbol->VarType = VariableType::Function;
 				FunctionSymbol* functionSym = new FunctionSymbol();
 				symbol->Data = functionSym;
-				Function* function = new Function();
+				ScriptFunction* function = new ScriptFunction();
 				functionSym->Type = FunctionType::User;
 				functionSym->DirectPtr = function;
 
@@ -797,7 +797,7 @@ Out;\
 
 void ASTWalker::WalkLoad(Node* n)
 {
-	Function* f = CurrentFunction;
+	ScriptFunction* f = CurrentFunction;
 	Node* first_child = n->children.size() ? n->children.front() : nullptr;
 	Node* last_child = n->children.size() ? n->children.back() : nullptr;
 	switch (n->type) {
@@ -1765,7 +1765,7 @@ void ASTWalker::WalkLoad(Node* n)
 }
 
 uint8_t ASTWalker::WalkStore(Node* n) {
-	Function* f = CurrentFunction;
+	ScriptFunction* f = CurrentFunction;
 	auto first_child = n->children.size() ? n->children.front() : nullptr;
 	auto last_child = n->children.size() ? n->children.back() : nullptr;
 	switch (n->type) {
@@ -1973,7 +1973,7 @@ std::pair<PathType, Symbol*> ASTWalker::FindOrCreateSymbol(const PathType& name,
 	return { {}, nullptr };
 }
 
-void ASTWalker::HandleFunction(Node* n, Function* f, CompileSymbol* s)
+void ASTWalker::HandleFunction(Node* n, ScriptFunction* f, CompileSymbol* s)
 {
 	InitRegisters();
 	CurrentFunction = f;

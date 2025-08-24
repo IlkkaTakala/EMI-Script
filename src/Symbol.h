@@ -66,13 +66,25 @@ struct CompileSymbol
 	}
 };
 
+struct FunctionSignature
+{
+	VariableType Return;
+	std::vector<VariableType> Arguments;
+	std::vector<NameType> ArgumentNames;
+};
+
+class ScriptFunction;
 struct FunctionSymbol
 {
 	FunctionType Type;
-	void* DirectPtr;
-	Variable Function;
-	VariableType Return;
-	std::vector<VariableType> Arguments;
+	union {
+		ScriptFunction* Local;
+		EMI::_internal_function* Host;
+		IntrinsicPtr Intrinsic;
+	};
+
+	Variable FunctionVar;
+	FunctionSignature Signature;
 };
 
 inline bool isAssignable(const SymbolFlags& s) { return SymbolFlags::Assignable == (s & SymbolFlags::Assignable); }

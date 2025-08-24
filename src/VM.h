@@ -44,14 +44,14 @@ struct CompileOptions
 
 struct CallObject 
 {
-	Function* FunctionPtr;
+	ScriptFunction* FunctionPtr;
 	const uint32_t* Ptr;
 	const uint32_t* End;
 	size_t StackOffset;
 	size_t PromiseIndex;
 	std::vector<Variable> Arguments;
 
-	CallObject(Function* function);
+	CallObject(ScriptFunction* function);
 };
 
 template <typename T>
@@ -128,7 +128,7 @@ public:
 	bool WaitForResult(void* ptr);
 
 	std::pair<PathType, Symbol*> FindSymbol(const PathTypeQuery& name);
-	void AddCompileUnit(const std::string& path, const SymbolTable& space, Function* InitFunction);
+	void AddCompileUnit(const std::string& path, const SymbolTable& space, ScriptFunction* InitFunction);
 
 	inline bool IsRunning() const { return VMRunning; }
 

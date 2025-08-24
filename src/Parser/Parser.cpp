@@ -152,7 +152,7 @@ void Parser::ThreadedParse(VM* vm)
 				std::ifstream file(fp, std::ios::in | std::ios::binary);
 
 				SymbolTable table;
-				Function* Init;
+				ScriptFunction* Init;
 				auto res = Library::Decode(file, table, Init);
 				if (res) vm->AddCompileUnit(MakePath(options.Path), table, Init);
 				options.CompileResult.set_value(res);

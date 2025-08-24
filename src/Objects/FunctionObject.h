@@ -20,6 +20,6 @@ public:
 	FunctionType InternalType;
 	PathType Name;
 
-	std::variant<Function*, EMI::_internal_function*, IntrinsicPtr> Callee;
+	std::variant<ScriptFunction*, EMI::_internal_function*, IntrinsicPtr> Callee;
 
 };

@@ -119,7 +119,7 @@ bool VM::Export(const char* path, const ExportOptions& options)
 			return false;
 		}
 
-		Function* fn = Units.values()[0].second.InitFunction;
+		ScriptFunction* fn = Units.values()[0].second.InitFunction;
 		for (int i = 1; i < Units.size(); i++) {
 			fn->Append(*Units.values()[i].second.InitFunction);
 		}
@@ -165,7 +165,7 @@ void* VM::GetFunctionID(const std::string& id)
 			gRuntimeWarn() << "Symbol is not a script function";
 			return 0;
 		}
-		if (!static_cast<Function*>(fn->DirectPtr)->IsPublic) {
+		if (!static_cast<ScriptFunction*>(fn->DirectPtr)->IsPublic) {
 			gRuntimeWarn() << "Function is private";
 			return 0;
 		}
@@ -177,7 +177,7 @@ void* VM::GetFunctionID(const std::string& id)
 
 size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& args)
 {
-	Function* fn = (Function*)(void*)handle;
+	ScriptFunction* fn = (ScriptFunction*)(void*)handle;
 	if (!fn) {
 		gRuntimeWarn() << "Invalid function handle";
 		return (size_t)-1;
@@ -242,7 +242,7 @@ std::pair<PathType, Symbol*> VM::FindSymbol(const PathTypeQuery& name)
 	return GlobalSymbols.FindName(name);
 }
 
-void VM::AddCompileUnit(const std::string& path, const SymbolTable& space, Function* InitFunction)
+void VM::AddCompileUnit(const std::string& path, const SymbolTable& space, ScriptFunction* InitFunction)
 {
 	std::unique_lock lk(MergeMutex);
 	Units[path].Symbols.reserve(space.Table.size());
@@ -490,7 +490,7 @@ void Runner::Run()
 								auto func = FunctionObject::GetAllocator()->Make(f->Type, res.first);
 								switch (f->Type) {
 								case FunctionType::Intrinsic: func->Callee = reinterpret_cast<IntrinsicPtr>(f->DirectPtr); break;
-								case FunctionType::User: func->Callee = static_cast<Function*>(f->DirectPtr); break;
+								case FunctionType::User: func->Callee = static_cast<ScriptFunction*>(f->DirectPtr); break;
 								case FunctionType::Host: func->Callee = static_cast<EMI::_internal_function*>(f->DirectPtr); break;
 								default: break;
 								}
@@ -616,7 +616,7 @@ void Runner::Run()
 						if (res.first && res.second->Type == SymbolType::Function) {
 							auto f = static_cast<FunctionSymbol*>(res.second->Data);
 							if (f->Type == FunctionType::User) {
-								fn = static_cast<Function*>(f->DirectPtr);
+								fn = static_cast<ScriptFunction*>(f->DirectPtr);
 							}
 							else {
 								Warn() << "Function has unexpected location: " << name;
@@ -687,7 +687,7 @@ void Runner::Run()
 					switch (f->InternalType)
 					{
 					case FunctionType::User: {
-						if (auto ptr = std::get<Function*>(f->Callee)) { // @todo: Add finding function
+						if (auto ptr = std::get<ScriptFunction*>(f->Callee)) { // @todo: Add finding function
 							if (!ptr->IsPublic && ptr->Name.IsChildOf(current->FunctionPtr->Name.Get(1))) {
 								Warn() << "Cannot call private function " << ptr->Name;
 								goto start;
@@ -1059,7 +1059,7 @@ void Runner::Run()
 	}
 }
 
-CallObject::CallObject(Function* function)
+CallObject::CallObject(ScriptFunction* function)
 {
 	PromiseIndex = 0;
 	FunctionPtr = function;

@@ -38,7 +38,7 @@ Symbol::~Symbol()
 		case SymbolType::Function: {
 			auto sym = static_cast<FunctionSymbol*>(Data);
 			if (sym->Type == FunctionType::User)
-				delete static_cast<Function*>(sym->DirectPtr);
+				delete static_cast<ScriptFunction*>(sym->DirectPtr);
 			delete sym;
 		} break;
 		case SymbolType::Object: {

@@ -74,14 +74,14 @@ struct ScopeType
 	}
 };
 
-struct Function
+struct ScriptFunction
 {
 	PathType Name;
 
 	std::vector<Variable> StringTable;
 	ankerl::unordered_dense::set<double> NumberTable;
 
-	std::vector<Function*> FunctionTable;
+	std::vector<ScriptFunction*> FunctionTable;
 	std::vector<EMI::_internal_function*> ExternalTable;
 	std::vector<IntrinsicPtr> IntrinsicTable;
 	std::vector<Variable*> GlobalTable;
@@ -105,15 +105,15 @@ struct Function
 
 	std::vector<uint32_t> Bytecode;
 
-	Function() : Name(nullptr) {
+	ScriptFunction() : Name(nullptr) {
 		FunctionScope = nullptr;
 		ArgCount = 0;
 		RegisterCount = 0;
 		IsPublic = false;
 	}
-	~Function() {
+	~ScriptFunction() {
 		delete FunctionScope;
 	}
 
-	void Append(Function fn);
+	void Append(ScriptFunction fn);
 };

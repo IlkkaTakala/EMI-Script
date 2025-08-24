@@ -18,4 +18,5 @@ file(
 
 add_executable(EMICLI ${_source_list})
 
+add_dependencies(EMICLI EMI)
 target_link_libraries(EMICLI PUBLIC EMI)

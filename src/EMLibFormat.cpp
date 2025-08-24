@@ -64,7 +64,7 @@ void ReadArray(std::istream& in, A& arr) {
 	in.read(reinterpret_cast<char*>(arr.data()), datasize);
 }
 
-void WriteFunction(std::ostream& out, const Function* fnd) {
+void WriteFunction(std::ostream& out, const ScriptFunction* fnd) {
 	
 	WriteValue(out, (uint8_t)fnd->ArgCount);
 	WriteValue(out, (uint8_t)fnd->RegisterCount);
@@ -97,7 +97,7 @@ void WriteFunction(std::ostream& out, const Function* fnd) {
 	WriteArray(out, fnd->Bytecode);
 }
 
-void ReadFunction(std::istream& instream, Function* fnd) {
+void ReadFunction(std::istream& instream, ScriptFunction* fnd) {
 	ReadValue(instream, fnd->ArgCount);
 	ReadValue(instream, fnd->RegisterCount);
 	ReadValue(instream, fnd->IsPublic);
@@ -146,7 +146,7 @@ void ReadFunction(std::istream& instream, Function* fnd) {
 	ReadArray(instream, fnd->Bytecode);
 }
 
-bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init)
+bool Library::Decode(std::istream& instream, SymbolTable& table, ScriptFunction*& init)
 {
 	char identifier[4] = { 0 };
 	uint8_t format;
@@ -219,7 +219,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init
 				switch (fn->Type)
 				{
 				case FunctionType::User: {
-					auto fnd = new Function();
+					auto fnd = new ScriptFunction();
 					fn->DirectPtr = fnd;
 
 					ReadFunction(instream, fnd);
@@ -236,7 +236,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init
 			table.AddName(name, symbol);
 		}
 
-		init = new Function();
+		init = new ScriptFunction();
 
 		ReadFunction(instream, init);
 
@@ -249,7 +249,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, Function*& init
 	return true;
 }
 
-bool Library::Encode(const SymbolTable& table, std::ostream& outstream, Function* init)
+bool Library::Encode(const SymbolTable& table, std::ostream& outstream, ScriptFunction* init)
 {
 	outstream << "EMI";
 	WriteValue(outstream, FORMAT_VERSION);
@@ -300,7 +300,7 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream, Function
 				switch (fn->Type)
 				{
 				case FunctionType::User: {
-					auto fnd = reinterpret_cast<Function*>(fn->DirectPtr);
+					auto fnd = reinterpret_cast<ScriptFunction*>(fn->DirectPtr);
 					WriteFunction(out, fnd);
 				} break;
 				default:

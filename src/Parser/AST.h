@@ -48,7 +48,7 @@ public:
 	~ASTWalker();
 	void Run();
 	SymbolTable Global;
-	Function* InitFunction;
+	ScriptFunction* InitFunction;
 	bool HasError;
 private:
 	void WalkLoad(Node*);
@@ -59,7 +59,7 @@ private:
 	std::pair<PathType, Symbol*> FindSymbol(const PathType& name);
 	std::pair<PathType, Symbol*> FindOrCreateSymbol(const PathType& name, SymbolType type = SymbolType::None);
 
-	void HandleFunction(Node* n, Function* f, CompileSymbol* s);
+	void HandleFunction(Node* n, ScriptFunction* f, CompileSymbol* s);
 	void HandleInit();
 	void HandleObject(Node* n);
 
@@ -72,7 +72,7 @@ private:
 
 	// Function parsing
 	ScopeType* CurrentScope;
-	Function* CurrentFunction;
+	ScriptFunction* CurrentFunction;
 	ankerl::unordered_dense::set<std::string> StringList;
 	std::vector<Instruction> InstructionList;
 	std::array<bool, 256> Registers;
