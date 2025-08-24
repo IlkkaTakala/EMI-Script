@@ -76,7 +76,6 @@ void WriteFunction(std::ostream& out, const ScriptFunction* fnd) {
 
 	WriteArray(out, fnd->NumberTable.values());
 	WriteArray(out, fnd->DebugLines.values());
-	WriteArray(out, fnd->Types);
 
 	WriteArray(out, fnd->FunctionTableSymbols, [](std::ostream& out, const PathTypeQuery& name) {
 		WriteString(out, name.GetTarget().toString());
@@ -115,8 +114,6 @@ void ReadFunction(std::istream& instream, ScriptFunction* fnd) {
 	ReadArray(instream, debug);
 	fnd->DebugLines.insert(debug.begin(), debug.end());
 
-	ReadArray(instream, fnd->Types);
-
 	ReadArray(instream, fnd->FunctionTableSymbols, [](std::istream& in, PathTypeQuery& name) {
 		PathTypeQuery query(toPath(ReadString(in).c_str()));
 		ReadArray(in, query.Paths(), [](std::istream& in, PathType& path) { path = toPath(ReadString(in).c_str()); });
@@ -137,8 +134,6 @@ void ReadFunction(std::istream& instream, ScriptFunction* fnd) {
 		});
 
 	fnd->FunctionTable.resize(fnd->FunctionTableSymbols.size(), nullptr);
-	fnd->IntrinsicTable.resize(fnd->FunctionTableSymbols.size(), nullptr);
-	fnd->ExternalTable.resize(fnd->FunctionTableSymbols.size(), nullptr);
 	fnd->PropertyTable.resize(fnd->PropertyTableSymbols.size(), -1);
 	fnd->TypeTable.resize(fnd->TypeTableSymbols.size(), VariableType::Undefined);
 	fnd->GlobalTable.resize(fnd->GlobalTableSymbols.size(), nullptr);
@@ -184,7 +179,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, ScriptFunction*
 			switch (symbol->Type)
 			{
 			case SymbolType::Namespace: {
-				symbol->Data = new Namespace{ name };
+				symbol->Space = new Namespace{ name };
 			} break;
 			case SymbolType::Object: {
 				auto ob = new UserDefinedType();
@@ -197,37 +192,44 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, ScriptFunction*
 					ReadValue(in, flags.VarType);
 					ob->AddField(name, {}, flags);
 				});
-				symbol->Data = ob;
+				symbol->UserObject = ob;
 			} break;
 			case SymbolType::Variable: {
-				symbol->Data = new Variable();
+				symbol->SimpleVariable = new Variable();
 			} break;
 			case SymbolType::Function: {
-				auto fn = new FunctionSymbol();
-				symbol->Data = fn;
+				auto fntable = new FunctionTable();
+				symbol->Function = fntable;
 
-				ReadValue(instream, data_u8);
-				fn->Type = (FunctionType)data_u8;
-				ReadValue(instream, data_u16);
-				fn->Return = (VariableType)data_u16;
-				ReadArray(instream, fn->Arguments, [](std::istream& in, VariableType type) {
-					uint16_t data_u16;
+				std::vector<int> data;
+				ReadArray(instream, data, [=](std::istream& in, int&) {
+					auto fn = new FunctionSymbol();
+					ReadValue(in, data_u8);
+					fn->Type = (FunctionType)data_u8;
 					ReadValue(in, data_u16);
-					type = (VariableType)data_u16;
+					fn->Signature.Return = (VariableType)data_u16;
+					ReadArray(in, fn->Signature.Arguments, [](std::istream& in, VariableType type) {
+						uint16_t data_u16;
+						ReadValue(in, data_u16);
+						type = (VariableType)data_u16;
+						});
+
+					fntable->AddFunction((int)fn->Signature.Arguments.size(), fn);
+
+					switch (fn->Type)
+					{
+					case FunctionType::User: {
+						auto fnd = new ScriptFunction();
+						fn->Local = fnd;
+
+						ReadFunction(in, fnd);
+
+					} break;
+					default:
+						break;
+					}
 				});
-
-				switch (fn->Type)
-				{
-				case FunctionType::User: {
-					auto fnd = new ScriptFunction();
-					fn->DirectPtr = fnd;
-
-					ReadFunction(instream, fnd);
-
-				} break;
-				default:
-					break;
-				}
+				
 			} break;
 			default:
 				break;
@@ -274,43 +276,45 @@ bool Library::Encode(const SymbolTable& table, std::ostream& outstream, ScriptFu
 		WriteValue(out, (uint16_t)symbol->Flags);
 		WriteValue(out, (uint16_t)symbol->VarType);
 
-		if (symbol->Data) {
-			switch (symbol->Type)
-			{
-			case SymbolType::Namespace: {
-				// Might need namespace
-			} break;
-			case SymbolType::Object: {
-				auto ob = static_cast<UserDefinedType*>(symbol->Data);
-				WriteValue(out, ob->Type);
-				WriteArray(out, ob->GetFields().values(), [](std::ostream& out, const auto& data) {
-					WriteString(out, data.first.toString());
-					WriteValue(out, data.second.Flags);
-					WriteValue(out, data.second.VarType);
-				});
-			} break;
-			case SymbolType::Function: {
-				auto fn = static_cast<FunctionSymbol*>(symbol->Data);
+		switch (symbol->Type)
+		{
+		case SymbolType::Namespace: {
+			// Might need namespace
+		} break;
+		case SymbolType::Object: {
+			auto ob = static_cast<UserDefinedType*>(symbol->UserObject);
+			WriteValue(out, ob->Type);
+			WriteArray(out, ob->GetFields().values(), [](std::ostream& out, const auto& data) {
+				WriteString(out, data.first.toString());
+				WriteValue(out, data.second.Flags);
+				WriteValue(out, data.second.VarType);
+			});
+		} break;
+		case SymbolType::Function: {
+			auto table = symbol->Function;
+
+			WriteArray(out, table->Functions, [](std::ostream& out, const auto& data) {
+				FunctionSymbol* fn = data.second;
 				WriteValue(out, (uint8_t)fn->Type);
-				WriteValue(out, (uint16_t)fn->Return);
-				WriteArray(out, fn->Arguments, [](std::ostream& out, VariableType type) {
+				WriteValue(out, (uint16_t)fn->Signature.Return);
+				WriteArray(out, fn->Signature.Arguments, [](std::ostream& out, VariableType type) {
 					WriteValue(out, (uint16_t)type);
 					});
 
 				switch (fn->Type)
 				{
 				case FunctionType::User: {
-					auto fnd = reinterpret_cast<ScriptFunction*>(fn->DirectPtr);
+					auto fnd = reinterpret_cast<ScriptFunction*>(fn->Local);
 					WriteFunction(out, fnd);
 				} break;
 				default:
 					break;
 				}
+			});
 
-			} break;
-			default:
-				break;
-			}
+		} break;
+		default:
+			break;
 		}
 	});
 

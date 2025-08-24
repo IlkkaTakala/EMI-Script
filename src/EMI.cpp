@@ -9,6 +9,8 @@ bool EMI::_internal_register(_internal_function* func)
 {
 	std::string name;
 	name = func->name;
+
+	// @todo: Should find the existing symbol
 	auto sym = new Symbol();
 	sym->Type = SymbolType::Function;
 	sym->VarType = VariableType::Function;
@@ -18,7 +20,19 @@ bool EMI::_internal_register(_internal_function* func)
 	for (int i = 0; i < types.size(); i++) {
 		types[i] = TypeFromValue(func->arg_types[i]);
 	}
-	sym->Data = new FunctionSymbol{ FunctionType::Host, func, Variable{}, TypeFromValue(func->return_type) };
+
+	auto fn = new FunctionSymbol{  };
+	fn->Signature.Return = TypeFromValue(func->return_type);
+	fn->Type = FunctionType::Host;
+	fn->Host = func;
+	fn->IsPublic = true;
+	fn->Signature.Arguments.resize(func->arg_count);
+	for (int i = 0; i < func->arg_count; i++) {
+		fn->Signature.Arguments[i] = TypeFromValue(func->arg_types[i]);
+	}
+	sym->Function = new FunctionTable();
+
+	sym->Function->AddFunction((int)func->arg_count, fn);
 
 	PathType fnname = toPath(func->name);
 
@@ -28,7 +42,7 @@ bool EMI::_internal_register(_internal_function* func)
 		if (!res.second && space.toString() != "Global") {
 			auto spaceSym = new Symbol();
 			spaceSym->setType(SymbolType::Namespace);
-			spaceSym->Data = new Namespace{space};
+			spaceSym->Space = new Namespace{space};
 			spaceSym->Builtin = true;
 			HostFunctions().AddName(space, spaceSym);
 		}

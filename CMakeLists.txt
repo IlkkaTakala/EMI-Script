@@ -18,12 +18,6 @@ option(BUILD_DEMOS "Include demos in the build" OFF)
 
 include(FetchContent)
 
-if (MSVC)
-    add_compile_options(/W4 /WX)
-else()
-    add_compile_options(-Wall -Wextra -Werror -fms-extensions)
-endif()
-
 macro(add_dependency)
     SET(dependency_name ${ARGV0})
     SET(endpoint_url ${ARGV1})
@@ -78,6 +72,12 @@ if(BUILD_SHARED_LIBS)
 	target_compile_definitions(EMI PRIVATE BUILD_SHARED_LIBS)
 else()
 	add_library(EMI STATIC ${_source_list})
+endif()
+
+if (MSVC)
+    target_compile_options(EMI PRIVATE /W4 /WX)
+else()
+    target_compile_options(EMI PRIVATE -Wall -Wextra -Werror -fms-extensions)
 endif()
 
 if (EMI_PARSE_GRAMMAR) 

@@ -7,6 +7,7 @@
 #include "Symbol.h"
 #include "EMI/EMI.h"
 #include "Intrinsic.h"
+#include <map>
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -46,6 +47,7 @@ union Instruction
 
 struct ScopeType
 {
+	// @todo: NameType might be enough?
 	ankerl::unordered_dense::map<PathType, CompileSymbol*> symbols;
 	ScopeType* parent = nullptr;
 	std::list<ScopeType> children;
@@ -74,6 +76,48 @@ struct ScopeType
 	}
 };
 
+struct FunctionSignature
+{
+	VariableType Return = VariableType::Undefined;
+	std::vector<VariableType> Arguments;
+	std::vector<NameType> ArgumentNames;
+	bool HasReturn;
+	bool AnyNumArgs;
+};
+
+struct FunctionSymbol
+{
+	FunctionSignature Signature;
+	bool IsPublic = true;
+	FunctionType Type = FunctionType::None;
+	union {
+		ScriptFunction* Local = nullptr;
+		EMI::_internal_function* Host;
+		IntrinsicPtr Intrinsic;
+	};
+	FunctionSymbol* Previous = nullptr;
+	FunctionSymbol* Next = nullptr;
+
+	~FunctionSymbol();
+};
+
+struct FunctionTable
+{
+	std::map<int, FunctionSymbol*> Functions;
+	Variable FunctionVar;
+
+	// @todo: Should probably account for types if arg count does not match
+	FunctionSymbol* GetFirstFitting(int args);
+
+	void AddFunction(int args, FunctionSymbol* symbol);
+
+	~FunctionTable() {
+		for (auto& [i, sym] : Functions) {
+			delete sym;
+		}
+	}
+};
+
 struct ScriptFunction
 {
 	PathType Name;
@@ -81,9 +125,7 @@ struct ScriptFunction
 	std::vector<Variable> StringTable;
 	ankerl::unordered_dense::set<double> NumberTable;
 
-	std::vector<ScriptFunction*> FunctionTable;
-	std::vector<EMI::_internal_function*> ExternalTable;
-	std::vector<IntrinsicPtr> IntrinsicTable;
+	std::vector<FunctionSymbol*> FunctionTable;
 	std::vector<Variable*> GlobalTable;
 	std::vector<int32_t> PropertyTable;
 	std::vector<VariableType> TypeTable;
@@ -96,8 +138,6 @@ struct ScriptFunction
 	ankerl::unordered_dense::map<int, int> DebugLines;
 
 	ScopeType* FunctionScope;
-
-	std::vector<VariableType> Types;
 
 	uint8_t ArgCount;
 	uint8_t RegisterCount;
@@ -117,3 +157,4 @@ struct ScriptFunction
 
 	void Append(ScriptFunction fn);
 };
+

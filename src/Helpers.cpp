@@ -151,7 +151,7 @@ bool isTruthy(const Variable& var)
 	case VariableType::Object:
 		return true;
 	case VariableType::Function:
-		return var.as<FunctionObject>()->InternalType != FunctionType::None;
+		return var.as<FunctionObject>()->Table != nullptr;
 	default:
 		return false;
 	}

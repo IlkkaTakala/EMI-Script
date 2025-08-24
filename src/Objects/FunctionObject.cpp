@@ -1,7 +1,7 @@
 #include "FunctionObject.h"
 
-FunctionObject::FunctionObject(FunctionType type, const PathType& name)
-	: InternalType(type), Name(name)
+FunctionObject::FunctionObject(const PathType& name, FunctionTable* symbol)
+	: Name(name), Table(symbol)
 {
 	Type = VariableType::Function;
 }
@@ -9,7 +9,6 @@ FunctionObject::FunctionObject(FunctionType type, const PathType& name)
 FunctionObject::FunctionObject(const FunctionObject& object)
 {
 	Type = VariableType::Function;
-	InternalType = object.InternalType;
 	Name = object.Name;
 }
 

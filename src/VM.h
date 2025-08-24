@@ -124,6 +124,7 @@ public:
 	void* GetFunctionID(const std::string& name);
 
 	size_t CallFunction(FunctionHandle handle, const std::span<InternalValue>& args);
+	size_t DirectCallFunction(ScriptFunction* symbol, const std::vector<VariableType>& argTypes, const std::span<InternalValue>& args);
 	InternalValue GetReturnValue(size_t index);
 	bool WaitForResult(void* ptr);
 

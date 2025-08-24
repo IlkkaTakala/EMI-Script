@@ -493,7 +493,7 @@ void ASTWalker::Run()
 						auto [nn, sym]= FindOrCreateSymbol(temp, SymbolType::Namespace);
 						Namespace* space = new Namespace();
 						space->Name = nn;
-						sym->Data = space;
+						sym->Space = space;
 					}
 					temp= temp.Pop();
 				}
@@ -533,7 +533,7 @@ void ASTWalker::Run()
 				}
 				symbol->setType(SymbolType::Object);
 				auto object = new UserDefinedType{};
-				symbol->Data = object;
+				symbol->UserObject = object;
 
 				for (auto& field : c->children) {
 					Symbol flags;
@@ -602,63 +602,67 @@ void ASTWalker::Run()
 		{
 			PathType data(std::get<0>(c->data).c_str());
 			auto [name, s] = FindSymbol(data);
+			Symbol* symbol = nullptr;
 			if (!name) {
-				auto symbol = new Symbol{};
+				symbol = new Symbol{};
 				Global.AddName(data.Append(SearchPaths[0]), symbol);
 				symbol->setType(SymbolType::Function);
 				symbol->VarType = VariableType::Function;
-				FunctionSymbol* functionSym = new FunctionSymbol();
-				symbol->Data = functionSym;
-				ScriptFunction* function = new ScriptFunction();
-				functionSym->Type = FunctionType::User;
-				functionSym->DirectPtr = function;
-
-				function->Name = data.Append(SearchPaths[0]);
-				function->IsPublic = c->type == Token::PublicFunctionDef || SearchPaths[0] == PathType();
-				c->sym = new CompileSymbol();
-				c->sym->Global = true;
-				c->sym->Sym = symbol;
-				functionList.emplace_back(c, function);
-				function->Types.resize(1);
-				function->FunctionScope = new ScopeType();
-				CurrentFunction = function;
-
-				for (auto& node : c->children) {
-					switch (node->type)
-					{
-					case Token::Scope: break;
-					case Token::CallParams: {
-						function->ArgCount = (uint8_t)node->children.size();
-						for (auto& v : node->children) {
-							auto [paramName, symParam] = FindSymbol(std::get<0>(v->data).c_str());
-							if (paramName) {
-								gCompileError() << "Line " << node->line << ": Symbol '" << paramName << "' already defined";
-								HasError = true;
-								break;
-							}
-							CompileSymbol* sym = function->FunctionScope->addSymbol(std::get<0>(v->data).c_str());
-							WalkLoad(v->children.front());
-							sym->Sym = new Symbol();
-							sym->Sym->setType(SymbolType::Variable);
-							sym->Sym->VarType = v->children.front()->varType;
-							if (sym->Sym->VarType != VariableType::Undefined) {
-								sym->Sym->Flags = sym->Sym->Flags | SymbolFlags::Typed;
-							}
-							sym->Resolved = true;
-							function->Types.push_back(sym->Sym->VarType);
-						}
-					} break;
-					default:
-						WalkLoad(node);
-						function->Types[0] = symbol->VarType;
-						break;
-					}
-				}
-
+				symbol->Function = new FunctionTable();
 			}
 			else {
-				gCompileError() << "Line " << c->line << ": Symbol '" << data << "' already defined";
+				symbol = s;
 			}
+
+			FunctionSymbol* functionSym = new FunctionSymbol();
+			ScriptFunction* function = new ScriptFunction();
+			functionSym->Type = FunctionType::User;
+			functionSym->Local = function;
+
+			function->Name = data.Append(SearchPaths[0]);
+			function->IsPublic = c->type == Token::PublicFunctionDef || SearchPaths[0] == PathType();
+			c->sym = new CompileSymbol();
+			c->sym->Global = true;
+			c->sym->Sym = symbol;
+			functionList.emplace_back(c, function);
+			function->FunctionScope = new ScopeType();
+			CurrentFunction = function;
+
+			for (auto& node : c->children) {
+				switch (node->type)
+				{
+				case Token::Scope: break;
+				case Token::CallParams: {
+					function->ArgCount = (uint8_t)node->children.size();
+					for (auto& v : node->children) {
+						auto [paramName, symParam] = FindSymbol(std::get<0>(v->data).c_str());
+						if (paramName) {
+							gCompileError() << "Line " << node->line << ": Symbol '" << paramName << "' already defined";
+							HasError = true;
+							break;
+						}
+						CompileSymbol* sym = function->FunctionScope->addSymbol(std::get<0>(v->data).c_str());
+						WalkLoad(v->children.front());
+						sym->Sym = new Symbol();
+						sym->Sym->setType(SymbolType::Variable);
+						sym->Sym->VarType = v->children.front()->varType;
+						if (sym->Sym->VarType != VariableType::Undefined) {
+							sym->Sym->Flags = sym->Sym->Flags | SymbolFlags::Typed;
+						}
+						sym->Resolved = true;
+						functionSym->Signature.Arguments.push_back(sym->Sym->VarType);
+						functionSym->Signature.ArgumentNames.push_back(std::get<0>(v->data).c_str());
+					}
+				} break;
+				default:
+					WalkLoad(node);
+					functionSym->Signature.Return = node->varType;
+					break;
+				}
+			}
+
+			symbol->Function->AddFunction(function->ArgCount, functionSym);
+
 		} break;
 
 		case Token::Static:
@@ -679,7 +683,7 @@ void ASTWalker::Run()
 				}
 				Variable* variable = new Variable();
 
-				symbol->Data = variable;
+				symbol->SimpleVariable = variable;
 
 				switch (c->children[0]->type)
 				{
@@ -1042,7 +1046,7 @@ void ASTWalker::WalkLoad(Node* n)
 			else {
 				if (First()->sym) {
 					if (First()->sym->Sym->Type == SymbolType::Namespace) {
-						PathType full = data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name);
+						PathType full = data.Append(First()->sym->Sym->Space->Name);
 						auto [fullName, globalSymbol] = FindSymbol(full);
 						if (fullName) {
 							data = fullName;
@@ -1083,7 +1087,7 @@ void ASTWalker::WalkLoad(Node* n)
 						if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
 							auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
 							if (auto [localObject, objectType] = FindSymbol(objectName); objectType && objectType->Type == SymbolType::Object) {
-								n->varType = static_cast<UserDefinedType*>(objectType->Data)->GetFieldType(data.GetFirst());
+								n->varType = objectType->UserObject->GetFieldType(data.GetFirst());
 							}
 						}
 						break;
@@ -1157,7 +1161,7 @@ void ASTWalker::WalkLoad(Node* n)
 			if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
 				auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
 				if (auto localObject = FindSymbol(objectName); localObject.second && localObject.second->Type == SymbolType::Object) {
-					n->varType = static_cast<UserDefinedType*>(localObject.second->Data)->GetFieldType(data);
+					n->varType = localObject.second->UserObject->GetFieldType(data);
 				}
 			}
 			break;
@@ -1657,7 +1661,6 @@ void ASTWalker::WalkLoad(Node* n)
 				type = 3;
 				goto function;
 			}
-			type = 4;
 			goto function;
 		}
 		else if (First()->sym->Sym->Type != SymbolType::Function && First()->sym->Sym->Type == SymbolType::Variable) {
@@ -1665,26 +1668,16 @@ void ASTWalker::WalkLoad(Node* n)
 			goto function;
 		}
 		else if (First()->sym->Sym->Type == SymbolType::Function) {
-			auto fn = static_cast<FunctionSymbol*>(First()->sym->Sym->Data);
-			switch (fn->Type)
-			{
-			case FunctionType::User:
-				type = 0; 
-				break;
-			case FunctionType::Host:
-				type = 1; 
-				break;
-			case FunctionType::Intrinsic:
-				type = 2; 
-				break;
-			default:
-				Error("Function has no type");
-				break;
-			}
+			auto fn = First()->sym->Sym->Function;
+			
 			if (First()->instruction != 0 && InstructionList[First()->instruction].code == OpCodes::LoadSymbol) {
 				InstructionList[First()->instruction].data = 0;
 			}
-			NodeType = fn->Return;
+
+			auto fnsym = fn->GetFirstFitting((int)Last()->children.size());
+
+			if (fnsym)
+			NodeType = fnsym->Signature.Return;
 		}
 		else {
 			Error("Cannot call unknown symbol, something went wrong");
@@ -1730,10 +1723,7 @@ void ASTWalker::WalkLoad(Node* n)
 		switch (type)
 		{
 		case 0: instruction.code = OpCodes::CallFunction; break;
-		case 1: instruction.code = OpCodes::CallExternal; break;
-		case 2: instruction.code = OpCodes::CallInternal; break;
 		case 3: instruction.code = OpCodes::CallSymbol; break;
-		case 4: instruction.code = OpCodes::Call; break;
 		}
 
 		if (params->children.size() != 0) {
@@ -1794,7 +1784,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 			else {
 				if (First()->sym) {
 					if (First()->sym->Sym->Type == SymbolType::Namespace) {
-						PathType full = data.Append(static_cast<Namespace*>(First()->sym->Sym->Data)->Name);
+						PathType full = data.Append(First()->sym->Sym->Space->Name);
 						auto [fullName, globalSymbol] = FindSymbol(full);
 						if (fullName) {
 							symbol = FindOrCreateLocalSymbol(full);
@@ -1814,7 +1804,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 						if (typeIndex < CurrentFunction->TypeTableSymbols.size()) {
 							auto& objectName = CurrentFunction->TypeTableSymbols[typeIndex];
 							if (auto it = FindSymbol(objectName); it.second && it.second->Type == SymbolType::Object) {
-								n->varType = static_cast<UserDefinedType*>(it.second->Data)->GetFieldType(data.GetFirst());
+								n->varType = it.second->UserObject->GetFieldType(data.GetFirst());
 							}
 						}
 
@@ -2034,13 +2024,9 @@ void ASTWalker::HandleFunction(Node* n, ScriptFunction* f, CompileSymbol* s)
 #endif // DEBUG
 
 	f->FunctionTable.resize(f->FunctionTableSymbols.size(), nullptr);
-	f->ExternalTable.resize(f->FunctionTableSymbols.size(), nullptr);
-	f->IntrinsicTable.resize(f->FunctionTableSymbols.size(), nullptr);
 	f->PropertyTable.resize(f->PropertyTableSymbols.size(), -1);
 	f->TypeTable.resize(f->TypeTableSymbols.size(), VariableType::Undefined);
 	f->GlobalTable.resize(f->GlobalTableSymbols.size(), nullptr);
-
-
 
 	f->StringTable.reserve(StringList.size());
 	for (auto& str : StringList) {
@@ -2131,8 +2117,6 @@ void ASTWalker::HandleInit()
 #endif // DEBUG
 
 	InitFunction->FunctionTable.resize(InitFunction->FunctionTableSymbols.size(), nullptr);
-	InitFunction->ExternalTable.resize(InitFunction->FunctionTableSymbols.size(), nullptr);
-	InitFunction->IntrinsicTable.resize(InitFunction->FunctionTableSymbols.size(), nullptr);
 	InitFunction->PropertyTable.resize(InitFunction->PropertyTableSymbols.size(), -1);
 	InitFunction->TypeTable.resize(InitFunction->TypeTableSymbols.size(), VariableType::Undefined);
 	InitFunction->GlobalTable.resize(InitFunction->GlobalTableSymbols.size(), nullptr);

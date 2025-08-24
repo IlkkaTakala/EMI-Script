@@ -43,8 +43,6 @@ void ScriptFunction::Append(ScriptFunction fn)
 			ins = reinterpret_cast<Instruction*>(&fn.Bytecode[++i]);
 			ins->param += (uint16_t)TypeTableSymbols.size();
 		} break;
-		case OpCodes::CallInternal:
-		case OpCodes::CallExternal:
 		case OpCodes::CallFunction: {
 			ins = reinterpret_cast<Instruction*>(&fn.Bytecode[++i]);
 			ins->data += (uint16_t)FunctionTableSymbols.size();
@@ -62,8 +60,6 @@ void ScriptFunction::Append(ScriptFunction fn)
 	GlobalTableSymbols.insert(GlobalTableSymbols.end(), fn.GlobalTableSymbols.begin(), fn.GlobalTableSymbols.end());
 
 	FunctionTable.resize(FunctionTableSymbols.size());
-	ExternalTable.resize(FunctionTableSymbols.size());
-	IntrinsicTable.resize(FunctionTableSymbols.size());
 	GlobalTable.resize(GlobalTableSymbols.size());
 	PropertyTable.resize(PropertyTableSymbols.size());
 	TypeTable.resize(TypeTableSymbols.size());
@@ -72,4 +68,36 @@ void ScriptFunction::Append(ScriptFunction fn)
 
 	RegisterCount = std::max(RegisterCount, fn.RegisterCount);
 	Bytecode.insert(Bytecode.end(), fn.Bytecode.begin(), fn.Bytecode.end());
+}
+
+FunctionSymbol::~FunctionSymbol()
+{
+	if (Type == FunctionType::User) {
+		delete Local;
+	}
+}
+
+FunctionSymbol* FunctionTable::GetFirstFitting(int args)
+{
+	if (auto it = Functions.find(args); it != Functions.end()) {
+		return it->second;
+	}
+	for (auto& [count, fnSym] : Functions) {
+		if (count > args) {
+			return fnSym;
+		}
+	}
+	return nullptr;
+}
+
+void FunctionTable::AddFunction(int args, FunctionSymbol* symbol)
+{
+	if (auto it = Functions.find(args); it != Functions.end()) {
+		it->second->Next = symbol;
+		symbol->Previous = it->second;
+		it->second = symbol;
+	}
+	else {
+		Functions[args] = symbol;
+	}
 }

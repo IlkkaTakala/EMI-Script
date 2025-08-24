@@ -36,12 +36,22 @@ inline SymbolFlags operator| (SymbolFlags a, SymbolFlags b) { return (SymbolFlag
 inline SymbolFlags operator& (SymbolFlags a, SymbolFlags b) { return (SymbolFlags)((int)a & (int)b); }
 inline SymbolFlags operator^ (SymbolFlags a, SymbolFlags b) { return (SymbolFlags)((int)a ^ (int)b); }
 
+struct FunctionTable;
+struct Namespace;
+class UserDefinedType;
+class Variable;
+
 struct Symbol
 {
 	SymbolType Type = SymbolType::Variable;
 	SymbolFlags Flags = SymbolFlags::None;
 	VariableType VarType = VariableType::Undefined;
-	void* Data = nullptr; // Namespace, UserDefinedObject, Variable or FunctionSymbol
+	union {
+		Namespace* Space = nullptr; 
+		UserDefinedType* UserObject;
+		Variable* SimpleVariable;
+		FunctionTable* Function;
+	};
 	bool Builtin = false;
 
 	void setType(SymbolType t);
@@ -64,27 +74,6 @@ struct CompileSymbol
 		if (!Global)
 			delete Sym;
 	}
-};
-
-struct FunctionSignature
-{
-	VariableType Return;
-	std::vector<VariableType> Arguments;
-	std::vector<NameType> ArgumentNames;
-};
-
-class ScriptFunction;
-struct FunctionSymbol
-{
-	FunctionType Type;
-	union {
-		ScriptFunction* Local;
-		EMI::_internal_function* Host;
-		IntrinsicPtr Intrinsic;
-	};
-
-	Variable FunctionVar;
-	FunctionSignature Signature;
 };
 
 inline bool isAssignable(const SymbolFlags& s) { return SymbolFlags::Assignable == (s & SymbolFlags::Assignable); }

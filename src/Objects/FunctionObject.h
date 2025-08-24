@@ -10,16 +10,12 @@ class FunctionAllocator;
 class FunctionObject : public Object
 {
 public:
-	FunctionObject(const PathType& name) : FunctionObject(FunctionType::None, name) {}
-	FunctionObject(FunctionType type, const PathType& name);
-	FunctionObject() : FunctionObject(FunctionType::None, "") {}
+	FunctionObject(const PathType& name, FunctionTable* table);
+	FunctionObject() : FunctionObject("", nullptr) {}
 	FunctionObject(const FunctionObject& object);
 
 	static Allocator<FunctionObject>* GetAllocator();
 
-	FunctionType InternalType;
+	FunctionTable* Table;
 	PathType Name;
-
-	std::variant<ScriptFunction*, EMI::_internal_function*, IntrinsicPtr> Callee;
-
 };

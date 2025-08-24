@@ -4,6 +4,7 @@
 #include "Objects/ArrayObject.h"
 #include "Objects/UserObject.h"
 #include "Helpers.h"
+#include "Function.h"
 #include <numeric>
 #include <math.h>
 #include <thread>
@@ -178,29 +179,56 @@ void mathsqrt(Variable& out, Variable* args, size_t argc) {
 
 
 
-#define FUNC(named, fn, ret) { named##_name, new Symbol{ SymbolType::Function, SymbolFlags::Typed, VariableType::Function, new FunctionSymbol{FunctionType::Intrinsic, (void*)fn, Variable{},VariableType::ret, 
-#define NAMESPACE(named) { named##_name, new Symbol{ SymbolType::Namespace, SymbolFlags::None, VariableType::Undefined, new Namespace{ named##_name }, true } },
+auto AddFunction(const char* name, IntrinsicPtr fn, VariableType ret, std::vector<std::pair<const char*, VariableType>> args, bool hasReturn = false, bool anyargs = false) {
+	auto sym = new Symbol{};
+	sym->Flags = SymbolFlags::Typed;
+	sym->Type = SymbolType::Function;
+	sym->VarType = VariableType::Function;
+
+	auto table = new FunctionTable();
+	sym->Function = table;
+
+	auto func = new FunctionSymbol();
+	func->Type = FunctionType::Intrinsic;
+	func->Signature.Return = ret;
+	func->Signature.HasReturn = hasReturn;
+	func->Signature.AnyNumArgs = anyargs;
+	for (auto& [argname, type] : args) {
+		func->Signature.Arguments.push_back(type);
+		func->Signature.ArgumentNames.push_back(argname);
+	}
+	func->Intrinsic = fn;
+
+	table->AddFunction((int)args.size(), func);
+
+	return std::pair<PathType, Symbol*>{name, sym};
+}
+auto AddNamespace(const char* name) {
+	auto sym = new Symbol{ SymbolType::Namespace, SymbolFlags::None, VariableType::Undefined, new Namespace{ name }, true };
+
+	return std::pair<PathType, Symbol*>{name, sym};
+}
 
 // @todo: Something better for these intrinsic definitions
 SymbolTable IntrinsicFunctions = { {
-	FUNC("print", print,						Undefined)		{ VariableType::Undefined } }, true}},
-	FUNC("println", printLn,					Undefined)		{ VariableType::Undefined } }, true}},
-	FUNC("delay", delay,						Undefined)		{ VariableType::Number } }, true}},
+	AddFunction("print", print, VariableType::Undefined, { {"text", VariableType::String } }),
+	AddFunction("println", printLn, VariableType::Undefined, { {"text", VariableType::String } }),
 
-	NAMESPACE("Array")
-	FUNC("Array.Size", arraySize,				Number)			{ VariableType::Array } }, true}},
-	FUNC("Array.Resize", arrayResize,			Number)			{ VariableType::Array, VariableType::Number, VariableType::Undefined } }, true}},
-	FUNC("Array.Push", arrayPush,				Undefined)		{ VariableType::Array, VariableType::Undefined } }, true}},
-	FUNC("Array.PushFront", arrayPushFront,		Undefined)		{ VariableType::Array, VariableType::Undefined } }, true}},
-	FUNC("Array.PushUnique", arrayPushUnique,	Number)			{ VariableType::Array, VariableType::Undefined } }, true}},
-	FUNC("Array.Pop", arrayPop,					Undefined)		{ VariableType::Array } }, true}},
-	FUNC("Array.Remove", arrayRemove,			Undefined)		{ VariableType::Array, VariableType::Undefined } }, true}},
-	FUNC("Array.RemoveIndex", arrayRemoveIdx,	Undefined)		{ VariableType::Array, VariableType::Number } }, true}},
-	FUNC("Array.Clear", arrayClear,				Undefined)		{ VariableType::Array } }, true}},
-	FUNC("Array.Find", arrayFind,				Number)			{ VariableType::Array } }, true}},
-	NAMESPACE("Math")
-	FUNC("Math.Sqrt", mathsqrt,					Number)			{ VariableType::Number } }, true}},
-	FUNC("Copy", copy,							Undefined)		{ VariableType::Undefined } }, true}},
-}};
+	AddFunction("delay", delay, VariableType::Undefined, { {"delay", VariableType::Number } }),
 
-#undef FUNC
+	AddNamespace("Array"),
+	AddFunction("Array.Size", arraySize,				VariableType::Number,	 { {"array", VariableType::Array } }, true),
+	AddFunction("Array.Resize", arrayResize,			VariableType::Number,	 { {"array", VariableType::Array }, { "new size", VariableType::Number}, { "fill", VariableType::Undefined}}, true),
+	AddFunction("Array.Push", arrayPush,				VariableType::Undefined, { {"array", VariableType::Array }, { "value", VariableType::Undefined } }),
+	AddFunction("Array.PushFront", arrayPushFront,		VariableType::Undefined, { {"array", VariableType::Array }, { "value", VariableType::Undefined } }),
+	AddFunction("Array.PushUnique", arrayPushUnique,	VariableType::Number,	 { {"array", VariableType::Array }, { "value", VariableType::Undefined } }, true),
+	AddFunction("Array.Pop", arrayPop,					VariableType::Undefined, { {"array", VariableType::Array } }),
+	AddFunction("Array.Remove", arrayRemove,			VariableType::Undefined, { {"array", VariableType::Array }, { "value", VariableType::Undefined } }),
+	AddFunction("Array.RemoveIndex", arrayRemoveIdx,	VariableType::Undefined, { {"array", VariableType::Array }, { "index", VariableType::Number } }),
+	AddFunction("Array.Clear", arrayClear,				VariableType::Undefined, { {"array", VariableType::Array } } ),
+	AddFunction("Array.Find", arrayFind,				VariableType::Number,	 { {"array", VariableType::Array } }, true),
+	
+	AddNamespace("Math"),
+	AddFunction("Math.Sqrt", mathsqrt,					VariableType::Number,			{ { "value", VariableType::Number } }, true ),
+	AddFunction("Copy", copy,							VariableType::Undefined,		{ { "value", VariableType::Undefined } }, true ),
+} };

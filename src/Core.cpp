@@ -66,8 +66,11 @@ PathType::PathType() : Path({ 0 }), Size(0) {}
 PathType::PathType(const char* text, PathType parent) : Path({ 0 }), Size(0)
 {
     if (text) {
-        Path[0] = text;
-        Size = 1;
+		auto parts = splits(text, '.');
+        Size = (char)parts.size();
+		for (int i = 0; i < parts.size(); i++) {
+			Path[Size - i - 1] = NameType(parts[i].c_str());
+		}
 
         if (parent) {
             std::copy(parent.Path.begin(), parent.Path.end(), Path.begin() + 1);
@@ -78,6 +81,7 @@ PathType::PathType(const char* text, PathType parent) : Path({ 0 }), Size(0)
 
 PathType::PathType(NameType text, PathType parent)
 {
+	Size = 0;
 	if (text) {
 		Path[0] = text;
 		Size = 1;

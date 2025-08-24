@@ -160,24 +160,41 @@ void* VM::GetFunctionID(const std::string& id)
 	PathType name(id.c_str());
 	auto [fullName, symbol] = GlobalSymbols.FindName(name);
 	if (symbol && symbol->Type == SymbolType::Function) {
-		auto fn = static_cast<FunctionSymbol*>(symbol->Data);
-		if (fn->Type != FunctionType::User) {
+		auto fn = symbol->Function;
+		/*if (fn->Type != FunctionType::User) {
 			gRuntimeWarn() << "Symbol is not a script function";
 			return 0;
 		}
-		if (!static_cast<ScriptFunction*>(fn->DirectPtr)->IsPublic) {
+		if (!fn->Local->IsPublic) {
 			gRuntimeWarn() << "Function is private";
 			return 0;
-		}
-
-		return fn->DirectPtr;
+		}*/
+		return fn;
 	}
 	return 0;
 }
 
 size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& args)
 {
-	ScriptFunction* fn = (ScriptFunction*)(void*)handle;
+	FunctionTable* table = (FunctionTable*)(void*)handle;
+
+	if (!table) {
+		gRuntimeWarn() << "Invalid function handle";
+		return (size_t)-1;
+	}
+
+	FunctionSymbol* sym = table->GetFirstFitting((int)args.size());
+
+	if (sym->Type != FunctionType::User) {
+		gRuntimeWarn() << "Cannot call non-script function"; //@todo: Make this possible
+		return (size_t)-1;
+	}
+
+	return DirectCallFunction(sym->Local, sym->Signature.Arguments, args);
+}
+
+size_t VM::DirectCallFunction(ScriptFunction* fn, const std::vector<VariableType>& argTypes, const std::span<InternalValue>& args)
+{
 	if (!fn) {
 		gRuntimeWarn() << "Invalid function handle";
 		return (size_t)-1;
@@ -186,9 +203,9 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& a
 	CallObject& call = CallQueue.emplace(fn);
 
 	call.Arguments.reserve(args.size());
-	for (size_t i = 0; i < call.FunctionPtr->ArgCount && i < args.size(); i++) {
+	for (size_t i = 0; i < argTypes.size() && i < args.size(); i++) {
 		auto val = moveOwnershipToVM(args[i]);
-		if (call.FunctionPtr->Types[i + 1] == val.getType()) {
+		if (argTypes[i + 1] == val.getType()) {
 			call.Arguments.push_back(val);
 		}
 	}
@@ -253,9 +270,9 @@ void VM::AddCompileUnit(const std::string& path, const SymbolTable& space, Scrip
 		switch (s->Type)
 		{
 		case SymbolType::Object: {
-			auto type = GetManager().AddType(name, *static_cast<UserDefinedType*>(s->Data));
+			auto type = GetManager().AddType(name, *s->UserObject);
 			s->VarType = type;
-			static_cast<UserDefinedType*>(s->Data)->Type = type;
+			s->UserObject->Type = type;
 		} break;
 
 		default:
@@ -266,7 +283,7 @@ void VM::AddCompileUnit(const std::string& path, const SymbolTable& space, Scrip
 	Units[path].InitFunction = InitFunction;
 	GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
 
-	size_t idx = CallFunction(EMI::FunctionHandle{ InitFunction, nullptr }, {});
+	size_t idx = DirectCallFunction(InitFunction, {}, {});
 	GetReturnValue(idx);
 }
 
@@ -483,19 +500,18 @@ void Runner::Run()
 						auto res = Owner->GlobalSymbols.FindName(name);
 						if (res.second) {
 							if (res.second->Type == SymbolType::Variable || res.second->Type == SymbolType::Static) {
-								var = static_cast<Variable*>(res.second->Data);
+								var = res.second->SimpleVariable;
 							}
 							else if (res.second->Type == SymbolType::Function) {
-								auto f = static_cast<FunctionSymbol*>(res.second->Data);
-								auto func = FunctionObject::GetAllocator()->Make(f->Type, res.first);
-								switch (f->Type) {
-								case FunctionType::Intrinsic: func->Callee = reinterpret_cast<IntrinsicPtr>(f->DirectPtr); break;
-								case FunctionType::User: func->Callee = static_cast<ScriptFunction*>(f->DirectPtr); break;
-								case FunctionType::Host: func->Callee = static_cast<EMI::_internal_function*>(f->DirectPtr); break;
-								default: break;
+								auto f = res.second->Function;
+								if (f->FunctionVar.getType() == VariableType::Function) {
+									var = &f->FunctionVar;
 								}
-								f->Function = func;
-								var = &f->Function;
+								else {
+									auto func = FunctionObject::GetAllocator()->Make(res.first, res.second->Function);
+									f->FunctionVar = func;
+									var = &f->FunctionVar;
+								}
 							}
 						}
 						else {
@@ -504,7 +520,6 @@ void Runner::Run()
 						}	
 					}
 
-					if (var)
 					Registers[byte.target] = *var;
 
 				} goto start;
@@ -515,12 +530,16 @@ void Runner::Run()
 						auto& name = current->FunctionPtr->GlobalTableSymbols[byte.param];
 						auto res = Owner->GlobalSymbols.FindName(name);
 						if (res.second && (res.second->Type == SymbolType::Variable || res.second->Type == SymbolType::Static)) {
-							var = static_cast<Variable*>(res.second->Data);
+							var = res.second->SimpleVariable;
 						}
 						else {
 							Warn() << "Symbol does not exist: " << name;
 							goto start;
 						}
+					}
+					if (var->getType() == VariableType::Function) {
+						Warn() << "Cannot assign to functions";
+						goto start;
 					}
 
 					*var = Registers[byte.target];
@@ -610,16 +629,14 @@ void Runner::Run()
 					const Instruction& data = *(Instruction*)current->Ptr++;
 
 					auto& fn = current->FunctionPtr->FunctionTable[data.data];
-					if (fn == nullptr) {
-						auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
+					auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
+					if (fn == nullptr || fn->Next) {
 						auto res = Owner->GlobalSymbols.FindName(name);
 						if (res.first && res.second->Type == SymbolType::Function) {
-							auto f = static_cast<FunctionSymbol*>(res.second->Data);
-							if (f->Type == FunctionType::User) {
-								fn = static_cast<ScriptFunction*>(f->DirectPtr);
-							}
-							else {
-								Warn() << "Function has unexpected location: " << name;
+							auto f = res.second->Function;
+							fn = f->GetFirstFitting(byte.in2);
+							if (!fn) {
+								Warn() << "No mathing overloaded function found: " << name;
 								goto start;
 							}
 						}
@@ -629,49 +646,72 @@ void Runner::Run()
 						}
 					}
 
-					if (!fn->IsPublic && fn->Name.IsChildOf(current->FunctionPtr->Name.Get(1))) {
-						Warn() << "Cannot call private function " << fn->Name;
+					if (!fn->IsPublic && name.GetTarget().IsChildOf(current->FunctionPtr->Name.Get(1))) {
+						Warn() << "Cannot call private function " << name;
 						goto start;
 					}
 
-					for (size_t i = 1; i < fn->Types.size() && i < byte.in2; i++) {
-						if (fn->Types[i] != VariableType::Undefined 
-							&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
-							VariableType real = fn->Types[i];
+					switch (fn->Type)
+					{
+					case FunctionType::User: {
 
-							if (real >= VariableType::Object) {
-								size_t typeidx = static_cast<uint16_t>(real) - static_cast<uint16_t>(VariableType::Object);
-								if (typeidx < fn->TypeTable.size()) {
-									real = fn->TypeTable[typeidx];
-									if (real == VariableType::Undefined) {
-										auto& name = fn->TypeTableSymbols[typeidx];
-										UserDefinedType* usertype = nullptr;
-										auto res = Owner->GlobalSymbols.FindName(name);
-										if (res.second && res.second->Type == SymbolType::Object) {
-											usertype = static_cast<UserDefinedType*>(res.second->Data);
-											fn->TypeTable[typeidx] = real = usertype->Type;
+						ScriptFunction* userfn = fn->Local;
+
+						for (size_t i = 0; i < fn->Signature.Arguments.size() && i < byte.in2; i++) {
+							if (fn->Signature.Arguments[i] != VariableType::Undefined
+								&& Registers[byte.in1 + i].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
+								VariableType real = fn->Signature.Arguments[i];
+
+								if (real >= VariableType::Object) {
+									size_t typeidx = static_cast<uint16_t>(real) - static_cast<uint16_t>(VariableType::Object);
+									if (typeidx < userfn->TypeTable.size()) {
+										real = userfn->TypeTable[typeidx];
+										if (real == VariableType::Undefined) {
+											auto& type_name = userfn->TypeTableSymbols[typeidx];
+											UserDefinedType* usertype = nullptr;
+											auto res = Owner->GlobalSymbols.FindName(type_name);
+											if (res.second && res.second->Type == SymbolType::Object) {
+												usertype = res.second->UserObject;
+												userfn->TypeTable[typeidx] = real = usertype->Type;
+											}
 										}
 									}
+									else {
+										Error() << "Invalid type while calling " << name;
+									}
 								}
-								else {
-									Error() << "Invalid type while calling " << fn->Name;
-								}
-							}
 
-							if (real != Registers[byte.in1 + (i - 1)].getType()) {
-								Warn() << "Invalid argument types when calling " << fn->Name;
-								goto start;
+								if (real != Registers[byte.in1 + i].getType()) {
+									Warn() << "Invalid argument types when calling " << name;
+									goto start;
+								}
 							}
 						}
-					}
-					
-					auto offset = current->StackOffset + byte.in1;
-					auto& call = CallStack.emplace_back(fn); // @todo: do this better, too slow
-					call.StackOffset = offset;
-					Registers.reserve(call.StackOffset + fn->RegisterCount);
-					Registers.to(call.StackOffset);
-					current = &call;
 
+						auto offset = current->StackOffset + byte.in1;
+						auto& call = CallStack.emplace_back(userfn); // @todo: do this better, too slow
+						call.StackOffset = offset;
+						Registers.reserve(call.StackOffset + userfn->RegisterCount);
+						Registers.to(call.StackOffset);
+						current = &call;
+
+						break;
+					}
+					case FunctionType::Host: {
+						thread_local static std::vector<InternalValue> args;
+						args.resize(byte.in2);
+						for (int i = 0; i < byte.in2; ++i) {
+							args[i] = makeHostArg(Registers[byte.in1 + i]);
+						}
+						InternalValue ret = (*fn->Host)(byte.in2, args.data());
+						Registers[byte.target] = moveOwnershipToVM(ret);
+						break;
+					}
+					case FunctionType::Intrinsic: {
+						fn->Intrinsic(Registers[byte.target], &Registers[byte.in1], byte.in2);
+						break;
+					}
+					}
 				} goto start;
 
 				TARGET(CallSymbol) {
@@ -682,74 +722,78 @@ void Runner::Run()
 						goto start;
 					}
 
+					//@todo: This needs to be optimized, no way to cache direct calls yet
 					FunctionObject* f = Registers[data.target].as<FunctionObject>();
 
-					switch (f->InternalType)
+					FunctionSymbol* fnsym = f->Table->GetFirstFitting(byte.in2);
+
+					if (!fnsym) {
+						Warn() << "Argument count does not match";
+						goto start;
+					}
+
+					switch (fnsym->Type)
 					{
 					case FunctionType::User: {
-						if (auto ptr = std::get<ScriptFunction*>(f->Callee)) { // @todo: Add finding function
-							if (!ptr->IsPublic && ptr->Name.IsChildOf(current->FunctionPtr->Name.Get(1))) {
-								Warn() << "Cannot call private function " << ptr->Name;
-								goto start;
-							}
+						auto ptr = fnsym->Local;
+						if (!ptr->IsPublic && ptr->Name.IsChildOf(current->FunctionPtr->Name.Get(1))) {
+							Warn() << "Cannot call private function " << ptr->Name;
+							goto start;
+						}
 
 
-							for (size_t i = 1; i < ptr->Types.size() && i < byte.in2; i++) {
-								if (ptr->Types[i] != VariableType::Undefined
-									&& Registers[byte.in1 + (i - 1)].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
-									VariableType real = ptr->Types[i];
+						for (size_t i = 0; i < fnsym->Signature.Arguments.size() && i < byte.in2; i++) {
+							if (fnsym->Signature.Arguments[i] != VariableType::Undefined
+								&& Registers[byte.in1 + i].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
+								VariableType real = fnsym->Signature.Arguments[i];
 
-									if (real >= VariableType::Object) {
-										size_t typeidx = static_cast<uint16_t>(real) - static_cast<uint16_t>(VariableType::Object);
-										if (typeidx < ptr->TypeTable.size()) {
-											real = ptr->TypeTable[typeidx];
-											if (real == VariableType::Undefined) {
-												auto& name = ptr->TypeTableSymbols[typeidx];
-												auto res = Owner->GlobalSymbols.FindName(name);
-												if (res.second && res.second->Type == SymbolType::Object) {
-													UserDefinedType* usertype = static_cast<UserDefinedType*>(res.second->Data);
-													ptr->TypeTable[typeidx] = real = usertype->Type;
-												}
+								if (real >= VariableType::Object) {
+									size_t typeidx = static_cast<uint16_t>(real) - static_cast<uint16_t>(VariableType::Object);
+									if (typeidx < ptr->TypeTable.size()) {
+										real = ptr->TypeTable[typeidx];
+										if (real == VariableType::Undefined) {
+											auto& name = ptr->TypeTableSymbols[typeidx];
+											auto res = Owner->GlobalSymbols.FindName(name);
+											if (res.second && res.second->Type == SymbolType::Object) {
+												UserDefinedType* usertype = res.second->UserObject;
+												ptr->TypeTable[typeidx] = real = usertype->Type;
 											}
 										}
-										else {
-											Error() << "Invalid type while calling " << ptr->Name;
-										}
 									}
-
-									if (real != Registers[byte.in1 + (i - 1)].getType()) {
-										Warn() << "Invalid argument types when calling " << ptr->Name;
-										goto start;
+									else {
+										Error() << "Invalid type while calling " << ptr->Name;
 									}
 								}
-							}
 
-							auto offset = current->StackOffset + byte.in1;
-							auto& call = CallStack.emplace_back(ptr); // @todo: do this better, too slow
-							call.StackOffset = offset;
-							Registers.reserve(call.StackOffset + ptr->RegisterCount);
-							Registers.to(call.StackOffset);
-							current = &call;
+								if (real != Registers[byte.in1 + i].getType()) {
+									Warn() << "Invalid argument types when calling " << ptr->Name;
+									goto start;
+								}
+							}
 						}
+
+						auto offset = current->StackOffset + byte.in1;
+						auto& call = CallStack.emplace_back(ptr); // @todo: do this better, too slow
+						call.StackOffset = offset;
+						Registers.reserve(call.StackOffset + ptr->RegisterCount);
+						Registers.to(call.StackOffset);
+						current = &call;
 					} break;
 
 					case FunctionType::Host: {
-						if (auto ptr = std::get<EMI::_internal_function*>(f->Callee)) {
-
-							thread_local static std::vector<InternalValue> args;
-							args.resize(byte.in2);
-							for (int i = 0; i < byte.in2; ++i) {
-								args[i] = makeHostArg(Registers[byte.in1 + i]);
-							}
-							InternalValue ret = (*ptr)(byte.in2, args.data());
-							Registers[byte.target] = moveOwnershipToVM(ret);
+						auto ptr = fnsym->Host;
+						thread_local static std::vector<InternalValue> args;
+						args.resize(byte.in2);
+						for (int i = 0; i < byte.in2; ++i) {
+							args[i] = makeHostArg(Registers[byte.in1 + i]);
 						}
+						InternalValue ret = (*ptr)(byte.in2, args.data());
+						Registers[byte.target] = moveOwnershipToVM(ret);
 					} break;
 
 					case FunctionType::Intrinsic: {
-						if (auto ptr = std::get<IntrinsicPtr>(f->Callee)) {
-							ptr(Registers[byte.target], &Registers[byte.in1], byte.in2);
-						}
+						auto ptr = fnsym->Intrinsic;
+						ptr(Registers[byte.target], &Registers[byte.in1], byte.in2);
 					} break;
 
 					case FunctionType::None: {
@@ -762,62 +806,6 @@ void Runner::Run()
 					#endif
 					break;
 					}
-				} goto start;
-
-				TARGET(CallInternal) {
-					const Instruction& data = *(Instruction*)current->Ptr++;
-					auto& fn = current->FunctionPtr->IntrinsicTable[data.data];
-					if (fn == nullptr) {
-						auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
-						auto res = Owner->GlobalSymbols.FindName(name);
-						if (res.second && res.second->Type == SymbolType::Function) {
-							auto f = static_cast<FunctionSymbol*>(res.second->Data);
-							if (f->Type == FunctionType::Intrinsic) {
-								fn = reinterpret_cast<IntrinsicPtr>(f->DirectPtr);
-							}
-						}
-						else {
-							Warn() << "Function does not exist: " << name;
-							goto start;
-							break;
-						}
-					}
-
-					fn(Registers[byte.target], &Registers[byte.in1], byte.in2);
-
-				} goto start;
-
-				TARGET(CallExternal) {
-					const Instruction& data = *(Instruction*)current->Ptr++;
-					auto& fn = current->FunctionPtr->ExternalTable[data.data];
-					if (fn == nullptr) {
-						auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
-						auto res = Owner->GlobalSymbols.FindName(name);
-						if (res.second && res.second->Type == SymbolType::Function) {
-							auto f = static_cast<FunctionSymbol*>(res.second->Data);
-							if (f->Type == FunctionType::Host) {
-								fn = static_cast<EMI::_internal_function*>(f->DirectPtr);
-							}
-						}
-						else {
-							Warn() << "Function does not exist: " << name;
-							goto start;
-							break;
-						}
-					}
-
-					thread_local static std::vector<InternalValue> args;
-					args.resize(byte.in2);
-					for (int i = 0; i < byte.in2; ++i) {
-						args[i] = makeHostArg(Registers[byte.in1 + i]);
-					}
-					InternalValue ret = (*fn)(byte.in2, args.data());
-					Registers[byte.target] = moveOwnershipToVM(ret);
-
-				} goto start;
-
-				TARGET(Call) {
-					Error() << "Unknown functions not implemented";
 				} goto start;
 
 				TARGET(PushUndefined) {
@@ -838,7 +826,7 @@ void Runner::Run()
 						auto& name = current->FunctionPtr->TypeTableSymbols[byte.param];
 						auto res = Owner->GlobalSymbols.FindName(name);
 						if (res.second && res.second->Type == SymbolType::Object) {
-							UserDefinedType* usertype = static_cast<UserDefinedType*>(res.second->Data);
+							UserDefinedType* usertype = res.second->UserObject;
 							type = usertype->Type;
 						}
 						else {
@@ -858,7 +846,7 @@ void Runner::Run()
 						auto& name = current->FunctionPtr->TypeTableSymbols[data.param];
 						auto res = Owner->GlobalSymbols.FindName(name);
 						if (res.second && res.second->Type == SymbolType::Object) {
-							UserDefinedType* usertype = static_cast<UserDefinedType*>(res.second->Data);
+							UserDefinedType* usertype = res.second->UserObject;
 							type = usertype->Type;
 						}
 						else {
