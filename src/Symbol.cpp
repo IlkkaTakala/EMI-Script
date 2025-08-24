@@ -1,0 +1,50 @@
+#include "Symbol.h"
+#include "Namespace.h"
+#include "Function.h"
+#include "Objects/UserObject.h"
+
+void Symbol::setType(SymbolType t)
+{
+	Type = t;
+	Flags = SymbolFlags::None;
+
+	switch (t)
+	{
+	case SymbolType::Static:
+		Flags = SymbolFlags::Value;
+		break;
+	case SymbolType::Object:
+		break;
+	case SymbolType::Function:
+		break;
+	case SymbolType::Namespace:
+		break;
+	case SymbolType::Variable:
+		Flags = SymbolFlags::Assignable;
+		break;
+	default:
+		break;
+	}
+}
+
+Symbol::~Symbol()
+{
+	switch (Type)
+	{
+	case SymbolType::Namespace: {
+		delete Space;
+	} break;
+	case SymbolType::Function: {
+		delete Function;
+	} break;
+	case SymbolType::Object: {
+		delete UserObject;
+	} break;
+	case SymbolType::Variable: {
+		delete SimpleVariable;
+	} break;
+	default:
+		break;
+	}
+	Space = nullptr;
+}
