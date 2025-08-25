@@ -9,7 +9,7 @@
 #include "ankerl/unordered_dense.h"
 
 #include "EMI/EMI.h"
-#include "Variable.h"
+#include "EmiDev/Variable.h"
 #include "Function.h"
 #include "Intrinsic.h"
 #include "Namespace.h"
@@ -119,6 +119,10 @@ public:
 	void CompileTemporary(const char* data);
 	void Interrupt();
 
+	std::string FindLibrary(const char* name) const;
+	void LoadLibrary(const char* name);
+	void LoadLibraryAsync(const char* name);
+
 	bool Export(const char* path, const ExportOptions& options);
 
 	void* GetFunctionID(const std::string& name);
@@ -169,4 +173,5 @@ private:
 	ankerl::unordered_dense::map<std::string, CompileUnit> Units;
 	SymbolTable GlobalSymbols;
 
+	std::vector<std::string> LibrarySearchPaths;
 };

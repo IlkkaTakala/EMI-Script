@@ -46,6 +46,7 @@ struct Namespace
 struct ScriptFunction;
 struct CompileUnit
 {
+	// @todo: we need to track function overloads too
 	std::vector<PathType> Symbols;
 	ScriptFunction* InitFunction;
 };

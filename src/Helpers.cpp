@@ -8,7 +8,7 @@
 #include <cmath>
 #include <math.h>
 
-Variable moveOwnershipToVM(const InternalValue& var)
+Variable CopyToVM(const InternalValue& var)
 {
 	switch (var.getType())
 	{
@@ -30,7 +30,7 @@ Variable moveOwnershipToVM(const InternalValue& var)
 	return {};
 }
 
-InternalValue moveOwnershipToHost(const Variable& var)
+InternalValue CopyToHost(const Variable& var)
 {
 	switch (var.getType())
 	{

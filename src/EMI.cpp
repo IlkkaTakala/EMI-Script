@@ -10,17 +10,19 @@ bool EMI::_internal_register(_internal_function* func)
 	std::string name;
 	name = func->name;
 
-	// @todo: Should find the existing symbol
-	auto sym = new Symbol();
-	sym->Type = SymbolType::Function;
-	sym->VarType = VariableType::Function;
-	sym->Builtin = true;
-	std::vector<VariableType> types;
-	types.resize(func->arg_count);
-	for (int i = 0; i < types.size(); i++) {
-		types[i] = TypeFromValue(func->arg_types[i]);
+	Symbol* sym = nullptr;
+	auto [pathname, symbol] = HostFunctions().FindName(toPath(func->name));
+	if (symbol && symbol->Type == SymbolType::Function) {
+		sym = symbol;
 	}
-
+	else {
+		sym = new Symbol();
+		sym->Type = SymbolType::Function;
+		sym->VarType = VariableType::Function;
+		sym->Builtin = true;
+		sym->Function = new FunctionTable();
+	}
+	
 	auto fn = new FunctionSymbol{  };
 	fn->Signature.Return = TypeFromValue(func->return_type);
 	fn->Type = FunctionType::Host;
@@ -30,7 +32,6 @@ bool EMI::_internal_register(_internal_function* func)
 	for (int i = 0; i < func->arg_count; i++) {
 		fn->Signature.Arguments[i] = TypeFromValue(func->arg_types[i]);
 	}
-	sym->Function = new FunctionTable();
 
 	sym->Function->AddFunction((int)func->arg_count, fn);
 
@@ -71,6 +72,7 @@ bool EMI::_internal_unregister(const char* name)
 
 CORE_API void EMI::UnregisterAllExternals()
 {
+	// @todo: Should also unregister all from VMs
 	for (auto& f : HostFunctions().Table) {
 		delete f.second;
 	}

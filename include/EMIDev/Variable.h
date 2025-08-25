@@ -24,6 +24,7 @@ https://craftinginterpreters.com/optimization.html#nan-boxing
 #define BOOL_VAL(b)		((b) ? TRUE_VAL : FALSE_VAL)
 #define OBJ_VAL(obj)	(SIGN_BIT | QNAN | (uint64_t)(uintptr_t)(obj))
 
+// @todo: Maybe int type too?
 enum class VariableType
 {
 	Undefined,

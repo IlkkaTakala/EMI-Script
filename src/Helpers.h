@@ -1,12 +1,12 @@
 #pragma once
-#include "Variable.h"
+#include "EmiDev/Variable.h"
 #include "EMI/Value.h"
 #include <string>
 
 // @todo: These should be inlined
 
-Variable moveOwnershipToVM(const InternalValue& var);
-InternalValue moveOwnershipToHost(const Variable& var);
+Variable CopyToVM(const InternalValue& var);
+InternalValue CopyToHost(const Variable& var);
 InternalValue makeHostArg(const Variable& var);
 
 Variable GetTypeDefault(VariableType type);

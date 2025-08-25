@@ -67,6 +67,17 @@ int main()
 			}
 			return 0;
 		}},
+		{"call", [](EMI::VMHandle& vm, const std::vector<std::string>& params) {
+			if (params.size() == 3) {
+				auto handle = vm.GetFunctionHandle(params[1].c_str());
+				handle(params[2].c_str());
+			}
+			if (params.size() == 2) {
+				auto handle = vm.GetFunctionHandle(params[1].c_str());
+				handle();
+			}
+			return 0;
+		}}
 	};
 
 	EMI::SetLogLevel(EMI::LogLevel::Debug);

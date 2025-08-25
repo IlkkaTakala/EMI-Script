@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include "EMLibFormat.h"
+#include "ModuleLoader.h"
 
 VM::VM()
 {
@@ -16,6 +17,7 @@ VM::VM()
 	auto counter = std::thread::hardware_concurrency();
 	CompileRunning = true;
 
+	// @todo: This should also happen during runtime, not only in init
 	GlobalSymbols.Table.insert(IntrinsicFunctions.Table.begin(), IntrinsicFunctions.Table.end());
 	GlobalSymbols.Table.insert(HostFunctions().Table.begin(), HostFunctions().Table.end());
 
@@ -98,6 +100,29 @@ void VM::CompileTemporary(const char* data)
 void VM::Interrupt()
 {
 
+}
+
+std::string VM::FindLibrary(const char* name) const
+{
+	name;
+	return std::string();
+}
+
+void VM::LoadLibrary(const char* name)
+{
+	std::filesystem::path path = FindLibrary(name);
+
+	if (path.extension() == ".ril" || path.extension() == ".eml") {
+		Compile(path.string().c_str(), {});
+		return;
+	}
+
+	ModuleLoader::LoadModule(path.string().c_str());
+}
+
+void VM::LoadLibraryAsync(const char* name)
+{
+	name;
 }
 
 bool VM::Export(const char* path, const ExportOptions& options)
@@ -204,8 +229,8 @@ size_t VM::DirectCallFunction(ScriptFunction* fn, const std::vector<VariableType
 
 	call.Arguments.reserve(args.size());
 	for (size_t i = 0; i < argTypes.size() && i < args.size(); i++) {
-		auto val = moveOwnershipToVM(args[i]);
-		if (argTypes[i + 1] == val.getType()) {
+		auto val = CopyToVM(args[i]);
+		if (argTypes[i] == val.getType() || argTypes[i] == VariableType::Undefined) {
 			call.Arguments.push_back(val);
 		}
 	}
@@ -236,7 +261,7 @@ InternalValue VM::GetReturnValue(size_t index)
 	if (ReturnValues.size() <= index || ReturnFreeList.end() != std::find(ReturnFreeList.begin(), ReturnFreeList.end(), index)) return {};
 	Variable var = ReturnValues[index].get();
 	ReturnFreeList.push_back(index);
-	auto val = moveOwnershipToHost(var);
+	auto val = CopyToHost(var);
 	return val;
 }
 
@@ -273,15 +298,35 @@ void VM::AddCompileUnit(const std::string& path, const SymbolTable& space, Scrip
 			auto type = GetManager().AddType(name, *s->UserObject);
 			s->VarType = type;
 			s->UserObject->Type = type;
+
+			GlobalSymbols.Table.emplace(name, s);
+		} break;
+
+		case SymbolType::Function: {
+			auto [fnname, sym] = FindSymbol(name);
+			if (!sym) {
+				GlobalSymbols.Table.emplace(name, s);
+				break;
+			}
+			if (sym->Type == SymbolType::Function) {
+				for (auto& fn : s->Function->Functions)
+					sym->Function->AddFunction(fn.first, fn.second);
+			}
+			else {
+				gRuntimeError() << "Symbol is not a function " << fnname;
+			}
+
 		} break;
 
 		default:
+			GlobalSymbols.Table.emplace(name, s);
 			break;
 		}
 	}
 
+	// @todo: Function overriding does not work properly, the whole symbol gets replaced
 	Units[path].InitFunction = InitFunction;
-	GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
+	//GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
 
 	size_t idx = DirectCallFunction(InitFunction, {}, {});
 	GetReturnValue(idx);
@@ -704,7 +749,7 @@ void Runner::Run()
 							args[i] = makeHostArg(Registers[byte.in1 + i]);
 						}
 						InternalValue ret = (*fn->Host)(byte.in2, args.data());
-						Registers[byte.target] = moveOwnershipToVM(ret);
+						Registers[byte.target] = CopyToVM(ret);
 						break;
 					}
 					case FunctionType::Intrinsic: {
@@ -747,6 +792,7 @@ void Runner::Run()
 								&& Registers[byte.in1 + i].getType() != VariableType::Undefined) { // @todo: Once conversions exist remove this
 								VariableType real = fnsym->Signature.Arguments[i];
 
+								// @todo: is there a way to avoid type checks every call
 								if (real >= VariableType::Object) {
 									size_t typeidx = static_cast<uint16_t>(real) - static_cast<uint16_t>(VariableType::Object);
 									if (typeidx < ptr->TypeTable.size()) {
@@ -788,7 +834,7 @@ void Runner::Run()
 							args[i] = makeHostArg(Registers[byte.in1 + i]);
 						}
 						InternalValue ret = (*ptr)(byte.in2, args.data());
-						Registers[byte.target] = moveOwnershipToVM(ret);
+						Registers[byte.target] = CopyToVM(ret);
 					} break;
 
 					case FunctionType::Intrinsic: {

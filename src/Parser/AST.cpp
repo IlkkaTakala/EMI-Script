@@ -76,7 +76,7 @@ Variable Node::ToVariable() const
 	default:
 		break;
 	}
-	auto var = moveOwnershipToVM(v);
+	auto var = CopyToVM(v);
 	return var;
 }
 #ifdef DEBUG
@@ -518,6 +518,8 @@ void ASTWalker::Run()
 			std::string path = std::get<std::string>(c->data);
 			ImportList.push_back(path);
 
+			Vm->LoadLibrary(path.c_str());
+
 		} break;
 		
 		case Token::ObjectDef:
@@ -601,7 +603,10 @@ void ASTWalker::Run()
 		case Token::FunctionDef:
 		{
 			PathType data(std::get<0>(c->data).c_str());
-			auto [name, s] = FindSymbol(data);
+
+			PathTypeQuery query(data, SearchPaths);
+			auto [name, s] = Global.FindName(query);
+
 			Symbol* symbol = nullptr;
 			if (!name) {
 				symbol = new Symbol{};
