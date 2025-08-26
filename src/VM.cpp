@@ -328,7 +328,7 @@ void VM::GarbageCollect()
 Runner::Runner(VM* vm) : Owner(vm)
 {
 	Registers.reserve(64);
-	CallStack.reserve(128);
+	CallStack.reserve(32);
 
 	RunThread = std::thread{ &Runner::Run, this };
 }
