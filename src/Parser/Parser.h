@@ -11,6 +11,7 @@ public:
 	static void ReleaseParser();
 	static void ThreadedParse(VM* vm);
 	static void Parse(VM* vm, CompileOptions& options);
+	static void ParseAST(VM* vm, CompileOptions& options);
 	static void ParseTemporary(VM* vm, CompileOptions& options);
 	static Node* ConstructAST(CompileOptions& options);
 };

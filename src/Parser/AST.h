@@ -3,42 +3,7 @@
 #include "ParseHelper.h"
 #include "Namespace.h"
 #include "Function.h"
-
-using NodeDataType = std::variant<std::string, double, bool>;
-
-class Node
-{
-public:
-	Node() :
-		varType(VariableType::Undefined),
-		regTarget(254),
-		line(0),
-		depth(0),
-		sym(nullptr),
-		instruction(0)
-	{}
-	~Node() {
-		for (auto& c : children) {
-			if (c != this)
-				delete c;
-		}
-	}
-	VariableType varType;
-	Token type = Token::None;
-	uint8_t regTarget;
-	size_t line;
-	size_t depth;
-	NodeDataType data;
-	std::vector<Node*> children;
-	CompileSymbol* sym;
-	size_t instruction;
-
-	Variable ToVariable() const;
-
-#ifdef DEBUG
-	void print(const std::string& prefix, bool isLast = false);
-#endif
-};
+#include "Parser/Node.h"
 
 class VM;
 class ASTWalker

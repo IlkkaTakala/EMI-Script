@@ -143,7 +143,10 @@ void Parser::ThreadedParse(VM* vm)
 			options = std::move(vm->CompileQueue.front());
 			vm->CompileQueue.pop();
 		}
-		if (options.Path != "") {
+		if (options.Ptr) {
+			ParseAST(vm, options);
+		}
+		else if (options.Path != "") {
 			std::filesystem::path fp(options.Path);
 			if (fp.extension() == ".ril") {
 				Parse(vm, options);
@@ -210,6 +213,24 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	}
 	else {
 		gCompileError() << "Errors present, compile failed: " << fullPath;
+		options.CompileResult.set_value(false);
+	}
+}
+
+void Parser::ParseAST(VM* vm, CompileOptions& options)
+{
+	gCompileDebug() << "Walking AST";
+	ASTWalker ast(vm, static_cast<Node*>(options.Ptr), "");
+	ast.Run();
+
+	if (!ast.HasError) {
+		vm->AddCompileUnit(options.Path, ast.Global, ast.InitFunction);
+		ast.InitFunction = nullptr;
+		ast.Global.Table.clear();
+		options.CompileResult.set_value(true);
+	}
+	else {
+		gCompileError() << "Errors present, compile failed: " << options.Path;
 		options.CompileResult.set_value(false);
 	}
 }

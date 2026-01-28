@@ -17,11 +17,13 @@
 
 using namespace EMI;
 
+class Node;
 class VM;
 struct CompileOptions
 {
 	std::string Path;
 	std::string Data;
+	void* Ptr = nullptr;
 	Options UserOptions;
 	std::promise<bool> CompileResult;
 
@@ -29,6 +31,7 @@ struct CompileOptions
 	CompileOptions& operator=(CompileOptions&& in) noexcept {
 		Path = in.Path;
 		Data = in.Data;
+		Ptr = in.Ptr;
 		UserOptions = in.UserOptions;
 		CompileResult = std::move(in.CompileResult);
 
@@ -37,6 +40,7 @@ struct CompileOptions
 	CompileOptions(CompileOptions&& in) noexcept {
 		Path = in.Path;
 		Data = in.Data;
+		Ptr = in.Ptr;
 		UserOptions = in.UserOptions;
 		CompileResult = std::move(in.CompileResult);
 	}
@@ -117,6 +121,7 @@ public:
 	void ReinitializeGrammar(const char* grammar);
 	void* Compile(const char* path, const Options& options);
 	void CompileTemporary(const char* data);
+	void CompileAST(const char* name, Node* ast);
 	void Interrupt();
 
 	std::string FindLibrary(const char* name) const;

@@ -10,6 +10,7 @@
 #include <fstream>
 #include "EMLibFormat.h"
 #include "ModuleLoader.h"
+#include "Parser/AST.h"
 
 VM::VM()
 {
@@ -28,6 +29,28 @@ VM::VM()
 	}
 
 	GarbageCollector = new std::thread(&VM::GarbageCollect, this);
+
+	auto program = new Node();
+	program->type = Token::Program;
+	auto function = new Node();
+	function->type = Token::FunctionCall;
+
+	auto id = new Node();
+	id->type = Token::Id;
+	id->data = "print";
+
+	auto callparams = new Node();
+	callparams->type = Token::CallParams;
+
+	auto literal = new Node();
+	literal->type = Token::Literal;
+	literal->data = "Hello?";
+
+	callparams->children.push_back(literal);
+	function->children.push_back(id);
+	function->children.push_back(callparams);
+	program->children.push_back(function);
+	CompileAST("tester", program);
 }
 
 VM::~VM()
@@ -87,6 +110,22 @@ void VM::CompileTemporary(const char* data)
 	CompileOptions fulloptions{};
 	std::future<bool>* future;
 	fulloptions.Data = data;
+	{
+		std::lock_guard lock(CompileMutex);
+		future = &CompileRequests.emplace_back(fulloptions.CompileResult.get_future());
+		CompileQueue.push(std::move(fulloptions));
+	}
+	QueueNotify.notify_one();
+
+	future->wait();
+}
+
+void VM::CompileAST(const char* name, Node* ast)
+{
+	CompileOptions fulloptions{};
+	std::future<bool>* future;
+	fulloptions.Ptr = ast;
+	fulloptions.Data = name;
 	{
 		std::lock_guard lock(CompileMutex);
 		future = &CompileRequests.emplace_back(fulloptions.CompileResult.get_future());
