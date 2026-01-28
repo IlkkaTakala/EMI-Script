@@ -29,28 +29,6 @@ VM::VM()
 	}
 
 	GarbageCollector = new std::thread(&VM::GarbageCollect, this);
-
-	auto program = new Node();
-	program->type = Token::Program;
-	auto function = new Node();
-	function->type = Token::FunctionCall;
-
-	auto id = new Node();
-	id->type = Token::Id;
-	id->data = "print";
-
-	auto callparams = new Node();
-	callparams->type = Token::CallParams;
-
-	auto literal = new Node();
-	literal->type = Token::Literal;
-	literal->data = "Hello?";
-
-	callparams->children.push_back(literal);
-	function->children.push_back(id);
-	function->children.push_back(callparams);
-	program->children.push_back(function);
-	CompileAST("tester", program);
 }
 
 VM::~VM()
