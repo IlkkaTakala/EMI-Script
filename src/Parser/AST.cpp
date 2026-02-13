@@ -261,7 +261,7 @@ bool Optimize(Node*& n)
 		if (IsOperator(n->type)) {
 			if (n->children.size() < 1) return true;
 			bool allConstant = true;
-			Node* l = nullptr, * r = nullptr;
+			Node* l = nullptr, *r = nullptr;
 			for (auto& c : n->children) {
 				if (!l) l = c; else r = c;
 				if (!IsConstant(c->type)) {
@@ -768,8 +768,8 @@ void printInstruction(const Instruction& in) {
 #define Warn(text) gWarn() << "Line " << n->line << ": " << text;
 #define FreeConstant(n) if (!n->sym || (n->sym && n->sym->NeedsLoading) ) FreeRegister(n->regTarget);
 #define EnsureOperands if (n->children.size() != 2) { Error("Invalid number of operands") return; }
-#define GetFirstNode() Node* first = n->children.size() ? n->children.front() : nullptr;
-#define GetLastNode() Node* last = n->children.size() ? n->children.back() : nullptr;
+#define GetFirstNode() Node* first = n->children.size() ? n->children.front() : nullptr; if (!first) { Error("Missing child node") return; }
+#define GetLastNode() Node* last = n->children.size() ? n->children.back() : nullptr; if (!last) { Error("Missing child node") return; }
 
 #define Operator(varTy, op, op2) \
 case VariableType::varTy: {\
@@ -1465,8 +1465,8 @@ void ASTWalker::handle_Conditional(Node* n) {
 		Error("Invalid ternary operator");
 		return;
 	}
-	WalkOne(n->children[0]);
 	GetFirstNode()
+	WalkOne(n->children[0]);
 	FreeConstant(first);
 
 	auto& trueInst = InstructionList.emplace_back();
@@ -1917,7 +1917,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 				n->sym = symbol;
 				return n->regTarget;
 			}
-		}
+		} break;
 
 		case Token::Indexer: {
 			Walk;
@@ -1928,7 +1928,7 @@ uint8_t ASTWalker::WalkStore(Node* n) {
 			FreeConstant(last);
 			Out;
 			return n->regTarget;
-		}break;
+		} break;
 
 		case Token::Number:
 		case Token::Literal:
