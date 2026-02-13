@@ -15,6 +15,10 @@
 #include "Namespace.h"
 #include "Objects/UserObject.h"
 
+#ifdef INCLUDE_DEBUGGER
+#include "DebugInfo.h"
+#endif // INCLUDE_DEBUGGER
+
 using namespace EMI;
 
 class Node;
@@ -179,4 +183,9 @@ private:
 	SymbolTable GlobalSymbols;
 
 	std::vector<std::string> LibrarySearchPaths;
+
+#ifdef INCLUDE_DEBUGGER
+	DebugInfo DebugInformation;
+#endif // INCLUDE_DEBUGGER
+
 };
