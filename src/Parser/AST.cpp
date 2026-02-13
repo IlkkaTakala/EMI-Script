@@ -933,7 +933,7 @@ void ASTWalker::handle_Add(Node* n) {
 	switch (first->varType)
 	{
 		Operator(Number, NumAdd, Add)
-			Operator(String, StrAdd, Add)
+		Operator(String, StrAdd, Add)
 	default:
 		NodeType = VariableType::Undefined;
 		instruction.code = OpCodes::Add;
@@ -1007,33 +1007,29 @@ void ASTWalker::handle_AssignAdd(Node* n) {
 	GetLastNode()
 	n->type = Token::Add;
 	WalkOne(n);
-	last = n;
 	n->type = Token::Assign;
-	helper_Assign(n);
+	helper_Assign(n, n);
 }
 void ASTWalker::handle_AssignSub(Node* n) {
 	GetLastNode()
 	n->type = Token::Sub;
 	WalkOne(n);
-	last = n;
 	n->type = Token::Assign;
-	helper_Assign(n);
+	helper_Assign(n, n);
 }
 void ASTWalker::handle_AssignDiv(Node* n) {
 	GetLastNode()
 		n->type = Token::Div;
 	WalkOne(n);
-	last = n;
 	n->type = Token::Assign;
-	helper_Assign(n);
+	helper_Assign(n, n);
 }
 void ASTWalker::handle_AssignMult(Node* n) {
 	GetLastNode()
 		n->type = Token::Mult;
 	WalkOne(n);
-	last = n;
 	n->type = Token::Assign;
-	helper_Assign(n);
+	helper_Assign(n, n);
 }
 
 void ASTWalker::handle_Id(Node* n) {
@@ -1313,12 +1309,11 @@ void ASTWalker::handle_Assign(Node* n) {
 	if (n->children.size() != 2) return;
 	GetLastNode()
 	WalkOne(last);
-	helper_Assign(n);
+	helper_Assign(n, last);
 }
 
-void ASTWalker::helper_Assign(Node * n) {
+void ASTWalker::helper_Assign(Node* n, Node* last) {
 	GetFirstNode()
-	GetLastNode()
 	auto& lhs = first;
 	auto& rhs = last;
 

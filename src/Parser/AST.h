@@ -79,7 +79,7 @@ private:
 	void handle_Else(Node* n);
 	void handle_FunctionCall(Node* n);
 
-	void helper_Assign(Node* n);
+	void helper_Assign(Node* n, Node* last);
 
 	void(ASTWalker::*TokenJumpTable[(unsigned long long)Token::Last])(Node*);
 
