@@ -18,5 +18,7 @@ file(
 
 add_executable(EMICLI ${_source_list})
 
+target_compile_definitions(EMICLI PRIVATE GRAMMAR_SOURCE="${CMAKE_SOURCE_DIR}/.grammar")
+
 add_dependencies(EMICLI EMI)
 target_link_libraries(EMICLI PUBLIC EMI)

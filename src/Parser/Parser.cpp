@@ -117,10 +117,21 @@ void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 			return;
 		}
 
-		ParseTable.clear();
+		ParseTable_t Parse;
 		RuleTable.clear();
-		CreateParser(ParseTable, RuleTable, Data, Rules);
+		CreateParser(Parse, RuleTable, Data, Rules);
 		Rules.clear();
+
+		if (ParseTable) {
+			delete[] ParseTable;
+		}
+
+		ParseTable = new ActionNode[Parse.size() * Parse[0].size()];
+		size_t offset = 0;
+		for (auto& data : Parse) {
+			memcpy(&ParseTable[offset], data.data(), data.size() * sizeof(ActionNode));
+			offset += data.size();
+		}
 	}
 
 	gCompileDebug() << "Grammar compiled";
@@ -311,7 +322,7 @@ Node* Parser::ConstructAST(CompileOptions& options)
 	{
 		int currentState = stateStack.top();
 
-		ActionNode action = ParseTable[currentState][(int)holder.token];
+		ActionNode action = ParseTable[GetIndex(currentState, (int)holder.token)];
 
 		switch (action.type)
 		{
@@ -388,7 +399,7 @@ Node* Parser::ConstructAST(CompileOptions& options)
 			symbolStack.push(next);
 			if (TokenParseData[(int)rule.nonTerminal].Precedence != 0) operatorStack.push(rule.nonTerminal);
 
-			stateStack.push(ParseTable[stateStack.top()][(int)rule.nonTerminal].shift);
+			stateStack.push(ParseTable[GetIndex(stateStack.top(), (int)rule.nonTerminal)].shift);
 		} break;
 
 		case DECIDE: {
@@ -432,14 +443,14 @@ Node* Parser::ConstructAST(CompileOptions& options)
 				<< " (" << c.Row << ", " << c.Column << ")"
 				<< ": Critical error found '" << holder.data << "'. ";
 #ifdef DEBUG
-			gCompileLogger() << "Expected one of: ";
+			/*gCompileLogger() << "Expected one of: ";
 			int idx = 0;
 			for (auto& state : ParseTable[currentState]) {
 				if (state.type != ERROR) {
 					gCompileLogger() << TokensToName[(Token)idx] << ", ";
 				}
 				idx++;
-			}
+			}*/
 #endif // DEBUG
 			notDone = false;
 			break;
