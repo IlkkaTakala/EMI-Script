@@ -8,19 +8,20 @@ class DefaultLogger : public EMI::Logger
 {
 public:
 	void Print(const char*) override;
+	void PrintError(const char*) override;
 
 private:
 
 };
 
-class BaseLogger
+class LogService
 {
 public:
-	explicit BaseLogger();
+	explicit LogService();
 	void SetLogLevel(EMI::LogLevel level);
 	void SetLogger(EMI::Logger* log);
 
-	BaseLogger& operator<<(EMI::LogLevel level)
+	LogService& operator<<(EMI::LogLevel level)
 	{
 		CurrentLevel = level;
 		*this << LogNames[(uint8_t)CurrentLevel];
@@ -28,11 +29,14 @@ public:
 	}
 
 	template<typename T>
-	friend BaseLogger& operator<<(BaseLogger& log, const T& arg) {
+	friend LogService& operator<<(LogService& log, const T& arg) {
 		if (log.OutputLevel > log.CurrentLevel) return log;
 		std::stringstream ss;
 		ss << arg;
-		log.Output->Print(ss.str().c_str());
+		if (log.CurrentLevel < EMI::LogLevel::Warning)
+			log.Output->Print(ss.str().c_str());
+		else
+			log.Output->PrintError(ss.str().c_str());
 		return log;
 	}
 
@@ -43,10 +47,10 @@ private:
 
 	static constexpr std::array<const char*, 4> LogNames = { "[Debug] ", "[Info] ", "[Warning] ", "[Error] " };
 
-	bool operator=(const BaseLogger & other) const = delete;
-	bool operator=(const BaseLogger && other) const = delete;
-	BaseLogger(const BaseLogger& other) = delete;
-	BaseLogger(const BaseLogger&& other) = delete;
+	bool operator=(const LogService & other) const = delete;
+	bool operator=(const LogService && other) const = delete;
+	LogService(const LogService& other) = delete;
+	LogService(const LogService&& other) = delete;
 };
 
 std::string MakePath(const std::string& path);

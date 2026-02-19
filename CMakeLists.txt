@@ -15,6 +15,7 @@ option(EMI_PARSE_GRAMMAR ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 option(BUILD_COMMAND_LINE "Build command line" ON)
 option(BUILD_DEMOS "Include demos in the build" OFF)
+option(INCLUDE_DEBUGGER "Include debugger in the build" ON)
 
 include(FetchContent)
 
@@ -72,6 +73,10 @@ if(BUILD_SHARED_LIBS)
 	target_compile_definitions(EMI PRIVATE BUILD_SHARED_LIBS)
 else()
 	add_library(EMI STATIC ${_source_list})
+endif()
+
+if(INCLUDE_DEBUGGER) 
+    target_compile_definitions(EMI PRIVATE INCLUDE_DEBUGGER) 
 endif()
 
 if (MSVC)
