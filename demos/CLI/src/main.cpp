@@ -9,6 +9,10 @@
 #include <vector>
 #include <string>
 
+#ifndef GRAMMAR_SOURCE
+#define GRAMMAR_SOURCE "../../../.grammar"
+#endif // !GRAMMAR_SOURCE
+
 using namespace std::literals::chrono_literals;
 
 template <typename Out>
@@ -197,7 +201,7 @@ int main(int argc, char** argv)
 		"reinit",
 		"Reinitialize grammar",
 		[](CommandContext& ctx, const std::vector<std::string>&) {
-			ctx.vm.ReinitializeGrammar("../../.grammar");
+			ctx.vm.ReinitializeGrammar(GRAMMAR_SOURCE);
 			return 0;
 		}
 	});
@@ -273,7 +277,7 @@ int main(int argc, char** argv)
 	EMI::SetLogLevel(EMI::LogLevel::Debug);
 	EMI::SetScriptLogLevel(EMI::LogLevel::Info);
 	auto vm = EMI::CreateEnvironment();
-	vm.ReinitializeGrammar("../../../.grammar");
+	vm.ReinitializeGrammar(GRAMMAR_SOURCE);
 
 	CommandContext ctx{ vm };
 
