@@ -105,9 +105,20 @@ int ScriptingMode(EMI::VMHandle& vm)
 		std::getline(std::cin, line);
 		if (line == "quit") {
 			break;
+		} else if (line == "step") {
+			vm.Step();
+		} else if (line == "up") {
+			vm.StepUp();
+		} else if (line == "down") {
+			vm.StepDown();
+		} else if (line == "resume") {
+			vm.Resume();
+		} else if (line == "pause") {
+			vm.Pause();
 		}
-
-		vm.CompileTemporary(line.c_str());
+		else {
+			vm.CompileTemporary(line.c_str());
+		}
 	}
 	printf("Exiting script stage\n\n");
 
@@ -138,20 +149,40 @@ int main(int argc, char** argv)
 		"compile <paths...>",
 		"Compile script files",
 		[](CommandContext& ctx, const std::vector<std::string>& params) {
-			static std::unordered_map<std::string, std::function<void(EMI::Options&)>> optionMap = {
-				//{"-s", [](EMI::Options& options) { options.Simplify = true; }}
+			static std::unordered_map<std::string, std::function<void(EMI::Options&, std::vector<int>&, const std::vector<std::string>&)>> optionMap = {
+				{"-b", [](EMI::Options& options, std::vector<int>& breaks, const std::vector<std::string>& args) { for (const auto& a : args) { try { breaks.push_back(std::stoi(a)); } catch (...) {} } }}
 			};
 			std::vector<std::string> path;
+			std::vector<int> breaks;
 			EMI::Options options;
-			for (size_t i = 1; i < params.size(); i++) {
-				if (auto it = optionMap.find(params[i]); it != optionMap.end()) {
-					it->second(options);
+			bool sawDash = false;
+			for (size_t i = 1; i < params.size(); ++i) {
+				const std::string& p = params[i];
+				if (!sawDash) {
+					if (!p.empty() && p[0] == '-') {
+						sawDash = true;
+					}
+					else {
+						path.push_back(p);
+						continue;
+					}
 				}
-				else {
-					path.push_back(params[i]);
+
+				auto it = optionMap.find(p);
+				std::vector<std::string> values;
+				size_t j = i + 1;
+				for (; j < params.size(); ++j) {
+					if (!params[j].empty() && params[j][0] == '-') break;
+					values.push_back(params[j]);
 				}
+				if (it != optionMap.end()) {
+					it->second(options, breaks, values);
+				}
+				i = j - 1;
 			}
 			bool result = false;
+			options.BreakpointCount = breaks.size();
+			options.Breakpoints = breaks.data();
 			for (const auto& p : path) {
 				auto handle = ctx.vm.CompileScript(p.c_str(), options);
 				result |= handle.wait();

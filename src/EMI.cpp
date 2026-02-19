@@ -133,9 +133,9 @@ ScriptHandle EMI::VMHandle::CompileScript(const char* file, const Options& optio
 	return { vm->Compile(file, options), this };
 }
 
-void EMI::VMHandle::CompileTemporary(const char* data)
+ScriptHandle EMI::VMHandle::CompileTemporary(const char* data)
 {
-	((VM*)Vm)->CompileTemporary(data);
+	return { ((VM*)Vm)->CompileTemporary(data), this };
 }
 
 FunctionHandle EMI::VMHandle::GetFunctionHandle(const char* name)
@@ -186,4 +186,44 @@ void EMI::VMHandle::ReinitializeGrammar(const char* grammar)
 void EMI::ReleaseEnvironment(VMHandle handle)
 {
 	handle.ReleaseVM();
+}
+
+int EMI::VMHandle::Resume()
+{
+	return ((VM*)Vm)->Resume();
+}
+
+DebugLineInfo EMI::VMHandle::Pause()
+{
+	return ((VM*)Vm)->Pause();
+}
+
+DebugLineInfo EMI::VMHandle::Step()
+{
+	return ((VM*)Vm)->Step();
+}
+
+DebugLineInfo EMI::VMHandle::StepUp()
+{
+	return ((VM*)Vm)->StepUp();
+}
+
+DebugLineInfo EMI::VMHandle::StepDown()
+{
+	return ((VM*)Vm)->StepDown();
+}
+
+int EMI::VMHandle::GetCurrentVariables()
+{
+	return ((VM*)Vm)->GetCurrentVariables();
+}
+
+DebugCallStack EMI::VMHandle::GetCurrentCallStack()
+{
+	return ((VM*)Vm)->GetCurrentCallStack();
+}
+
+int EMI::VMHandle::GetObjectFields(const char* objectName)
+{
+	return ((VM*)Vm)->GetObjectFields(objectName);
 }

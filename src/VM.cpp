@@ -17,6 +17,7 @@ VM::VM()
 	Parser::InitializeParser();
 	auto counter = std::thread::hardware_concurrency();
 	CompileRunning = true;
+	Paused = false;
 
 	// @todo: This should also happen during runtime, not only in init
 	GlobalSymbols.Table.insert(IntrinsicFunctions.Table.begin(), IntrinsicFunctions.Table.end());
@@ -83,19 +84,20 @@ void* VM::Compile(const char* path, const Options& options)
 	return handle;
 }
 
-void VM::CompileTemporary(const char* data)
+void* VM::CompileTemporary(const char* data)
 {
+	void* handle = nullptr;
 	CompileOptions fulloptions{};
-	std::future<bool>* future;
 	fulloptions.Data = data;
 	{
 		std::lock_guard lock(CompileMutex);
-		future = &CompileRequests.emplace_back(fulloptions.CompileResult.get_future());
+		auto& future = CompileRequests.emplace_back(fulloptions.CompileResult.get_future());
+		handle = &future;
 		CompileQueue.push(std::move(fulloptions));
 	}
 	QueueNotify.notify_one();
 
-	future->wait();
+	return handle;
 }
 
 void VM::CompileAST(const char* name, Node* ast)
@@ -303,50 +305,61 @@ std::pair<PathType, Symbol*> VM::FindSymbol(const PathTypeQuery& name)
 
 void VM::AddCompileUnit(const std::string& path, const SymbolTable& space, ScriptFunction* InitFunction)
 {
-	std::unique_lock lk(MergeMutex);
-	Units[path].Symbols.reserve(space.Table.size());
-	for (auto& [name, s] : space.Table) {
-		Units[path].Symbols.push_back(name);
-		if (!s) continue;
+	{
+		std::unique_lock lk(MergeMutex);
+		Units[path].Symbols.reserve(space.Table.size());
+		for (auto& [name, s] : space.Table) {
+			Units[path].Symbols.push_back(name);
+			if (!s) continue;
 
-		switch (s->Type)
-		{
-		case SymbolType::Object: {
-			auto type = GetManager().AddType(name, *s->UserObject);
-			s->VarType = type;
-			s->UserObject->Type = type;
+			switch (s->Type)
+			{
+			case SymbolType::Object: {
+				auto type = GetManager().AddType(name, *s->UserObject);
+				s->VarType = type;
+				s->UserObject->Type = type;
 
-			GlobalSymbols.Table.emplace(name, s);
-		} break;
+				GlobalSymbols.Table.emplace(name, s);
+			} break;
 
-		case SymbolType::Function: {
-			auto [fnname, sym] = FindSymbol(name);
-			if (!sym) {
+			case SymbolType::Function: {
+				auto [fnname, sym] = FindSymbol(name);
+				if (!sym) {
+					GlobalSymbols.Table.emplace(name, s);
+					break;
+				}
+				if (sym->Type == SymbolType::Function) {
+					for (auto& fn : s->Function->Functions)
+						sym->Function->AddFunction(fn.first, fn.second);
+				}
+				else {
+					gRuntimeError() << "Symbol is not a function " << fnname;
+				}
+
+			} break;
+
+			default:
 				GlobalSymbols.Table.emplace(name, s);
 				break;
 			}
-			if (sym->Type == SymbolType::Function) {
-				for (auto& fn : s->Function->Functions)
-					sym->Function->AddFunction(fn.first, fn.second);
-			}
-			else {
-				gRuntimeError() << "Symbol is not a function " << fnname;
-			}
-
-		} break;
-
-		default:
-			GlobalSymbols.Table.emplace(name, s);
-			break;
 		}
+
+		// @todo: Function overriding does not work properly, the whole symbol gets replaced
+		Units[path].InitFunction = InitFunction;
+		//GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
 	}
-
-	// @todo: Function overriding does not work properly, the whole symbol gets replaced
-	Units[path].InitFunction = InitFunction;
-	//GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
-
 	size_t idx = DirectCallFunction(InitFunction, {}, {});
 	GetReturnValue(idx);
+}
+
+void VM::AddCompileUnitDebug(const std::string& path, const DebugInfo& info)
+{
+	DebugInformation.AddInfo(path, info);
+}
+
+void VM::RemoveCompileUnitDebug(const std::string& path)
+{
+	DebugInformation.RemoveInfo(path);
 }
 
 void VM::RemoveUnit(const std::string& unit)
@@ -374,6 +387,95 @@ void VM::RemoveUnit(const std::string& unit)
 	}
 }
 
+int VM::Resume()
+{
+	Paused = false;
+	PausedRunner = nullptr;
+	for (auto& runner : RunnerPool) {
+		runner->SetPaused(false);
+	}
+	RunnerNotify.notify_all();
+	return 0;
+}
+
+DebugLineInfo VM::Pause()
+{
+	Paused = true;
+	for (auto& runner : RunnerPool) {
+		runner->SetPaused(true);
+	}
+	return 0;
+}
+
+DebugLineInfo VM::Step()
+{
+	if (!PausedRunner) return 0;
+	PausedRunner->SetPauseDepth((int)PausedRunner->GetCallStack().size());
+	return StepInternal(SteppingType::Step);
+}
+
+DebugLineInfo VM::StepUp()
+{
+	return StepInternal(SteppingType::Up);
+}
+
+DebugLineInfo VM::StepDown()
+{
+	return StepInternal(SteppingType::Down);
+}
+
+DebugLineInfo VM::StepInternal(SteppingType type)
+{
+	if (!PausedRunner) return {};
+
+	auto fn = PausedRunner->GetCurrentFunction();
+	if (!fn) return {};
+	auto fnd = DebugInformation.GetFunction(fn->Name);
+	if (fnd) {
+		auto line = fnd->GetLineForInstruction(int(PausedRunner->GetCurrentPointer() - fn->Bytecode.data()));
+		auto inst = fnd->GetInstructionForLine(line + 1);
+		if (inst < 0) inst = (int)fn->Bytecode.size() - 1;
+		if (PausedRunner->GetCurrentPointer() == fn->Bytecode.data() + fn->Bytecode.size() + 1)
+			Resume();
+
+		PausedRunner->SetTargetInstruction(fn->Bytecode.data() + inst);
+		PausedRunner->Stepping = type;
+	}
+	else {
+		gRuntimeWarn() << "No debug information for current function";
+	}
+
+	RunnerNotify.notify_all();
+	return {};
+}
+
+int VM::GetCurrentVariables()
+{
+	if (!PausedRunner) return 0;
+
+	return 0;
+}
+
+DebugCallStack VM::GetCurrentCallStack()
+{
+	if (!PausedRunner) return 0;
+
+	/*auto& calls = PausedRunner->GetCallStack();
+
+	for (auto& call : calls) {
+
+
+
+	}*/
+
+	return 0;
+}
+
+int VM::GetObjectFields(const std::string&)
+{
+	return 0;
+}
+
 void VM::GarbageCollect()
 {
 	while (VMRunning) {
@@ -391,6 +493,12 @@ Runner::Runner(VM* vm) : Owner(vm)
 {
 	Registers.reserve(64);
 	CallStack.reserve(128);
+	Running = false;
+	Paused = false;
+	TargetInstruction = 0;
+	CurrentInstruction = nullptr;
+	PauseDepth = 0;
+	Stepping = SteppingType::None;
 
 	RunThread = std::thread{ &Runner::Run, this };
 }
@@ -405,14 +513,27 @@ void Runner::Join()
 	RunThread.join();
 }
 
+void Runner::Pause(const uint32_t* ptr) {
+	TargetInstruction = (uint32_t*)-1;
+	CurrentInstruction = ptr;
+	Stepping = SteppingType::None;
+	std::unique_lock pauseLock(Owner->RunnerPauseMutex);
+	Owner->RunnerNotify.wait(pauseLock, [=]() { return !Paused || (Owner->PausedRunner == this && Stepping != SteppingType::None); });
+}
+
 #define TARGET(Op) Op: 
-#define Error() gRuntimeError() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
-#define Warn() gRuntimeWarn() << current->FunctionPtr->Name << " (" << current->FunctionPtr->DebugLines[int(current->Ptr - current->FunctionPtr->Bytecode.data())] << "):  "
+#define Error() gRuntimeError() << current->FunctionPtr->Name << " (" << FunctionDebug->GetLineForInstruction(int(current->Ptr - current->FunctionPtr->Bytecode.data())) << "):  "
+#define Warn() gRuntimeWarn() << current->FunctionPtr->Name << " (" << FunctionDebug->GetLineForInstruction(int(current->Ptr - current->FunctionPtr->Bytecode.data())) << "):  "
 
 void Runner::Run()
 {
 	Running = true;
 	while (Running) {
+
+		if (Owner->PausedRunner == this) {
+			std::unique_lock pauseLock(Owner->RunnerPauseMutex);
+			Owner->Resume();
+		}
 
 		{
 			std::unique_lock lk(Owner->CallMutex);
@@ -429,6 +550,7 @@ void Runner::Run()
 		current->Ptr = current->FunctionPtr->Bytecode.data();
 		current->End = current->Ptr + current->FunctionPtr->Bytecode.size();
 		current->StackOffset = 0;
+		auto FunctionDebug = Owner->DebugInformation.GetFunction(current->FunctionPtr->Name);
 
 		if (current->FunctionPtr->Bytecode.size() == 0) break;
 
@@ -446,7 +568,35 @@ void Runner::Run()
 		while (interrupt && Running) {
 
 		start: // @todo: maybe something better so we can exit whenever?
-			if (!Running) goto out;
+			if (!Running) [[unlikely]] goto out;
+#ifdef INCLUDE_DEBUGGER
+			if (Paused) [[unlikely]] {
+				if (TargetInstruction == (uint32_t*)-1) {
+					std::unique_lock pauseLock(Owner->RunnerPauseMutex);
+					Owner->RunnerNotify.wait(pauseLock, [=]() { return !Paused || (Owner->PausedRunner == this && Stepping != SteppingType::None); });
+				}
+				else {
+					switch (Stepping)
+					{
+					case SteppingType::Step:
+						if (current->Ptr > TargetInstruction && PauseDepth == CallStack.size())
+							Pause(current->Ptr);
+						break;
+					case SteppingType::Up:
+						if (PauseDepth > CallStack.size())
+							Pause(current->Ptr);
+						break;
+					case SteppingType::Down:
+						if (PauseDepth < CallStack.size() || current->Ptr > TargetInstruction)
+							Pause(current->Ptr);
+						break;
+					default:
+						Pause(current->Ptr);
+						break;
+					}
+				}
+			}
+#endif
 			const Instruction& byte = *(Instruction*)current->Ptr++;
 
 #define X(x) case OpCodes::x: goto x;
@@ -462,7 +612,12 @@ void Runner::Run()
 #undef X
 				TARGET(Noop) goto start;
 				TARGET(Break) {
-					interrupt = false;
+					std::unique_lock lock(Owner->RunnerPauseMutex);
+					PauseDepth = (int)CallStack.size();
+					Owner->PausedRunner = this;
+					Owner->Pause();
+					CurrentInstruction = current->Ptr;
+					TargetInstruction = (uint32_t*)CurrentInstruction;
 				} goto out;
 
 				TARGET(JumpForward) {
@@ -753,6 +908,7 @@ void Runner::Run()
 						auto offset = current->StackOffset + byte.in1;
 						auto& call = CallStack.emplace_back(userfn); // @todo: do this better, too slow
 						call.StackOffset = offset;
+						call.CallingInstruction = current->Ptr - current->FunctionPtr->Bytecode.data();
 						Registers.reserve(call.StackOffset + userfn->RegisterCount);
 						Registers.to(call.StackOffset);
 						current = &call;
@@ -838,6 +994,7 @@ void Runner::Run()
 						auto offset = current->StackOffset + byte.in1;
 						auto& call = CallStack.emplace_back(ptr); // @todo: do this better, too slow
 						call.StackOffset = offset;
+						call.CallingInstruction = current->Ptr - current->FunctionPtr->Bytecode.data();
 						Registers.reserve(call.StackOffset + ptr->RegisterCount);
 						Registers.to(call.StackOffset);
 						current = &call;

@@ -4,17 +4,21 @@
 #include "Namespace.h"
 #include "Function.h"
 #include "Parser/Node.h"
+#include "DebugInfo.h"
+#include "EMI/EMI.h"
 
 class VM;
 class ASTWalker
 {
 public:
-	ASTWalker(VM*, Node*, const std::string&);
+	ASTWalker(VM*, Node*, const std::string&, const EMI::Options&);
 	~ASTWalker();
 	void Run();
 	SymbolTable Global;
 	ScriptFunction* InitFunction;
 	bool HasError;
+	const DebugInfo& GetDebugInfo() const { return CurrentDebugInfo; }
+
 private:
 	void WalkLoad(Node*);
 	uint8_t WalkStore(Node*);
@@ -84,13 +88,20 @@ private:
 	void(ASTWalker::*TokenJumpTable[(unsigned long long)Token::Last])(Node*);
 
 	std::string Filename;
-	bool HasDebug;
 	VM* Vm;
 	Node* Root;
 	std::vector<PathType> SearchPaths;
 	std::vector<std::pair<size_t, PathType>> AllSearchPaths;
 
 	// Function parsing
+	bool HasDebug;
+	DebugInfo CurrentDebugInfo;
+	DebugFunctionInfo* CurrentDebugFunction;
+	int CurrentDebugScope;
+	size_t CurrentLine;
+	std::vector<int> BreakPoints;
+	EMI::Options CompileOptions;
+
 	ScopeType* CurrentScope;
 	ScriptFunction* CurrentFunction;
 	ankerl::unordered_dense::set<std::string> StringList;

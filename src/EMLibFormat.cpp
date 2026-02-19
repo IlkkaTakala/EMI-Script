@@ -75,7 +75,6 @@ void WriteFunction(std::ostream& out, const ScriptFunction* fnd) {
 		});
 
 	WriteArray(out, fnd->NumberTable.values());
-	WriteArray(out, fnd->DebugLines.values());
 
 	WriteArray(out, fnd->FunctionTableSymbols, [](std::ostream& out, const PathTypeQuery& name) {
 		WriteString(out, name.GetTarget().toString());
@@ -112,7 +111,6 @@ void ReadFunction(std::istream& instream, ScriptFunction* fnd) {
 
 	std::vector<std::pair<int, int>> debug;
 	ReadArray(instream, debug);
-	fnd->DebugLines.insert(debug.begin(), debug.end());
 
 	ReadArray(instream, fnd->FunctionTableSymbols, [](std::istream& in, PathTypeQuery& name) {
 		PathTypeQuery query(toPath(ReadString(in).c_str()));

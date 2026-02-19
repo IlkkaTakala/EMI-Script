@@ -2,6 +2,7 @@
 #include <string_view>
 #include <filesystem>
 #include <unordered_map>
+#include <map>
 #include <vector>
 #include <string>
 #include "Symbol.h"
@@ -24,39 +25,52 @@ public:
 	void AddInstructionLine(int instruction, int line) { InstructionToLine[instruction] = line; }
 	int GetLineForInstruction(int instruction) const {
 		auto it = InstructionToLine.find(instruction);
-		if (it == InstructionToLine.end()) return -1;
+		if (it == InstructionToLine.end()) return 0;
 		return it->second;
+	}
+	int GetInstructionForLine(int line) const {
+		if (InstructionToLine.empty() || line < InstructionToLine.begin()->second) return -1;
+		for (const auto& kv : InstructionToLine) {
+			if (kv.second >= line) return (int)kv.first;
+		}
+		return -1;
 	}
 
 	struct Scope {
-		int StartInstr = 0;
-		int EndInstr = 0;
+		size_t StartInstr = 0;
+		size_t EndInstr = 0;
 		std::unordered_map<std::string, DebugVariableInfo> Variables;
 	};
 
-	void AddScope(int startInstr, int endInstr, const std::unordered_map<std::string, DebugVariableInfo>& vars) {
-		Scope s; s.StartInstr = startInstr; s.EndInstr = endInstr; s.Variables = vars;
+	int AddScope(size_t startInstr) {
+		Scope s; s.StartInstr = startInstr;
 		Scopes.push_back(std::move(s));
+		return static_cast<int>(Scopes.size() - 1);
 	}
-	std::unordered_map<std::string, DebugVariableInfo> GetVisibleVariables(int instruction) const;
+	Scope* GetScope(int index) {
+		if (index < 0 || index >= Scopes.size()) return nullptr;
+		return &Scopes[index];
+	}
+
+	std::unordered_map<std::string, DebugVariableInfo> GetVisibleVariables(size_t instruction) const;
 
 	void AddNamespace(std::string_view ns) { Namespaces.emplace_back(ns); }
 	const std::vector<std::string>& GetNamespaces() const { return Namespaces; }
 
-	DebugVariableInfo& AddVariable(std::string_view name, Symbol* sym, int reg);
+	DebugVariableInfo& AddVariable(const std::string& name, Symbol* sym, int reg);
 
 	std::filesystem::path File;
 	std::string Name;
 
 private:
-	std::unordered_map<int, int> InstructionToLine;
+	std::map<int, int> InstructionToLine;
 	std::vector<Scope> Scopes;
 	std::vector<std::string> Namespaces;
 };
 
 struct QueryResult
 {
-	int LineNumber = -1;
+	size_t LineNumber = 0;
 	std::filesystem::path File;
 	std::unordered_map<std::string, DebugVariableInfo> VariableInfo;
 };
@@ -65,13 +79,35 @@ class DebugInfo
 {
 public:
 
-	QueryResult Query(std::string_view fnName, int instruction);
+	QueryResult Query(PathType fnName, size_t instruction);
+	size_t QueryLine(PathType fnName, size_t instruction);
 
-	DebugFunctionInfo& EnsureFunction(std::string_view fnName) {
-		return Functions[std::string(fnName)];
+	DebugFunctionInfo* AddFunction(const std::string& fnName) {
+		DebugFunctionInfo fn;
+		fn.Name = fnName;
+		return &Functions[""].emplace(fnName, fn).first->second;
+	}
+
+	DebugFunctionInfo* GetFunction(const PathType& fnName) {
+		for (auto& [name, fns] : Functions) {
+			auto it = fns.find(fnName.toString());
+			if (it != fns.end())
+				return &it->second;
+		}
+		return nullptr;
+	}
+
+	void AddInfo(const std::string& path, const DebugInfo& info) {
+		for (const auto& [fnName, fnInfo] : info.Functions.at("")) {
+			Functions[path].emplace(fnName, fnInfo);
+		}
+	}
+
+	void RemoveInfo(const std::string& path) {
+		Functions.erase(path);
 	}
 
 private:
-	std::unordered_map<std::string, DebugFunctionInfo> Functions;
+	std::unordered_map<std::string, std::unordered_map<std::string, DebugFunctionInfo>> Functions;
 };
 

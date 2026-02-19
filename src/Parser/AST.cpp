@@ -358,7 +358,7 @@ void TypeConverter(NodeDataType& n, const TokenHolder& h)
 	}
 }
 
-ASTWalker::ASTWalker(VM* in_vm, Node* n, const std::string& file)
+ASTWalker::ASTWalker(VM* in_vm, Node* n, const std::string& file, const EMI::Options& options)
 {
 	Vm = in_vm;
 	Root = n;
@@ -373,6 +373,11 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n, const std::string& file)
 	InitFunction->FunctionScope = new ScopeType();
 
 	HasDebug = true; // @todo: disable debugs
+	CurrentDebugFunction = nullptr;
+	CurrentDebugScope = 0;
+	CurrentLine = 0;
+	CompileOptions = options;
+	BreakPoints = std::vector<int>{ options.Breakpoints, options.Breakpoints + options.BreakpointCount };
 
 	for (int i = 0; i < (int)Token::Last; ++i) {
 		TokenJumpTable[i] = &ASTWalker::handle_default;
@@ -754,7 +759,11 @@ void printInstruction(const Instruction& in) {
 }
 #endif // DEBUG
 
-#define Op(op) n->instruction = InstructionList.size(); auto& instruction = InstructionList.emplace_back(); instruction.code = OpCodes::op; if (HasDebug) CurrentFunction->DebugLines[(int)n->instruction] = (int)n->line;
+#ifdef INCLUDE_DEBUGGER
+#define Op(op) n->instruction = InstructionList.size(); auto& instruction = InstructionList.emplace_back(); instruction.code = OpCodes::op; if (HasDebug) CurrentDebugFunction->AddInstructionLine((int)n->instruction, (int)n->line);
+#else
+#define Op(op) n->instruction = InstructionList.size(); auto& instruction = InstructionList.emplace_back(); instruction.code = OpCodes::op;
+#endif // INCLUDE_DEBUGGER
 #define Walk for(auto& child : n->children) (this->*TokenJumpTable[(int)child->type])(child);
 #define WalkOne(node) (this->*TokenJumpTable[(int)node->type])(node);
 #define In16 instruction.param
@@ -770,6 +779,7 @@ void printInstruction(const Instruction& in) {
 #define EnsureOperands if (n->children.size() != 2) { Error("Invalid number of operands") return; }
 #define GetFirstNode() Node* first = n->children.size() ? n->children.front() : nullptr; if (!first) { Error("Missing child node") return; }
 #define GetLastNode() Node* last = n->children.size() ? n->children.back() : nullptr; if (!last) { Error("Missing child node") return; }
+#define GetCurrentDebugScope() CurrentDebugFunction->GetScope(CurrentDebugScope)
 
 #define Operator(varTy, op, op2) \
 case VariableType::varTy: {\
@@ -814,10 +824,12 @@ void ASTWalker::handle_Scope(Node* n) {
 	next.parent = CurrentScope;
 	CurrentScope = &next;
 	auto regs = Registers;
+	int top = CurrentDebugScope = CurrentDebugFunction->AddScope(InstructionList.size());
 	for (auto& c : n->children) {
 		WalkOne(c);
 		FreeConstant(c);
 	}
+	CurrentDebugFunction->GetScope(top)->EndInstr = InstructionList.size();
 	CurrentScope = CurrentScope->parent;
 	Registers = regs;
 }
@@ -1377,6 +1389,7 @@ void ASTWalker::handle_VarDeclare(Node* n) {
 					In8 = last->regTarget;
 					sym->Register = Out;
 				}
+				CurrentDebugFunction->AddVariable(data.GetFirst().toString(), sym->Sym, sym->Register);
 				return;
 			}
 			Error("Cannot assign unrelated types");
@@ -1392,6 +1405,7 @@ void ASTWalker::handle_VarDeclare(Node* n) {
 		In16 = (uint16_t)sym->Sym->VarType;
 		sym->Register = Out;
 	}
+	CurrentDebugFunction->AddVariable(data.GetFirst().toString(), sym->Sym, sym->Register);
 }
 
 void ASTWalker::handle_ObjectInit(Node* n) {
@@ -2020,6 +2034,10 @@ void ASTWalker::HandleFunction(Node* n, ScriptFunction* f, CompileSymbol* s)
 		}
 	}
 
+	CurrentDebugFunction = CurrentDebugInfo.AddFunction(f->Name.toString());
+	CurrentDebugFunction->File = Filename;
+	CurrentLine = 0;
+
 	for (auto& c : n->children) {
 		switch (c->type)
 		{
@@ -2028,12 +2046,14 @@ void ASTWalker::HandleFunction(Node* n, ScriptFunction* f, CompileSymbol* s)
 				auto symParam = f->FunctionScope->FindSymbol(std::get<0>(v->data).c_str());
 				if (symParam) symParam->Register = GetFirstFree();
 			}
+			CurrentDebugFunction->AddInstructionLine(-1, (int)c->line);
 		} break;
 
 		case Token::Scope: {
 
 			InstructionList.reserve(c->children.size() * n->depth);
 			CurrentScope = f->FunctionScope;
+			int top = CurrentDebugScope = CurrentDebugFunction->AddScope(InstructionList.size());
 			for (auto& stmt : c->children) {
 				try {
 					WalkOne(stmt);
@@ -2043,6 +2063,7 @@ void ASTWalker::HandleFunction(Node* n, ScriptFunction* f, CompileSymbol* s)
 					gCompileError() << "Internal error occured!";
 				}
 			}
+			CurrentDebugFunction->GetScope(top)->EndInstr = InstructionList.size();
 			Instruction op;
 			op.code = OpCodes::Return;
 			op.in1 = 0;
@@ -2052,6 +2073,16 @@ void ASTWalker::HandleFunction(Node* n, ScriptFunction* f, CompileSymbol* s)
 
 		default:
 			break;
+		}
+	}
+
+	if (HasDebug) {
+		for (auto point : BreakPoints) { // @todo: Do something better here, now it cannot be last instruction
+			auto inst = CurrentDebugFunction->GetInstructionForLine(point);
+			if (inst == -1) continue;
+			Instruction op;
+			op.code = OpCodes::Break;
+			InstructionList.insert(InstructionList.begin() + inst, op);
 		}
 	}
 
@@ -2084,6 +2115,7 @@ void ASTWalker::HandleFunction(Node* n, ScriptFunction* f, CompileSymbol* s)
 	InstructionList.clear();
 
 	CurrentFunction = nullptr;
+	CurrentDebugFunction = nullptr;
 	CurrentScope = nullptr;
 
 	// Cleanup
@@ -2095,7 +2127,10 @@ void ASTWalker::HandleInit()
 {
 	InitRegisters();
 	CurrentFunction = InitFunction;
+	CurrentDebugFunction = CurrentDebugInfo.AddFunction(InitFunction->Name.toString());
 	CurrentScope = CurrentFunction->FunctionScope;
+	CurrentLine = 0;
+	int top = CurrentDebugScope = CurrentDebugFunction->AddScope(0);
 	SearchPaths.resize(1);
 	SearchPaths[0] = PathType();
 
@@ -2143,6 +2178,7 @@ void ASTWalker::HandleInit()
 			break;
 		}
 	}
+	CurrentDebugFunction->GetScope(top)->EndInstr = InstructionList.size();
 	Instruction op;
 	op.code = OpCodes::Return;
 	op.in1 = 0;
@@ -2176,6 +2212,7 @@ void ASTWalker::HandleInit()
 	InstructionList.clear();
 
 	CurrentFunction = nullptr;
+	CurrentDebugFunction = nullptr;
 	CurrentScope = nullptr;
 
 	// Cleanup

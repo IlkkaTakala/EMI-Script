@@ -40,6 +40,7 @@ namespace EMI
 	{
 	public:
 		virtual void Print(const char*) = 0;
+		virtual void PrintError(const char*) = 0;
 		virtual ~Logger() {}
 	};
 
@@ -94,6 +95,8 @@ namespace EMI
 
 	struct Options
 	{
+		const int* Breakpoints = nullptr;
+		size_t BreakpointCount = 0;
 	};
 
 	struct ExportOptions
@@ -191,6 +194,22 @@ namespace EMI
 
 	}
 
+	struct DebugLineInfo
+	{
+		const char* File = nullptr;
+		int Line = 0;
+	};
+
+	struct DebugCallStack {
+		size_t Count;
+		const char** FunctionNames;
+	};
+
+	struct DebugVariableInfo {
+		const char* Name;
+		ValueType Type;
+	};
+
 #define CONCAT(a, b, c) a##_##b##_##c
 #define EMI_MAKENAME(file, line) CONCAT(_emi_reg, file, line)
 #define EMI_REGISTER(name, func) static inline bool EMI_MAKENAME(__COUNTER__, __LINE__) = EMI::RegisterFunction(#name, std::function{func});
@@ -202,7 +221,7 @@ namespace EMI
 		VMHandle(unsigned int, void*);
 
 		ScriptHandle CompileScript(const char* file, const Options& options = {});
-		void CompileTemporary(const char* data);
+		ScriptHandle CompileTemporary(const char* data);
 
 		FunctionHandle GetFunctionHandle(const char* name);
 
@@ -218,6 +237,16 @@ namespace EMI
 		void ReleaseVM();
 
 		void ReinitializeGrammar(const char* grammar);
+
+		// Debugger
+		int Resume();
+		DebugLineInfo Pause();
+		DebugLineInfo Step();
+		DebugLineInfo StepUp();
+		DebugLineInfo StepDown();
+		int GetCurrentVariables();
+		DebugCallStack GetCurrentCallStack();
+		int GetObjectFields(const char* objectName);
 
 	private:
 		unsigned int Index;

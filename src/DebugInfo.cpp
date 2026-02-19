@@ -1,19 +1,26 @@
 #include "DebugInfo.h"
 
-QueryResult DebugInfo::Query(std::string_view fnName, int instruction)
+QueryResult DebugInfo::Query(PathType fnName, size_t instruction)
 {
 	QueryResult res;
-	auto it = Functions.find(std::string(fnName));
-	if (it == Functions.end()) return res;
+	auto fn = GetFunction(fnName);
 
-	const DebugFunctionInfo& funcInfo = it->second;
-	res.LineNumber = funcInfo.GetLineForInstruction(instruction);
+	const DebugFunctionInfo& funcInfo = *fn;
+	res.LineNumber = funcInfo.GetLineForInstruction((int)instruction);
 	res.File = funcInfo.File;
-	res.VariableInfo = funcInfo.GetVisibleVariables(instruction);
+	res.VariableInfo = funcInfo.GetVisibleVariables((int)instruction);
 	return res;
 }
 
-std::unordered_map<std::string, DebugVariableInfo> DebugFunctionInfo::GetVisibleVariables(int instruction) const
+size_t DebugInfo::QueryLine(PathType fnName, size_t instruction)
+{
+	auto fn = GetFunction(fnName);
+
+	const DebugFunctionInfo& funcInfo = *fn;
+	return funcInfo.GetLineForInstruction((int)instruction);;
+}
+
+std::unordered_map<std::string, DebugVariableInfo> DebugFunctionInfo::GetVisibleVariables(size_t instruction) const
 {
 	std::unordered_map<std::string, DebugVariableInfo> out;
 	for (const auto& s : Scopes) {
@@ -24,9 +31,9 @@ std::unordered_map<std::string, DebugVariableInfo> DebugFunctionInfo::GetVisible
 	return out;
 }
 
-DebugVariableInfo& DebugFunctionInfo::AddVariable(std::string_view name, Symbol* sym, int reg)
+DebugVariableInfo& DebugFunctionInfo::AddVariable(const std::string& name, Symbol* sym, int reg)
 {
 	DebugVariableInfo info{ std::string(name), sym->Flags, sym->VarType, sym, reg };
-	auto result = Scopes.rend()->Variables.emplace(std::string(name), info);
+	auto result = Scopes.rbegin()->Variables.emplace(name, info);
 	return result.first->second;
 }
