@@ -12,70 +12,54 @@
 constexpr uint16_t EMI_VERSION = 10100; // Major 01 Minor 01 Patch 00;
 constexpr uint8_t FORMAT_VERSION = 1; // Major 01 Minor 01 Patch 00;
 
-inline BaseLogger& gCompileLogger()
+inline LogService& gCompileLogger()
 {
-	static BaseLogger log;
+	static LogService log;
 	return log;
 }
-inline BaseLogger& gCompileDebug()
+inline LogService& gCompileDebug()
 {
 	return gCompileLogger() << '\n' << EMI::LogLevel::Debug;
 }
-inline BaseLogger& gCompileInfo()
+inline LogService& gCompileInfo()
 {
 	return gCompileLogger() << '\n' << EMI::LogLevel::Info;
 }
-inline BaseLogger& gCompileWarn()
+inline LogService& gCompileWarn()
 {
 	return gCompileLogger() << '\n' << EMI::LogLevel::Warning;
 }
-inline BaseLogger& gCompileError()
+inline LogService& gCompileError()
 {
 	return gCompileLogger() << '\n' << EMI::LogLevel::Error;
 }
 
-inline BaseLogger& gRuntimeLogger()
+inline LogService& gRuntimeLogger()
 {
-	static BaseLogger log;
+	static LogService log;
 	return log;
 }
-inline BaseLogger& gRuntimeDebug()
+inline LogService& gRuntimeDebug()
 {
 	return gRuntimeLogger() << '\n' << EMI::LogLevel::Debug;
 }
-inline BaseLogger& gRuntimeInfo()
+inline LogService& gRuntimeInfo()
 {
 	return gRuntimeLogger() << '\n' << EMI::LogLevel::Info;
 }
-inline BaseLogger& gRuntimeWarn()
+inline LogService& gRuntimeWarn()
 {
 	return gRuntimeLogger() << '\n' << EMI::LogLevel::Warning;
 }
-inline BaseLogger& gRuntimeError()
+inline LogService& gRuntimeError()
 {
 	return gRuntimeLogger() << '\n' << EMI::LogLevel::Error;
 }
 
-inline BaseLogger& gScriptLogger()
+inline LogService& gScriptLogger()
 {
-	static BaseLogger log;
+	static LogService log;
 	return log;
-}
-inline BaseLogger& gScriptDebug()
-{
-	return gScriptLogger() << '\n' << EMI::LogLevel::Debug;
-}
-inline BaseLogger& gScriptInfo()
-{
-	return gScriptLogger() << '\n' << EMI::LogLevel::Info;
-}
-inline BaseLogger& gScriptWarn()
-{
-	return gScriptLogger() << '\n' << EMI::LogLevel::Warning;
-}
-inline BaseLogger& gScriptError()
-{
-	return gScriptLogger() << '\n' << EMI::LogLevel::Error;
 }
 
 #define X(x) x,

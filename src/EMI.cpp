@@ -10,17 +10,19 @@ bool EMI::_internal_register(_internal_function* func)
 	std::string name;
 	name = func->name;
 
-	// @todo: Should find the existing symbol
-	auto sym = new Symbol();
-	sym->Type = SymbolType::Function;
-	sym->VarType = VariableType::Function;
-	sym->Builtin = true;
-	std::vector<VariableType> types;
-	types.resize(func->arg_count);
-	for (int i = 0; i < types.size(); i++) {
-		types[i] = TypeFromValue(func->arg_types[i]);
+	Symbol* sym = nullptr;
+	auto [pathname, symbol] = HostFunctions().FindName(toPath(func->name));
+	if (symbol && symbol->Type == SymbolType::Function) {
+		sym = symbol;
 	}
-
+	else {
+		sym = new Symbol();
+		sym->Type = SymbolType::Function;
+		sym->VarType = VariableType::Function;
+		sym->Builtin = true;
+		sym->Function = new FunctionTable();
+	}
+	
 	auto fn = new FunctionSymbol{  };
 	fn->Signature.Return = TypeFromValue(func->return_type);
 	fn->Type = FunctionType::Host;
@@ -30,7 +32,6 @@ bool EMI::_internal_register(_internal_function* func)
 	for (int i = 0; i < func->arg_count; i++) {
 		fn->Signature.Arguments[i] = TypeFromValue(func->arg_types[i]);
 	}
-	sym->Function = new FunctionTable();
 
 	sym->Function->AddFunction((int)func->arg_count, fn);
 
@@ -71,6 +72,7 @@ bool EMI::_internal_unregister(const char* name)
 
 CORE_API void EMI::UnregisterAllExternals()
 {
+	// @todo: Should also unregister all from VMs
 	for (auto& f : HostFunctions().Table) {
 		delete f.second;
 	}
@@ -131,9 +133,9 @@ ScriptHandle EMI::VMHandle::CompileScript(const char* file, const Options& optio
 	return { vm->Compile(file, options), this };
 }
 
-void EMI::VMHandle::CompileTemporary(const char* data)
+ScriptHandle EMI::VMHandle::CompileTemporary(const char* data)
 {
-	((VM*)Vm)->CompileTemporary(data);
+	return { ((VM*)Vm)->CompileTemporary(data), this };
 }
 
 FunctionHandle EMI::VMHandle::GetFunctionHandle(const char* name)
@@ -184,4 +186,44 @@ void EMI::VMHandle::ReinitializeGrammar(const char* grammar)
 void EMI::ReleaseEnvironment(VMHandle handle)
 {
 	handle.ReleaseVM();
+}
+
+int EMI::VMHandle::Resume()
+{
+	return ((VM*)Vm)->Resume();
+}
+
+DebugLineInfo EMI::VMHandle::Pause()
+{
+	return ((VM*)Vm)->Pause();
+}
+
+DebugLineInfo EMI::VMHandle::Step()
+{
+	return ((VM*)Vm)->Step();
+}
+
+DebugLineInfo EMI::VMHandle::StepUp()
+{
+	return ((VM*)Vm)->StepUp();
+}
+
+DebugLineInfo EMI::VMHandle::StepDown()
+{
+	return ((VM*)Vm)->StepDown();
+}
+
+int EMI::VMHandle::GetCurrentVariables()
+{
+	return ((VM*)Vm)->GetCurrentVariables();
+}
+
+DebugCallStack EMI::VMHandle::GetCurrentCallStack()
+{
+	return ((VM*)Vm)->GetCurrentCallStack();
+}
+
+int EMI::VMHandle::GetObjectFields(const char* objectName)
+{
+	return ((VM*)Vm)->GetObjectFields(objectName);
 }

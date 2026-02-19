@@ -3,53 +3,22 @@
 #include "ParseHelper.h"
 #include "Namespace.h"
 #include "Function.h"
-
-using NodeDataType = std::variant<std::string, double, bool>;
-
-class Node
-{
-public:
-	Node() :
-		varType(VariableType::Undefined),
-		regTarget(254),
-		line(0),
-		depth(0),
-		sym(nullptr),
-		instruction(0)
-	{}
-	~Node() {
-		for (auto& c : children) {
-			if (c != this)
-				delete c;
-		}
-	}
-	VariableType varType;
-	Token type = Token::None;
-	uint8_t regTarget;
-	size_t line;
-	size_t depth;
-	NodeDataType data;
-	std::vector<Node*> children;
-	CompileSymbol* sym;
-	size_t instruction;
-
-	Variable ToVariable() const;
-
-#ifdef DEBUG
-	void print(const std::string& prefix, bool isLast = false);
-#endif
-};
+#include "Parser/Node.h"
+#include "DebugInfo.h"
+#include "EMI/EMI.h"
 
 class VM;
 class ASTWalker
 {
 public:
-	ASTWalker(VM*, Node*, const std::string&);
+	ASTWalker(VM*, Node*, const std::string&, const EMI::Options&);
 	~ASTWalker();
 	void Run();
 	SymbolTable Global;
 	ScriptFunction* InitFunction;
 	bool HasError;
+	const DebugInfo& GetDebugInfo() const { return CurrentDebugInfo; }
+
 private:
 	void WalkLoad(Node*);
 	uint8_t WalkStore(Node*);
@@ -63,14 +32,76 @@ private:
 	void HandleInit();
 	void HandleObject(Node* n);
 
+	// per-token handlers (used by WalkLoad jump table)
+	void handle_default(Node* n);
+	void handle_Scope(Node* n);
+	void handle_TypeNumber(Node* n);
+	void handle_TypeBoolean(Node* n);
+	void handle_TypeString(Node* n);
+	void handle_TypeArray(Node* n);
+	void handle_TypeFunction(Node* n);
+	void handle_AnyType(Node* n);
+	void handle_Typename(Node* n);
+	void handle_Number(Node* n);
+	void handle_Literal(Node* n);
+	void handle_Null(Node* n);
+	void handle_Array(Node* n);
+	void handle_Indexer(Node* n);
+	void handle_True(Node* n);
+	void handle_False(Node* n);
+	void handle_Add(Node* n);
+	void handle_Sub(Node* n);
+	void handle_Div(Node* n);
+	void handle_Mult(Node* n);
+	void handle_AssignAdd(Node* n);
+	void handle_AssignSub(Node* n);
+	void handle_AssignDiv(Node* n);
+	void handle_AssignMult(Node* n);
+	void handle_Id(Node* n);
+	void handle_Property(Node* n);
+	void handle_Negate(Node* n);
+	void handle_Not(Node* n);
+	void handle_Less(Node* n);
+	void handle_LessEqual(Node* n);
+	void handle_Larger(Node* n);
+	void handle_LargerEqual(Node* n);
+	void handle_Equal(Node* n);
+	void handle_NotEqual(Node* n);
+	void handle_And(Node* n);
+	void handle_Or(Node* n);
+	void handle_Increment(Node* n);
+	void handle_PreIncrement(Node* n);
+	void handle_Assign(Node* n);
+	void handle_VarDeclare(Node* n);
+	void handle_ObjectInit(Node* n);
+	void handle_Return(Node* n);
+	void handle_Conditional(Node* n);
+	void handle_If(Node* n);
+	void handle_For(Node* n);
+	void handle_While(Node* n);
+	void handle_Break(Node* n);
+	void handle_Else(Node* n);
+	void handle_FunctionCall(Node* n);
+
+	void helper_Assign(Node* n, Node* last);
+
+	void(ASTWalker::*TokenJumpTable[(unsigned long long)Token::Last])(Node*);
+
 	std::string Filename;
-	bool HasDebug;
 	VM* Vm;
 	Node* Root;
 	std::vector<PathType> SearchPaths;
 	std::vector<std::pair<size_t, PathType>> AllSearchPaths;
 
 	// Function parsing
+	bool HasDebug;
+	DebugInfo CurrentDebugInfo;
+	DebugFunctionInfo* CurrentDebugFunction;
+	int CurrentDebugScope;
+	size_t CurrentLine;
+	std::vector<int> BreakPoints;
+	EMI::Options CompileOptions;
+
 	ScopeType* CurrentScope;
 	ScriptFunction* CurrentFunction;
 	ankerl::unordered_dense::set<std::string> StringList;

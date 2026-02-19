@@ -40,6 +40,7 @@ namespace EMI
 	{
 	public:
 		virtual void Print(const char*) = 0;
+		virtual void PrintError(const char*) = 0;
 		virtual ~Logger() {}
 	};
 
@@ -94,6 +95,8 @@ namespace EMI
 
 	struct Options
 	{
+		const int* Breakpoints = nullptr;
+		size_t BreakpointCount = 0;
 	};
 
 	struct ExportOptions
@@ -146,6 +149,7 @@ namespace EMI
 	};
 
 	CORE_API bool _internal_register(_internal_function* func);
+	//CORE_API bool _internal_register_variable(InternalValue(*setter)(InternalValue*), InternalValue(*getter)(InternalValue*), );
 	CORE_API bool _internal_unregister(const char*);
 
 	template<class V, class F, typename ...Args, size_t... S> 
@@ -184,9 +188,32 @@ namespace EMI
 
 	CORE_API void UnregisterAllExternals();
 
+	template<class F> requires (std::is_convertible_v<F, InternalValue>)
+		bool RegisterVariable(const std::string& name, F& f) {
+		
+
+	}
+
+	struct DebugLineInfo
+	{
+		const char* File = nullptr;
+		int Line = 0;
+	};
+
+	struct DebugCallStack {
+		size_t Count;
+		const char** FunctionNames;
+	};
+
+	struct DebugVariableInfo {
+		const char* Name;
+		ValueType Type;
+	};
+
 #define CONCAT(a, b, c) a##_##b##_##c
 #define EMI_MAKENAME(file, line) CONCAT(_emi_reg, file, line)
 #define EMI_REGISTER(name, func) static inline bool EMI_MAKENAME(__COUNTER__, __LINE__) = EMI::RegisterFunction(#name, std::function{func});
+#define EMI_REGISTER_VARIABLE(name, var) static inline bool EMI_MAKENAME(__COUNTER__, __LINE__) = EMI::RegisterVariable(#name, var);
 
 	class CORE_API VMHandle
 	{
@@ -194,7 +221,7 @@ namespace EMI
 		VMHandle(unsigned int, void*);
 
 		ScriptHandle CompileScript(const char* file, const Options& options = {});
-		void CompileTemporary(const char* data);
+		ScriptHandle CompileTemporary(const char* data);
 
 		FunctionHandle GetFunctionHandle(const char* name);
 
@@ -210,6 +237,16 @@ namespace EMI
 		void ReleaseVM();
 
 		void ReinitializeGrammar(const char* grammar);
+
+		// Debugger
+		int Resume();
+		DebugLineInfo Pause();
+		DebugLineInfo Step();
+		DebugLineInfo StepUp();
+		DebugLineInfo StepDown();
+		int GetCurrentVariables();
+		DebugCallStack GetCurrentCallStack();
+		int GetObjectFields(const char* objectName);
 
 	private:
 		unsigned int Index;

@@ -143,7 +143,10 @@ void Parser::ThreadedParse(VM* vm)
 			options = std::move(vm->CompileQueue.front());
 			vm->CompileQueue.pop();
 		}
-		if (options.Path != "") {
+		if (options.Ptr) {
+			ParseAST(vm, options);
+		}
+		else if (options.Path != "") {
 			std::filesystem::path fp(options.Path);
 			if (fp.extension() == ".ril") {
 				Parse(vm, options);
@@ -176,6 +179,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 			return;
 		}
 		vm->RemoveUnit(fullPath);
+		vm->RemoveCompileUnitDebug(fullPath);
 	}
 	else {
 		if (options.Data.size() == 0) {
@@ -199,10 +203,11 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	//root->print("");
 #endif // DEBUG
 	gCompileDebug() << "Walking AST";
-	ASTWalker ast(vm, root, fullPath);
+	ASTWalker ast(vm, root, fullPath, options.UserOptions);
 	ast.Run();
 
 	if (!ast.HasError) {
+		vm->AddCompileUnitDebug(fullPath, ast.GetDebugInfo());
 		vm->AddCompileUnit(fullPath, ast.Global, ast.InitFunction);
 		ast.InitFunction = nullptr;
 		ast.Global.Table.clear();
@@ -210,6 +215,25 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	}
 	else {
 		gCompileError() << "Errors present, compile failed: " << fullPath;
+		options.CompileResult.set_value(false);
+	}
+}
+
+void Parser::ParseAST(VM* vm, CompileOptions& options)
+{
+	gCompileDebug() << "Walking AST";
+	ASTWalker ast(vm, static_cast<Node*>(options.Ptr), "", options.UserOptions);
+	ast.Run();
+
+	if (!ast.HasError) {
+		vm->AddCompileUnitDebug(options.Path, ast.GetDebugInfo());
+		vm->AddCompileUnit(options.Path, ast.Global, ast.InitFunction);
+		ast.InitFunction = nullptr;
+		ast.Global.Table.clear();
+		options.CompileResult.set_value(true);
+	}
+	else {
+		gCompileError() << "Errors present, compile failed: " << options.Path;
 		options.CompileResult.set_value(false);
 	}
 }
@@ -230,10 +254,11 @@ void Parser::ParseTemporary(VM* vm, CompileOptions& options)
 	root->print("");
 #endif // DEBUG
 	gCompileDebug() << "Walking AST";
-	ASTWalker ast(vm, root, "console");
+	ASTWalker ast(vm, root, "console", options.UserOptions);
 	ast.Run();
 
 	if (!ast.HasError) {
+		vm->AddCompileUnitDebug("__emi_temp_funcs", ast.GetDebugInfo());
 		vm->AddCompileUnit("__emi_temp_funcs", ast.Global, ast.InitFunction);
 		ast.InitFunction = nullptr;
 		ast.Global.Table.clear();

@@ -9,19 +9,25 @@
 #include "ankerl/unordered_dense.h"
 
 #include "EMI/EMI.h"
-#include "Variable.h"
+#include "EmiDev/Variable.h"
 #include "Function.h"
 #include "Intrinsic.h"
 #include "Namespace.h"
 #include "Objects/UserObject.h"
 
+#ifdef INCLUDE_DEBUGGER
+#include "DebugInfo.h"
+#endif // INCLUDE_DEBUGGER
+
 using namespace EMI;
 
+class Node;
 class VM;
 struct CompileOptions
 {
 	std::string Path;
 	std::string Data;
+	void* Ptr = nullptr;
 	Options UserOptions;
 	std::promise<bool> CompileResult;
 
@@ -29,6 +35,7 @@ struct CompileOptions
 	CompileOptions& operator=(CompileOptions&& in) noexcept {
 		Path = in.Path;
 		Data = in.Data;
+		Ptr = in.Ptr;
 		UserOptions = in.UserOptions;
 		CompileResult = std::move(in.CompileResult);
 
@@ -37,6 +44,7 @@ struct CompileOptions
 	CompileOptions(CompileOptions&& in) noexcept {
 		Path = in.Path;
 		Data = in.Data;
+		Ptr = in.Ptr;
 		UserOptions = in.UserOptions;
 		CompileResult = std::move(in.CompileResult);
 	}
@@ -47,6 +55,7 @@ struct CallObject
 	ScriptFunction* FunctionPtr;
 	const uint32_t* Ptr;
 	const uint32_t* End;
+	size_t CallingInstruction;
 	size_t StackOffset;
 	size_t PromiseIndex;
 	std::vector<Variable> Arguments;
@@ -85,6 +94,16 @@ private:
 	T* fast = nullptr;
 };
 
+#ifdef INCLUDE_DEBUGGER
+enum class SteppingType
+{
+	None,
+	Step,
+	Up,
+	Down
+};
+#endif // INCLUDE_DEBUGGER
+
 class Runner
 {
 public:
@@ -93,7 +112,22 @@ public:
 	void Join();
 
 	void SetRunning(bool value) { Running = value; }
-
+	const std::vector<CallObject>& GetCallStack() const { return CallStack; }
+	ScriptFunction* GetCurrentFunction() const { return CallStack.empty() ? nullptr : CallStack.back().FunctionPtr; }
+#ifdef INCLUDE_DEBUGGER
+	const uint32_t* GetCurrentPointer() const { return CurrentInstruction; }
+	void SetPaused(bool value) { Paused = value; if (!Paused) Stepping = SteppingType::None; }
+	void SetTargetInstruction(uint32_t* instruction) { TargetInstruction = instruction; }
+	int GetPauseDepth() const { return PauseDepth; }
+	void SetPauseDepth(int depth) { PauseDepth = depth; }
+	SteppingType Stepping;
+private:
+	inline void Pause(const uint32_t* ptr);
+	bool Paused;
+	int PauseDepth;
+	uint32_t* TargetInstruction;
+	const uint32_t* CurrentInstruction;
+#endif
 private:
 	void Run();
 	bool Running;
@@ -116,8 +150,13 @@ public:
 
 	void ReinitializeGrammar(const char* grammar);
 	void* Compile(const char* path, const Options& options);
-	void CompileTemporary(const char* data);
+	void* CompileTemporary(const char* data);
+	void CompileAST(const char* name, Node* ast);
 	void Interrupt();
+
+	std::string FindLibrary(const char* name) const;
+	void LoadLibrary(const char* name);
+	void LoadLibraryAsync(const char* name);
 
 	bool Export(const char* path, const ExportOptions& options);
 
@@ -130,12 +169,27 @@ public:
 
 	std::pair<PathType, Symbol*> FindSymbol(const PathTypeQuery& name);
 	void AddCompileUnit(const std::string& path, const SymbolTable& space, ScriptFunction* InitFunction);
+	void RemoveUnit(const std::string& unit);
+#ifdef INCLUDE_DEBUGGER
+	void AddCompileUnitDebug(const std::string& path, const DebugInfo& info);
+	void RemoveCompileUnitDebug(const std::string& path);
+#endif // INCLUDE_DEBUGGER
 
 	inline bool IsRunning() const { return VMRunning; }
 
-	void RemoveUnit(const std::string& unit);
 
 	auto GetSymbols() const { return GlobalSymbols.Table; }
+
+	// Debugger
+	int Resume();
+	DebugLineInfo Pause();
+	DebugLineInfo Step();
+	DebugLineInfo StepUp();
+	DebugLineInfo StepDown();
+	DebugLineInfo StepInternal(SteppingType type);
+	int GetCurrentVariables();
+	DebugCallStack GetCurrentCallStack();
+	int GetObjectFields(const std::string& objectName);
 
 private:
 	friend class Parser;
@@ -168,5 +222,15 @@ private:
 
 	ankerl::unordered_dense::map<std::string, CompileUnit> Units;
 	SymbolTable GlobalSymbols;
+
+	std::vector<std::string> LibrarySearchPaths;
+
+#ifdef INCLUDE_DEBUGGER
+	std::condition_variable RunnerNotify;
+	std::mutex RunnerPauseMutex;
+	bool Paused;
+	Runner* PausedRunner;
+	DebugInfo DebugInformation;
+#endif // INCLUDE_DEBUGGER
 
 };

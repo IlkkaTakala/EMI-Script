@@ -135,8 +135,6 @@ struct ScriptFunction
 	std::vector<PathTypeQuery> TypeTableSymbols;
 	std::vector<PathTypeQuery> GlobalTableSymbols;
 
-	ankerl::unordered_dense::map<int, int> DebugLines;
-
 	ScopeType* FunctionScope;
 
 	uint8_t ArgCount;

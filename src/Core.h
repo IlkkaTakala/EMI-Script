@@ -118,11 +118,11 @@ public:
 	}
 };
 
-inline BaseLogger& operator<<(BaseLogger& log, const PathType& arg) {
+inline LogService& operator<<(LogService& log, const PathType& arg) {
 	log << arg.toString();
 	return log;
 }
-inline BaseLogger& operator<<(BaseLogger& log, const PathTypeQuery& arg) {
+inline LogService& operator<<(LogService& log, const PathTypeQuery& arg) {
 	log << arg.GetTarget().toString();
 	return log;
 }

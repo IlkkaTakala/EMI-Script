@@ -64,8 +64,6 @@ void ScriptFunction::Append(ScriptFunction fn)
 	PropertyTable.resize(PropertyTableSymbols.size());
 	TypeTable.resize(TypeTableSymbols.size());
 
-	DebugLines.clear();
-
 	RegisterCount = std::max(RegisterCount, fn.RegisterCount);
 	Bytecode.insert(Bytecode.end(), fn.Bytecode.begin(), fn.Bytecode.end());
 }
