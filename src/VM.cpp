@@ -404,12 +404,12 @@ DebugLineInfo VM::Pause()
 	for (auto& runner : RunnerPool) {
 		runner->SetPaused(true);
 	}
-	return 0;
+	return {};
 }
 
 DebugLineInfo VM::Step()
 {
-	if (!PausedRunner) return 0;
+	if (!PausedRunner) return {};
 	PausedRunner->SetPauseDepth((int)PausedRunner->GetCallStack().size());
 	return StepInternal(SteppingType::Step);
 }
@@ -458,7 +458,7 @@ int VM::GetCurrentVariables()
 
 DebugCallStack VM::GetCurrentCallStack()
 {
-	if (!PausedRunner) return 0;
+	if (!PausedRunner) return {};
 
 	/*auto& calls = PausedRunner->GetCallStack();
 
@@ -468,7 +468,7 @@ DebugCallStack VM::GetCurrentCallStack()
 
 	}*/
 
-	return 0;
+	return {};
 }
 
 int VM::GetObjectFields(const std::string&)
