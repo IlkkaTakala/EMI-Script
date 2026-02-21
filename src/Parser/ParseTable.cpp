@@ -446,7 +446,9 @@ constexpr size_t CreateTime = )";
 	auto time = std::chrono::file_clock::now().time_since_epoch().count();
 	outh << time << "u; \n\n";
 
-	outh << R"(extern ParseTable_t ParseTable;
+	outh << R"(
+int GetIndex(int state, int token);
+extern ActionNode* ParseTable;
 extern RuleTable_t RuleTable;
 extern std::vector<RuleData> Data;
 )";
@@ -465,16 +467,34 @@ RuleTable_t RuleTable = {
 		outcpp << " }}, \n";
 	}
 
-outcpp << R"(};
+	outcpp << R"(};
 
-ParseTable_t ParseTable = {
+int Width = )";
+	if (ParseTable.size() > 0) {
+		outcpp << ParseTable[0].size();
+	}
+	else {
+		outcpp << 0;
+	}
+
+	outcpp << R"(;
+int Height = )";
+	outcpp << ParseTable.size();
+
+	outcpp << R"(;
+
+int GetIndex(int state, int token)
+{
+	return state * Width + token;
+}
+
+ActionNode* ParseTable = new ActionNode[Width * Height] {
 )";
 	for (auto& row : ParseTable) {
-		outcpp << "{ ";
 		for (auto& action : row) {
 			outcpp << "{ " << ActionToName(action.type) << ", " << action.shift << ", " << action.reduce << " }, ";
 		}
-		outcpp << "}, \n";
+		outcpp << "\n";
 	}
 
 outcpp << R"(};
