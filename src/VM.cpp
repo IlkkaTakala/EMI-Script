@@ -492,7 +492,7 @@ void VM::GarbageCollect()
 Runner::Runner(VM* vm) : Owner(vm)
 {
 	Registers.reserve(64);
-	CallStack.reserve(128);
+	CallStack.reserve(32);
 	Running = false;
 	Paused = false;
 	TargetInstruction = 0;
@@ -1169,6 +1169,14 @@ void Runner::Run()
 					Registers[byte.target] = Registers[byte.in1].as<double>() * toNumber(Registers[byte.in2]);
 				} goto start;
 
+				TARGET(NumPow) {
+					Registers[byte.target] = pow(Registers[byte.in1].as<double>(), toNumber(Registers[byte.in2]));
+				} goto start;
+
+				TARGET(NumMod) {
+					Registers[byte.target] = Registers[byte.in1].as<int>() % (int)round(toNumber(Registers[byte.in2]));
+				} goto start;
+
 				// @todo: these could be optimized if the arguments are always the same type
 				TARGET(Add) {
 					 add(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
@@ -1185,7 +1193,15 @@ void Runner::Run()
 				TARGET(Mul) {
 					mul(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
 				} goto start;
-				
+
+				TARGET(Pow) {
+					power(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
+				} goto start;
+
+				TARGET(Mod) {
+					mod(Registers[byte.target], Registers[byte.in1], Registers[byte.in2]);
+				} goto start;
+
 				TARGET(Equal) {
 					auto& lhs = Registers[byte.in1];
 					auto& rhs = Registers[byte.in2];

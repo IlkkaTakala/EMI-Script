@@ -255,6 +255,48 @@ void div(Variable& out, const Variable& lhs, const Variable& rhs)
 	}
 }
 
+void power(Variable& out, const Variable& lhs, const Variable& rhs)
+{
+	if (lhs.getType() != rhs.getType()) return;
+	switch (lhs.getType())
+	{
+	case VariableType::Number: {
+		auto val = pow(lhs.as<double>(), rhs.as<double>());
+		if (!isnan(val)) {
+			out = val;
+		}
+		else {
+			out.setUndefined();
+		}
+		return;
+	}
+
+	default:
+		return;
+	}
+}
+
+void mod(Variable& out, const Variable& lhs, const Variable& rhs)
+{
+	if (lhs.getType() != rhs.getType()) return;
+	switch (lhs.getType())
+	{
+	case VariableType::Number: {
+		auto val = lhs.as<int>() % rhs.as<int>();
+		if (!isnan(val)) {
+			out = val;
+		}
+		else {
+			out.setUndefined();
+		}
+		return;
+	}
+
+	default:
+		return;
+	}
+}
+
 double toNumber(const Variable& in)
 {
 	switch (in.getType())
@@ -304,8 +346,8 @@ std::string toStdString(const Variable& in)
 	{
 	case VariableType::Number: {
 		double value = in.as<double>();
-		if (trunc(value) == value) {
-			return std::to_string((int64_t)value).c_str();
+		if (trunc(value) == value && value < std::numeric_limits<int64_t>::max()) {
+			return std::to_string(static_cast<int64_t>(value)).c_str();
 		}
 		return std::to_string(value).c_str();
 	}

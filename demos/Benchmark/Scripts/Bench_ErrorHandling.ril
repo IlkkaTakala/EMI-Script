@@ -1,0 +1,21 @@
+# Benchmark: simulate error handling with functions returning null and checks
+
+public def maybeFail(flag : number) {
+    if (flag % 5 == 0) return null;
+    return flag;
+}
+
+public def benchErrorHandling(n : number) {
+    var acc = 0;
+    for (var i = 0; i < n; i++) {
+        var r = maybeFail(i);
+        if (r == null) continue;
+        acc = acc + r;
+    }
+    return acc;
+}
+
+
+public def run_benchmark() {
+	benchErrorHandling(10000);
+}

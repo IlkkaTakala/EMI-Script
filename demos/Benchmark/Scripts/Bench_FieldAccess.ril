@@ -1,0 +1,29 @@
+# Benchmark: field access and updates
+# Repeatedly read and write object fields to measure overhead.
+
+object Accumulator {
+    count : number = 0;
+    sum : number = 0;
+    last : number = 0;
+}
+
+def benchFieldAccess(iterations : number) {
+    var a = Accumulator{};
+    for (var i = 0; i < iterations; i++) {
+        a.count = a.count + 1;
+        a.last = i;
+        a.sum = a.sum + (i * 7) - (i / 3);
+        # read fields into locals
+        var c = a.count;
+        var s = a.sum;
+        var l = a.last;
+        # small computation
+        var v = c * s - l;
+        a.sum = v + a.sum;
+    }
+    return a;
+}
+
+public def run_benchmark() {
+	benchFieldAccess(1000000);
+}

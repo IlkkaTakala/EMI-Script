@@ -1,0 +1,28 @@
+# Benchmark: long numeric loops and array operations
+
+public def benchLongLoops(n : number) {
+    var arr : array;
+    Array.Resize(arr, n);
+    # initialize
+    for (var i = 0; i < n; i++) {
+        arr[i] = i;
+    }
+
+    var sum = 0;
+    for (var iter = 0; iter < 10; iter++) {
+        for (var i = 0; i < n; i++) {
+            # some math operations
+            var v = arr[i];
+            v = v * 2654435761 % 1024;
+            v = (v << 3) ^ (v >> 2);
+            sum = sum + v;
+            arr[i] = v;
+        }
+    }
+    return sum;
+}
+
+
+public def run_benchmark() {
+	benchLongLoops(10000);
+}

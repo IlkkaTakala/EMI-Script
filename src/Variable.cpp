@@ -27,11 +27,6 @@ Variable::Variable(Variable&& rhs) noexcept
 	}
 }
 
-Variable::Variable(double v)
-{
-	memcpy(&value, &v, sizeof(value));
-}
-
 Variable::Variable(Object* ptr)
 {
 	if (ptr == nullptr) value = NIL_VAL;

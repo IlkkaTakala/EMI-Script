@@ -1,0 +1,41 @@
+# Benchmark: array operations, nested arrays and resizing
+
+def benchArrayOps(n : number) {
+    var a : array;
+    Array.Clear(a);
+
+    # push numbers
+    for (var i = 0; i < n; i++) {
+        Array.Push(a, i);
+    }
+
+    # create nested arrays: each entry is an array of 4 numbers
+    for (var i = 0; i < n; i++) {
+        var sub : array;
+        Array.Resize(sub, 4);
+        for (var j = 0; j < 4; j++) {
+            sub[j] = i * 4 + j;
+        }
+        a[i] = sub;
+    }
+
+    # iterate and do some work
+    var total = 0;
+    for (item in a) {
+        for (var k = 0; k < Array.Size(item); k++) {
+            total = total + item[k];
+        }
+    }
+
+    # shrink and expand repeatedly
+    for (var r = 0; r < 5; r++) {
+        Array.Resize(a, (n / 2) + r);
+        Array.Resize(a, n);
+    }
+
+    return total;
+}
+
+public def run_benchmark() {
+	benchArrayOps(100000);
+}

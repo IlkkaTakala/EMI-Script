@@ -9,6 +9,7 @@
 #include "Lexer.h"
 #include "ParseHelper.h"
 #include "EMLibFormat.h"
+#include "NodePool.h"
 
 #ifdef EMI_PARSE_GRAMMAR
 #include "ParseTable.h"
@@ -129,6 +130,7 @@ void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 
 void Parser::ReleaseParser()
 {
+	// print profiler and clear node pool
 }
 
 void Parser::ThreadedParse(VM* vm)
@@ -165,6 +167,7 @@ void Parser::ThreadedParse(VM* vm)
 		else if (!options.Data.empty()) {
 			ParseTemporary(vm, options);
 		}
+		NodePool::Instance().clear();
 	}
 }
 
@@ -190,13 +193,14 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	}
 
 	gCompileDebug() << "Constructing AST";
-	auto root = ConstructAST(options);
+
+	Node* root = ConstructAST(options);
+
 	if (!root) {
 		gCompileError() << fullPath << ": Parse failed";
 		options.CompileResult.set_value(false);
 		return;
 	}
-
 	Desugar(root);
 
 #ifdef DEBUG
@@ -333,16 +337,8 @@ Node* Parser::ConstructAST(CompileOptions& options)
 			TokenHolder next;
 			next.token = rule.nonTerminal;
 
-
-			if (data.mergeToken == Token::None) {
-				next.ptr = new Node();
-				next.ptr->type = data.nodeType == Token::None ? next.token : data.nodeType;
-				next.ptr->depth = 0;
-				next.ptr->line = lex.GetContext().Row;
-			}
-			else {
-				//next.ptr->type = next.token;
-			}
+			next.ptr = nullptr;
+			bool createdNew = false;
 
 			thread_local static std::vector<Node*> childrenList;
 			childrenList.clear();
@@ -357,9 +353,8 @@ Node* Parser::ConstructAST(CompileOptions& options)
 				auto& old = symbolStack.top();
 
 				if (data.mergeToken == old.token) {
-					if (next.ptr) delete next.ptr;
 					next.ptr = old.ptr;
-					if (data.nodeType != Token::None) next.ptr->type = data.nodeType;
+					if (data.nodeType != Token::None && next.ptr) next.ptr->type = data.nodeType;
 				}
 				else {
 					if (old.ptr) {
@@ -375,6 +370,15 @@ Node* Parser::ConstructAST(CompileOptions& options)
 				symbolStack.pop();
 				stateStack.pop();
 			}
+
+			if (next.ptr == nullptr && data.mergeToken == Token::None) {
+				next.ptr = new Node();
+				createdNew = true;
+				next.ptr->type = data.nodeType == Token::None ? next.token : data.nodeType;
+				next.ptr->depth = 0;
+				next.ptr->line = lex.GetContext().Row;
+			}
+
 			if (next.ptr) {
 				if (hasData) next.ptr->data = nodeData;
 				next.ptr->depth = std::max(maxDepth, next.ptr->depth);
@@ -382,7 +386,10 @@ Node* Parser::ConstructAST(CompileOptions& options)
 				for (auto it = childrenList.begin(); it != childrenList.end(); it++) {
 					next.ptr->children.insert(next.ptr->children.begin(), *it);
 				}
-				Optimize(next.ptr);
+				if (createdNew || !childrenList.empty() || hasData) {
+					Optimize(next.ptr);
+				}
+	
 			}
 
 			symbolStack.push(next);

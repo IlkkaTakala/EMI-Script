@@ -11,42 +11,58 @@ extern ankerl::unordered_dense::map<Token, const char*> TokensToName = {
 #undef X
 #endif // DEBUG
 
-ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
-	{"object", Token::Object },
-	{"def", Token::Definition },
-	{"defp", Token::PublicDef },
-	{"public", Token::Public },
-	{"return", Token::Return },
-	{"if", Token::If },
-	{"else", Token::Else },
-	{"for", Token::For },
-	{"while", Token::While },
-	{"break", Token::Break },
-	{"continue", Token::Continue },
-	{"extend", Token::Extend },
-	{"using", Token::Using },
-	{"import", Token::Import },
-	{"var", Token::Var },
-	{"set", Token::Set },
-	{"static", Token::Static },
-	{"const", Token::Const },
-	{"null", Token::Null },
-
-	{"string", Token::TypeString},
-	{"bool", Token::TypeBoolean},
-	{"number", Token::TypeNumber},
-	{"array", Token::TypeArray},
-	{"function", Token::TypeFunction},
-
-	{"true", Token::True},
-	{"false", Token::False},
-
-	{"in", Token::In},
-	{"or", Token::Or},
-	{"is", Token::Equal},
-	{"not", Token::Not},
-	{"and", Token::And},
-};
+namespace {
+	inline Token lookup_keyword(std::string_view s) {
+		switch (s.size()) {
+		case 2:
+			if (s == "if") return Token::If;
+			if (s == "in") return Token::In;
+			if (s == "or") return Token::Or;
+			if (s == "is") return Token::Equal;
+			break;
+		case 3:
+			if (s == "def") return Token::Definition;
+			if (s == "for") return Token::For;
+			if (s == "var") return Token::Var;
+			if (s == "set") return Token::Set;
+			if (s == "not") return Token::Not;
+			if (s == "and") return Token::And;
+			break;
+		case 4:
+			if (s == "defp") return Token::PublicDef;
+			if (s == "else") return Token::Else;
+			if (s == "null") return Token::Null;
+			if (s == "bool") return Token::TypeBoolean;
+			if (s == "true") return Token::True;
+			break;
+		case 5:
+			if (s == "while") return Token::While;
+			if (s == "break") return Token::Break;
+			if (s == "using") return Token::Using;
+			if (s == "const") return Token::Const;
+			if (s == "array") return Token::TypeArray;
+			if (s == "false") return Token::False;
+			break;
+		case 6:
+			if (s == "object") return Token::Object;
+			if (s == "public") return Token::Public;
+			if (s == "return") return Token::Return;
+			if (s == "extend") return Token::Extend;
+			if (s == "import") return Token::Import;
+			if (s == "static") return Token::Static;
+			if (s == "string") return Token::TypeString;
+			if (s == "number") return Token::TypeNumber;
+			break;
+		case 8:
+			if (s == "continue") return Token::Continue;
+			if (s == "function") return Token::TypeFunction;
+			break;
+		default:
+			break;
+		}
+		return Token::Id;
+	}
+} // anonymous namespace
 
 Lexer::Lexer(const char* data, size_t size)
 {
@@ -164,10 +180,7 @@ Token Lexer::Analyse(std::string_view& Data)
 			while (ValidID(*ptr)) Current.Advance();
 
 			std::string_view value(start, ptr - start);
-			if (auto it = TokenMap.find(value); it != TokenMap.end()) {
-				token = it->second;
-			}
-			else token = Token::Id;
+			token = lookup_keyword(value);
 		}
 	}
 	else if (is_digit(*ptr)) {
@@ -219,6 +232,8 @@ Token Lexer::Analyse(std::string_view& Data)
 		case '+': { token = Token::Add; } break;
 		case '-': { token = Token::Sub; } break;
 		case '*': { token = Token::Mult; } break;
+		case '^': { token = Token::Power; } break;
+		case '%': { token = Token::Mod; } break;
 		case '/': { 
 			if (*(ptr + 1) == '*') {
 				Current.Advance(); 

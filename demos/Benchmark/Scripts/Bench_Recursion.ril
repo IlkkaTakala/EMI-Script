@@ -1,0 +1,30 @@
+# Benchmark: recursive functions and tail recursion
+
+# naive fibonacci
+public def fib(n : number) : number {
+    if (n <= 1) return n;
+    return fib(n - 1) + fib(n - 2);
+}
+
+# tail-recursive fibonacci using accumulator
+public def fibTail(n : number) : number {
+    def helper(k : number, a : number, b : number) : number {
+        if (k == 0) return a;
+        return helper(k - 1, b, a + b);
+    }
+    return helper(n, 0, 1);
+}
+
+public def benchRecursion(n : number) {
+    var r1 = 0;
+    # run small naive fib only for small n
+    if (n < 30) {
+        r1 = fib(n);
+    }
+    var r2 = fibTail(n);
+    return Array{r1, r2};
+}
+
+public def run_benchmark() {
+	benchRecursion(40);
+}

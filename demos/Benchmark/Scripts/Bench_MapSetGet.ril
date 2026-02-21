@@ -1,0 +1,31 @@
+# Benchmark: map-like operations using MapContainer from game.ril
+
+# reuse MapContainer and Map.* methods defined in game.ril
+
+public def benchMapSetGet(n : number) {
+    var map : MapContainer;
+    map.equality = equal; # rely on global equal from game.ril
+
+    for (var i = 0; i < n; i++) {
+        var key = Coord{i, i};
+        Map.insert(map, key, i);
+    }
+
+    var sum = 0;
+    for (var i = 0; i < n; i++) {
+        var key = Coord{i, i};
+        var v = Map.Get(map, key);
+        if (v != null) sum = sum + v;
+    }
+
+    # erase half
+    for (var i = 0; i < n; i += 2) {
+        Map.Erase(map, Coord{i, i});
+    }
+
+    return sum;
+}
+
+public def run_benchmark() {
+	benchMapSetGet(10000);
+}

@@ -1,0 +1,23 @@
+# Benchmark: functions as first-class values and calling via variables
+
+public def add(a : number, b : number) { return a + b; }
+public def mul(a : number, b : number) { return a * b; }
+
+public def benchFunctionPointers(n : number) {
+    var fns : array;
+    Array.Push(fns, add);
+    Array.Push(fns, mul);
+
+    var acc = 1;
+    for (var i = 0; i < n; i++) {
+        var fn = fns[i % 2];
+        acc = fn(acc, i + 1);
+        if (acc == null) acc = 1;
+    }
+    return acc;
+}
+
+
+public def run_benchmark() {
+	benchFunctionPointers(10000);
+}

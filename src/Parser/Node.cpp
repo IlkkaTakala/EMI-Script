@@ -1,5 +1,20 @@
 #include "Node.h"
 #include "TypeConverters.h"
+#include "NodePool.h"
+
+size_t NodePool::nodeAllocSize = sizeof(Node);
+
+void* Node::operator new(size_t sz)
+{
+    if (sz != sizeof(Node)) return ::operator new(sz);
+    return NodePool::Instance().allocate();
+}
+
+void Node::operator delete(void* ptr) noexcept
+{
+    if (!ptr) return;
+    NodePool::Instance().deallocate(ptr);
+}
 
 #ifdef DEBUG
 constexpr unsigned char print_first[] = { 195, 196, 196, 0 };

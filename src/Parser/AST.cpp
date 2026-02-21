@@ -402,10 +402,14 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n, const std::string& file, const EMI::Opt
 	TokenJumpTable[(int)Token::Sub] = &ASTWalker::handle_Sub;
 	TokenJumpTable[(int)Token::Div] = &ASTWalker::handle_Div;
 	TokenJumpTable[(int)Token::Mult] = &ASTWalker::handle_Mult;
+	TokenJumpTable[(int)Token::Power] = &ASTWalker::handle_Power;
+	TokenJumpTable[(int)Token::Mod] = &ASTWalker::handle_Mod;
 	TokenJumpTable[(int)Token::AssignAdd] = &ASTWalker::handle_AssignAdd;
 	TokenJumpTable[(int)Token::AssignSub] = &ASTWalker::handle_AssignSub;
 	TokenJumpTable[(int)Token::AssignDiv] = &ASTWalker::handle_AssignDiv;
 	TokenJumpTable[(int)Token::AssignMult] = &ASTWalker::handle_AssignMult;
+	TokenJumpTable[(int)Token::AssignPower] = &ASTWalker::handle_AssignPower;
+	TokenJumpTable[(int)Token::AssignMod] = &ASTWalker::handle_AssignMod;
 	TokenJumpTable[(int)Token::Id] = &ASTWalker::handle_Id;
 	TokenJumpTable[(int)Token::Property] = &ASTWalker::handle_Property;
 	TokenJumpTable[(int)Token::Negate] = &ASTWalker::handle_Negate;
@@ -814,9 +818,11 @@ void ASTWalker::WalkLoad(Node* n)
 	(this->*TokenJumpTable[(int)n->type])(n);
 }
 
-void ASTWalker::handle_default(Node* n)
+void ASTWalker::handle_default([[maybe_unused]] Node* n)
 {
+#ifdef DEBUG
 	Error("No handler for token " << TokensToName[n->type]);
+#endif // DEBUG
 }
 
 void ASTWalker::handle_Scope(Node* n) {
@@ -1015,6 +1021,48 @@ void ASTWalker::handle_Mult(Node* n) {
 	OperatorAssign;
 }
 
+void ASTWalker::handle_Power(Node* n)
+{
+	GetFirstNode()
+	GetLastNode()
+	EnsureOperands;
+	Walk;
+	Op(NumAdd);
+	switch (first->varType)
+	{
+		Operator(Number, NumPow, Pow);
+	default:
+		NodeType = VariableType::Undefined;
+		instruction.code = OpCodes::Pow;
+		In8 = first->regTarget;
+		In8_2 = last->regTarget;
+		FreeChildren;
+		break;
+	}
+	OperatorAssign;
+}
+
+void ASTWalker::handle_Mod(Node* n)
+{
+	GetFirstNode()
+	GetLastNode()
+	EnsureOperands;
+	Walk;
+	Op(NumAdd);
+	switch (first->varType)
+	{
+		Operator(Number, NumMod, Mod);
+	default:
+		NodeType = VariableType::Undefined;
+		instruction.code = OpCodes::Mod;
+		In8 = first->regTarget;
+		In8_2 = last->regTarget;
+		FreeChildren;
+		break;
+	}
+	OperatorAssign;
+}
+
 void ASTWalker::handle_AssignAdd(Node* n) {
 	GetLastNode()
 	n->type = Token::Add;
@@ -1031,14 +1079,30 @@ void ASTWalker::handle_AssignSub(Node* n) {
 }
 void ASTWalker::handle_AssignDiv(Node* n) {
 	GetLastNode()
-		n->type = Token::Div;
+	n->type = Token::Div;
 	WalkOne(n);
 	n->type = Token::Assign;
 	helper_Assign(n, n);
 }
 void ASTWalker::handle_AssignMult(Node* n) {
 	GetLastNode()
-		n->type = Token::Mult;
+	n->type = Token::Mult;
+	WalkOne(n);
+	n->type = Token::Assign;
+	helper_Assign(n, n);
+}
+
+void ASTWalker::handle_AssignPower(Node* n) {
+	GetLastNode()
+	n->type = Token::Power;
+	WalkOne(n);
+	n->type = Token::Assign;
+	helper_Assign(n, n);
+}
+
+void ASTWalker::handle_AssignMod(Node* n) {
+	GetLastNode()
+	n->type = Token::Mod;
 	WalkOne(n);
 	n->type = Token::Assign;
 	helper_Assign(n, n);

@@ -1,0 +1,30 @@
+# Benchmark: simulate light concurrency via interleaved loops
+
+# Not real threads, but simulates many small tasks interleaved
+public def taskWork(seed : number) {
+    var v = seed;
+    for (var i = 0; i < 100; i++) {
+        v = (v * 31 + i) % 100000;
+    }
+    return v;
+}
+
+public def benchConcurrencySim(tasks : number) {
+    var states : array;
+    Array.Resize(states, tasks);
+    for (var i = 0; i < tasks; i++) states[i] = i;
+
+    var total = 0;
+    for (var step = 0; step < 50; step++) {
+        for (var t = 0; t < tasks; t++) {
+            states[t] = taskWork(states[t]);
+            total = total + states[t];
+        }
+    }
+    return total;
+}
+
+
+public def run_benchmark() {
+	benchConcurrencySim(10000);
+}

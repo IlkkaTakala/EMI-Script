@@ -53,10 +53,14 @@ private:
 	void handle_Sub(Node* n);
 	void handle_Div(Node* n);
 	void handle_Mult(Node* n);
+	void handle_Power(Node* n);
+	void handle_Mod(Node* n);
 	void handle_AssignAdd(Node* n);
 	void handle_AssignSub(Node* n);
 	void handle_AssignDiv(Node* n);
 	void handle_AssignMult(Node* n);
+	void handle_AssignPower(Node* n);
+	void handle_AssignMod(Node* n);
 	void handle_Id(Node* n);
 	void handle_Property(Node* n);
 	void handle_Negate(Node* n);

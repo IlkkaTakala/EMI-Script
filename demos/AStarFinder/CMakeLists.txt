@@ -22,7 +22,7 @@ add_custom_command(
     TARGET AStarFinder 
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${AStarFinder_SOURCE_DIR}/../Scripts"
+        "${AStarFinder_SOURCE_DIR}/game.ril"
         "${AStarFinder_BINARY_DIR}/Scripts"
 )
 

@@ -27,6 +27,11 @@ public:
 				delete c;
 		}
 	}
+
+	// Use a pool for Node allocations: custom new/delete operators
+	static void* operator new(size_t sz);
+	static void operator delete(void* ptr) noexcept;
+
 	VariableType varType;
 	Token type = Token::None;
 	uint8_t regTarget;

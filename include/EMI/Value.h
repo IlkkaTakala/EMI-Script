@@ -14,14 +14,13 @@ https://craftinginterpreters.com/optimization.html#nan-boxing
 
 #define SIGN_BIT		((uint64_t)0x8000000000000000)
 #define QNAN			((uint64_t)0x7ffc000000000000)
+#define TAG				((uint64_t)0x0000000000000003)
+#define TAG_OBJECT		0
 #define TAG_NIL			1
-#define TAG_FALSE		2
-#define TAG_TRUE		3
+#define TAG_BOOL		2
 #define NIL_VAL			(uint64_t)(QNAN | TAG_NIL)
-#define FALSE_VAL		(uint64_t)(QNAN | TAG_FALSE)
-#define TRUE_VAL		(uint64_t)(QNAN | TAG_TRUE)
-#define BOOL_VAL(b)		((b) ? TRUE_VAL : FALSE_VAL)
-#define OBJ_VAL(obj)	(SIGN_BIT | QNAN | (uint64_t)(uintptr_t)(obj))
+#define BOOL_VAL(b)		(QNAN | ((uint64_t)b << 2) | TAG_BOOL)
+#define OBJ_VAL(obj)	(QNAN | (uint64_t)(uintptr_t)(obj))
 
 enum class ValueType
 {
@@ -65,7 +64,7 @@ public:
 		return value == NIL_VAL;
 	}
 	inline bool isBool() const {
-		return (value | 1) == TRUE_VAL;
+		return (value & TAG) == TAG_BOOL;
 	}
 	inline bool isExternal() const {
 		return ((value) & (QNAN | SIGN_BIT | TAG_NIL)) == (QNAN | SIGN_BIT | TAG_NIL);
@@ -108,7 +107,7 @@ public:
 
 template<>
 inline bool InternalValue::as() const {
-	return value == TRUE_VAL;
+	return (bool)(value & ~(QNAN | TAG));
 }
 
 template <typename T>

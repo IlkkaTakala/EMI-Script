@@ -22,6 +22,8 @@ void add(Variable& out, const Variable& lhs, const Variable& rhs);
 void sub(Variable& out, const Variable& lhs, const Variable& rhs);
 void mul(Variable& out, const Variable& lhs, const Variable& rhs);
 void div(Variable& out, const Variable& lhs, const Variable& rhs);
+void power(Variable& out, const Variable& lhs, const Variable& rhs);
+void mod(Variable& out, const Variable& lhs, const Variable& rhs);
 
 double toNumber(const Variable& in);
 

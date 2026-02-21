@@ -1,0 +1,648 @@
+#include "Lexer.h"
+#include <ankerl/unordered_dense.h>
+#include "Defines.h"
+#include <filesystem>
+#include <cstring>
+#include <algorithm>
+
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
+#if defined(__AVX2__) || defined(_MSC_VER)
+#include <immintrin.h>
+#endif
+
+#ifdef DEBUG
+#define X(name) {Token::name, #name},
+extern ankerl::unordered_dense::map<Token, const char*> TokensToName = {
+#include "Lexemes.h"
+};
+#undef X
+#endif // DEBUG
+
+#ifndef FORCE_INLINE
+#  if defined(_MSC_VER)
+#    define FORCE_INLINE __forceinline
+#  else
+#    define FORCE_INLINE inline __attribute__((always_inline))
+#  endif
+#endif
+
+namespace {
+inline Token lookup_keyword(std::string_view s) {
+    switch (s.size()) {
+    case 2:
+        if (s == "if") return Token::If;
+        if (s == "in") return Token::In;
+        if (s == "or") return Token::Or;
+        if (s == "is") return Token::Equal;
+        break;
+    case 3:
+        if (s == "def") return Token::Definition;
+        if (s == "for") return Token::For;
+        if (s == "var") return Token::Var;
+        if (s == "set") return Token::Set;
+        if (s == "not") return Token::Not;
+        if (s == "and") return Token::And;
+        break;
+    case 4:
+        if (s == "defp") return Token::PublicDef;
+        if (s == "else") return Token::Else;
+        if (s == "null") return Token::Null;
+        if (s == "bool") return Token::TypeBoolean;
+        if (s == "true") return Token::True;
+        break;
+    case 5:
+        if (s == "while") return Token::While;
+        if (s == "break") return Token::Break;
+        if (s == "using") return Token::Using;
+        if (s == "const") return Token::Const;
+        if (s == "array") return Token::TypeArray;
+        if (s == "false") return Token::False;
+        break;
+    case 6:
+        if (s == "object") return Token::Object;
+        if (s == "public") return Token::Public;
+        if (s == "return") return Token::Return;
+        if (s == "extend") return Token::Extend;
+        if (s == "import") return Token::Import;
+        if (s == "static") return Token::Static;
+        if (s == "string") return Token::TypeString;
+        if (s == "number") return Token::TypeNumber;
+        break;
+    case 8:
+        if (s == "continue") return Token::Continue;
+        if (s == "function") return Token::TypeFunction;
+        break;
+    default:
+        break;
+    }
+    return Token::Id;
+}
+
+// Pointer+length keyword lookup to avoid constructing string_view on hot path
+FORCE_INLINE Token lookup_keyword_ptr(const char* start, size_t len) {
+    switch (len) {
+    case 2:
+        if (start[0]=='i' && start[1]=='f') return Token::If;
+        if (start[0]=='i' && start[1]=='n') return Token::In;
+        if (start[0]=='o' && start[1]=='r') return Token::Or;
+        if (start[0]=='i' && start[1]=='s') return Token::Equal;
+        break;
+    case 3:
+        if (memcmp(start, "def", 3)==0) return Token::Definition;
+        if (memcmp(start, "for", 3)==0) return Token::For;
+        if (memcmp(start, "var", 3)==0) return Token::Var;
+        if (memcmp(start, "set", 3)==0) return Token::Set;
+        if (memcmp(start, "not", 3)==0) return Token::Not;
+        if (memcmp(start, "and", 3)==0) return Token::And;
+        break;
+    case 4:
+        if (memcmp(start, "defp", 4)==0) return Token::PublicDef;
+        if (memcmp(start, "else", 4)==0) return Token::Else;
+        if (memcmp(start, "null", 4)==0) return Token::Null;
+        if (memcmp(start, "bool", 4)==0) return Token::TypeBoolean;
+        if (memcmp(start, "true", 4)==0) return Token::True;
+        break;
+    case 5:
+        if (memcmp(start, "while", 5)==0) return Token::While;
+        if (memcmp(start, "break", 5)==0) return Token::Break;
+        if (memcmp(start, "using", 5)==0) return Token::Using;
+        if (memcmp(start, "const", 5)==0) return Token::Const;
+        if (memcmp(start, "array", 5)==0) return Token::TypeArray;
+        if (memcmp(start, "false", 5)==0) return Token::False;
+        break;
+    case 6:
+        if (memcmp(start, "object", 6)==0) return Token::Object;
+        if (memcmp(start, "public", 6)==0) return Token::Public;
+        if (memcmp(start, "return", 6)==0) return Token::Return;
+        if (memcmp(start, "extend", 6)==0) return Token::Extend;
+        if (memcmp(start, "import", 6)==0) return Token::Import;
+        if (memcmp(start, "static", 6)==0) return Token::Static;
+        if (memcmp(start, "string", 6)==0) return Token::TypeString;
+        if (memcmp(start, "number", 6)==0) return Token::TypeNumber;
+        break;
+    case 8:
+        if (memcmp(start, "continue", 8)==0) return Token::Continue;
+        if (memcmp(start, "function", 8)==0) return Token::TypeFunction;
+        break;
+    default:
+        break;
+    }
+    return Token::Id;
+}
+
+// portable first set bit (index of least-significant 1) for 32-bit mask
+FORCE_INLINE int first_bit_index(unsigned int mask) {
+#if defined(_MSC_VER)
+    unsigned long idx;
+    _BitScanForward(&idx, mask);
+    return (int)idx;
+#else
+    return __builtin_ctz(mask);
+#endif
+}
+
+// portable last set bit (index of most-significant 1) for 32-bit mask
+FORCE_INLINE int last_bit_index(unsigned int mask) {
+#if defined(_MSC_VER)
+    unsigned long idx;
+    _BitScanReverse(&idx, mask);
+    return (int)idx;
+#else
+    return 31 - __builtin_clz(mask);
+#endif
+}
+
+// popcount for 32-bit
+FORCE_INLINE unsigned int popcount32(unsigned int v) {
+#if defined(_MSC_VER)
+    return __popcnt(v);
+#else
+    return __builtin_popcount(v);
+#endif
+}
+
+// Choose small-threshold scalar loops for small ranges to avoid SIMD/memchr overhead
+constexpr size_t SMALL_SCAN_THRESHOLD = 32;
+
+// SIMD-accelerated find first of three characters. Falls back to scalar for small ranges.
+FORCE_INLINE const char* find_first_of3(const char* p, const char* end, char a, char b, char c) {
+    size_t len = (size_t)(end - p);
+    if (len <= SMALL_SCAN_THRESHOLD) {
+        // fast scalar scan for short regions
+        const char* cur = p;
+        while (cur < end) {
+            char ch = *cur;
+            if (ch == a || ch == b || ch == c) return cur;
+            ++cur;
+        }
+        return end;
+    }
+#if true
+    const __m256i va = _mm256_set1_epi8((char)a);
+    const __m256i vb = _mm256_set1_epi8((char)b);
+    const __m256i vc = _mm256_set1_epi8((char)c);
+    const char* cur = p;
+    while (cur + 32 <= end) {
+        __m256i block = _mm256_loadu_si256((const __m256i*)cur);
+        unsigned int mask = (unsigned int)(_mm256_movemask_epi8(_mm256_or_si256(_mm256_or_si256(_mm256_cmpeq_epi8(block, va), _mm256_cmpeq_epi8(block, vb)), _mm256_cmpeq_epi8(block, vc))));
+        if (mask) {
+            int idx = first_bit_index(mask);
+            return cur + idx;
+        }
+        cur += 32;
+    }
+    // tail
+    while (cur < end) {
+        if (*cur == a || *cur == b || *cur == c) return cur;
+        ++cur;
+    }
+    return end;
+#elif defined(_MSC_VER)
+    // SSE2 path for MSVC
+    const __m128i va = _mm_set1_epi8((char)a);
+    const __m128i vb = _mm_set1_epi8((char)b);
+    const __m128i vc = _mm_set1_epi8((char)c);
+    const char* cur = p;
+    while (cur + 16 <= end) {
+        __m128i block = _mm_loadu_si128((const __m128i*)cur);
+        unsigned int mask = (unsigned int)(_mm_movemask_epi8(_mm_or_si128(_mm_or_si128(_mm_cmpeq_epi8(block, va), _mm_cmpeq_epi8(block, vb)), _mm_cmpeq_epi8(block, vc))));
+        if (mask) return cur + first_bit_index(mask);
+        cur += 16;
+    }
+    while (cur < end) {
+        if (*cur == a || *cur == b || *cur == c) return cur;
+        ++cur;
+    }
+    return end;
+#else
+    // scalar fallback but for large ranges use memchr-based approach
+    const char* pa = (const char*)memchr(p, a, (size_t)(end - p));
+    const char* pb = (const char*)memchr(p, b, (size_t)(end - p));
+    const char* pc = (const char*)memchr(p, c, (size_t)(end - p));
+    const char* res = end;
+    if (pa && pa < res) res = pa;
+    if (pb && pb < res) res = pb;
+    if (pc && pc < res) res = pc;
+    return res;
+#endif
+}
+
+// SIMD-accelerated count newlines and last newline pointer in [p,q). Fallback to scalar.
+FORCE_INLINE size_t count_newlines_and_last(const char* p, const char* q, const char*& last_newline) {
+    size_t len = (size_t)(q - p);
+    last_newline = nullptr;
+    if (len <= SMALL_SCAN_THRESHOLD) {
+        size_t count = 0;
+        const char* cur = p;
+        while (cur < q) {
+            if (*cur == '\n') { last_newline = cur; ++count; }
+            ++cur;
+        }
+        return count;
+    }
+#if true
+    size_t count = 0;
+    const char* cur = p;
+    const __m256i vnl = _mm256_set1_epi8('\n');
+    while (cur + 32 <= q) {
+        __m256i block = _mm256_loadu_si256((const __m256i*)cur);
+        unsigned int mask = (unsigned int)_mm256_movemask_epi8(_mm256_cmpeq_epi8(block, vnl));
+        if (mask) {
+            count += popcount32(mask);
+            int last = last_bit_index(mask);
+            last_newline = cur + last;
+        }
+        cur += 32;
+    }
+    // tail
+    while (cur < q) {
+        if (*cur == '\n') { last_newline = cur; ++count; }
+        ++cur;
+    }
+    return count;
+#else
+    // scalar fallback: use memchr loop which is efficient for large ranges
+    size_t count = 0;
+    const char* cur = p;
+    while (cur < q) {
+        const char* found = (const char*)memchr(cur, '\n', (size_t)(q - cur));
+        if (!found) break;
+        ++count;
+        last_newline = found;
+        cur = found + 1;
+    }
+    return count;
+#endif
+}
+
+// Consume range [p, q): update p, row and column accordingly
+FORCE_INLINE void consume_range(const char*& p, const char* q, const char* end, size_t& row, size_t& column) {
+    if (p >= q) return;
+    const char* last_nl = nullptr;
+    size_t n = count_newlines_and_last(p, q, last_nl);
+    if (n == 0) {
+        column += (size_t)(q - p);
+    } else {
+        row += n;
+        // column is distance from last newline to q
+        column = (size_t)(q - (last_nl + 1));
+    }
+    p = q;
+    // ensure p does not exceed end (shouldn't)
+    if (p > end) p = end;
+}
+
+} // anonymous namespace
+
+Lexer::Lexer(const char* data, size_t size)
+{
+    Valid = data && size > 0;
+    FileData = data;
+    Size = size;
+    Reset();
+}
+
+Lexer::~Lexer()
+{
+    Valid = false;
+}
+
+inline bool is_whitespace(unsigned char c) {
+    return (c >= 9 && c <= 13) || c == 32;
+}
+
+inline bool is_digit(unsigned char c) {
+    return c >= 48 && c <= 57;
+}
+
+inline bool is_alpha(unsigned char c) {
+    return (c >= 97 && c <= 122) || (c >= 65 && c <= 90);
+}
+
+inline bool is_alnum(unsigned char c) {
+    return is_alpha(c) || is_digit(c);
+}
+
+inline bool ValidIDFirst(unsigned char c) {
+    return is_alpha(c) || c == 95;
+}
+
+inline bool ValidID(unsigned char c) {
+    return is_alnum(c) || c == 95;
+}
+
+void Lexer::Reset()
+{
+    Current.Ptr = FileData;
+    Current.Last = FileData + Size;
+    Current.Column = 1;
+    Current.Row = 1;
+    Current.Valid = true;
+    InString = false;
+    InQuote = false;
+}
+
+// advance one character (rare use)
+FORCE_INLINE void advance_one(const char*& p, const char* end, size_t& row, size_t& column) {
+    if (p >= end) return;
+    if (*p == '\n') {
+        ++row;
+        column = 0;
+    } else {
+        ++column;
+    }
+    ++p;
+}
+
+Token Lexer::GetNext(std::string_view& Data)
+{
+    Token token = Token::None;
+    do {
+        token = Analyse(Data);
+    } while (token == Token::Skip);
+
+    return token;
+}
+
+Token Lexer::Analyse(std::string_view& Data)
+{
+    Token token(Token::None);
+
+    if (!Current.Valid) return token;
+
+    const char* start = Current.Ptr;
+    const char* p = start;
+    const char* end = Current.Last;
+    size_t row = Current.Row;
+    size_t column = Current.Column;
+
+    if (p >= end) {
+        Current.Valid = false;
+        return Token::None;
+    }
+
+    // Handle InString && InQuote special parsing
+    if (InString && InQuote) {
+        // find next occurrence of one of '}', '`', '"'
+        const char* q = find_first_of3(p, end, '}', '`', '"');
+        // consume up to q
+        consume_range(p, q, end, row, column);
+
+        // now p == q or end
+        if (p < end) {
+            char c = *p;
+            char nxt = (p + 1 < end) ? *(p + 1) : '\0';
+            if (c == '}' && nxt == '`') {
+                // do not consume delimiters here (original stops before them)
+                // leave p at '}' so caller will emit delimiter token
+                // InString flag cleared below
+            }
+            else if (c == '`' && nxt == '{') {
+                // same: leave pointer at '`'
+            }
+            else if (c == '"') {
+                // leave pointer at '"'
+            }
+            else {
+                // edge: found char but not delimiter pair - consume it
+                advance_one(p, end, row, column);
+            }
+        }
+
+        token = Token::Literal;
+        InString = false;
+
+        Data = std::string_view(start, p - start);
+        Current.Ptr = p;
+        Current.Row = row;
+        Current.Column = column;
+        Current.Valid = (Current.Ptr < end);
+        Current.Previous = token;
+        return token;
+    }
+
+    // skip whitespace (batch)
+    const char* ws = p;
+    while (ws < end && is_whitespace((unsigned char)*ws)) ++ws;
+    consume_range(p, ws, end, row, column);
+    start = p;
+
+    if (p >= end) {
+        Current.Ptr = p;
+        Current.Row = row;
+        Current.Column = column;
+        Current.Valid = (Current.Ptr < end);
+        return Token::None;
+    }
+
+    unsigned char c = (unsigned char)*p;
+    char nxt = (p + 1 < end) ? *(p + 1) : '\0';
+
+    if (ValidIDFirst(c)) {
+        // numbers starting with x or . followed by digit
+        if ((c == 'x' || c == '.') && is_digit((unsigned char)nxt)) {
+            // number: consume alnum
+            const char* q = p;
+            while (q < end && is_alnum((unsigned char)*q)) ++q;
+            // fast path: identifiers/numbers don't include newlines, update column directly
+            size_t len = (size_t)(q - p);
+            column += len;
+            p = q;
+            token = Token::Number;
+        }
+        else {
+            const char* q = p;
+            while (q < end && ValidID((unsigned char)*q)) ++q;
+            // keyword check using pointer+length to avoid constructing string_view and avoid newline scan
+            size_t len = (size_t)(q - p);
+            Token k = lookup_keyword_ptr(p, len);
+            // update column directly (identifiers contain no newlines)
+            column += len;
+            p = q;
+            token = k;
+        }
+    }
+    else if (is_digit(c)) {
+        const char* q = p;
+        while (q < end && is_digit((unsigned char)*q)) ++q;
+        if (q < end) {
+            unsigned char cur = (unsigned char)*q;
+            if (cur == '.') {
+                const char* q2 = q + 1;
+                while (q2 < end && is_digit((unsigned char)*q2)) ++q2;
+                size_t len = (size_t)(q2 - p);
+                column += len;
+                p = q2;
+                token = Token::Number;
+            }
+            else if (cur == 'x') {
+                const char* q2 = q + 1;
+                while (q2 < end && is_alnum((unsigned char)*q2)) ++q2;
+                size_t len = (size_t)(q2 - p);
+                column += len;
+                p = q2;
+                token = Token::Number;
+            }
+            else {
+                size_t len = (size_t)(q - p);
+                column += len;
+                p = q;
+                token = Token::Number;
+            }
+        }
+        else {
+            size_t len = (size_t)(q - p);
+            column += len;
+            p = q;
+            token = Token::Number;
+        }
+    }
+    else {
+        // single or multi-char tokens
+        switch (c) {
+        case ';': token = Token::Semi; advance_one(p, end, row, column); break;
+        case '(' : token = Token::Lparenthesis; advance_one(p, end, row, column); break;
+        case ')' : token = Token::Rparenthesis; advance_one(p, end, row, column); break;
+        case '{' : token = Token::Lcurly; advance_one(p, end, row, column); break;
+        case '}' :
+            if (nxt == '`') {
+                token = Token::StrDelimiterR;
+                // consume both characters '}' and '`'
+                const char* q = p + 2 <= end ? p + 2 : end;
+                consume_range(p, q, end, row, column);
+                InString = true;
+            }
+            else {
+                token = Token::Rcurly;
+                advance_one(p, end, row, column);
+            }
+            break;
+        case '`':
+            if (nxt == '{') {
+                token = Token::StrDelimiterL;
+                const char* q = p + 2 <= end ? p + 2 : end;
+                consume_range(p, q, end, row, column);
+            }
+            else {
+                token = Token::Error;
+                advance_one(p, end, row, column);
+            }
+            break;
+        case '[': token = Token::Lbracket; advance_one(p, end, row, column); break;
+        case ']': token = Token::Rbracket; advance_one(p, end, row, column); break;
+        case '<': token = Token::Less; advance_one(p, end, row, column); break;
+        case '>': token = Token::Larger; advance_one(p, end, row, column); break;
+        case ',': token = Token::Comma; advance_one(p, end, row, column); break;
+        case '?': token = Token::Opt; advance_one(p, end, row, column); break;
+        case '.': token = Token::Dot; advance_one(p, end, row, column); break;
+        case ':':
+            if (is_alpha((unsigned char)nxt)) {
+                token = Token::ValueId;
+                // consume ':' then identifier chars
+                advance_one(p, end, row, column);
+                const char* q = p;
+                while (q < end && ValidID((unsigned char)*q)) ++q;
+                // identifiers don't include newlines
+                size_t len = (size_t)(q - p);
+                column += len;
+                p = q;
+            }
+            else {
+                token = Token::Colon;
+                advance_one(p, end, row, column);
+            }
+            break;
+        case '+': token = Token::Add; advance_one(p, end, row, column); break;
+        case '-': token = Token::Sub; advance_one(p, end, row, column); break;
+        case '*': token = Token::Mult; advance_one(p, end, row, column); break;
+        case '/':
+            if (nxt == '*') {
+                // find closing "*/" by searching for '*' and checking following '/'
+                const char* cur = p + 2;
+                const char* found = nullptr;
+                while (cur + 1 < end) {
+                    const char* star = (const char*)memchr(cur, '*', (size_t)(end - cur));
+                    if (!star) break;
+                    if (star + 1 < end && *(star + 1) == '/') { found = star; break; }
+                    cur = star + 1;
+                }
+                const char* q = found ? found + 2 : end;
+                // consume entire block comment
+                consume_range(p, q, end, row, column);
+                token = Token::Skip;
+            }
+            else {
+                token = Token::Div;
+                advance_one(p, end, row, column);
+            }
+            break;
+
+        case '"':
+            token = Token::Quote;
+            // toggle quote/string behaviour similar to original
+            InString = !InQuote;
+            InQuote = InString;
+            advance_one(p, end, row, column);
+            break;
+
+        case '=':
+            if (nxt == '=') {
+                token = Token::Equal;
+                // consume '=='
+                const char* q = p + 2 <= end ? p + 2 : end;
+                consume_range(p, q, end, row, column);
+            }
+            else {
+                token = Token::Assign;
+                advance_one(p, end, row, column);
+            }
+            break;
+
+        case '!':
+            if (nxt == '=') {
+                token = Token::NotEqual;
+                const char* q = p + 2 <= end ? p + 2 : end;
+                consume_range(p, q, end, row, column);
+            }
+            else { token = Token::Not; advance_one(p, end, row, column); }
+            break;
+
+        case '|':
+            if (nxt == '|') { token = Token::Or; const char* q = p + 2 <= end ? p + 2 : end; consume_range(p, q, end, row, column); }
+            else if (nxt == '>') { token = Token::Router; const char* q = p + 2 <= end ? p + 2 : end; consume_range(p, q, end, row, column); }
+            else { token = Token::Error; advance_one(p, end, row, column); }
+            break;
+
+        case '&':
+            if (nxt == '&') { token = Token::And; const char* q = p + 2 <= end ? p + 2 : end; consume_range(p, q, end, row, column); }
+            else { token = Token::Error; advance_one(p, end, row, column); }
+            break;
+
+        case '#': {
+            // comment until newline or end, consume newline as well (original advanced past newline)
+            const char* found = (const char*)memchr(p, '\n', (size_t)(end - p));
+            const char* q = found ? found + 1 : end;
+            consume_range(p, q, end, row, column);
+            token = Token::Skip;
+        } break;
+
+        default:
+            // unknown or skip: consume one
+            advance_one(p, end, row, column);
+            token = Token::Skip;
+            break;
+        }
+    }
+
+    Data = std::string_view(start, p - start);
+    Current.Ptr = p;
+    Current.Row = row;
+    Current.Column = column;
+    Current.Valid = (Current.Ptr < end);
+    Current.Previous = token;
+
+    return token;
+}

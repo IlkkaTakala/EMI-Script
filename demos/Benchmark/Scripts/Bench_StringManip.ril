@@ -1,0 +1,26 @@
+# Benchmark: string concatenation and manipulation
+
+def benchStringManip(iterations : number) {
+    var s = "";
+    for (var i = 0; i < iterations; i++) {
+        # simple concatenation
+        s = s + "x" + string(i % 10);
+        if ((i & 7) == 0) {
+            # substring via array of chars workaround: create array, then join
+            var a : array;
+            Array.Resize(a, String.Length(s));
+            for (var j = 0; j < String.Length(s); j++) {
+                a[j] = String.Substring(s, j, 1);
+            }
+            # rebuild string
+            var t = "";
+            for (item in a) t = t + item;
+            s = t;
+        }
+    }
+    return String.Length(s);
+}
+
+public def run_benchmark() {
+	benchStringManip(100000);
+}

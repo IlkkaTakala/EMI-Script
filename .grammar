@@ -55,6 +55,8 @@ Expr Expr Add Expr
 Expr Expr Sub Expr
 Expr Expr Div Expr
 Expr Expr Mult Expr
+Expr Expr Power Expr
+Expr Expr Mod Expr
 
 Expr Expr NotEqual Expr
 Expr Expr Equal Expr
@@ -108,6 +110,8 @@ Expr Expr Add Assign Expr
 Expr Expr Sub Assign Expr
 Expr Expr Div Assign Expr
 Expr Expr Mult Assign Expr
+Expr Expr Power Assign Expr
+Expr Expr Pow Assign Expr
 Expr VarDeclare
 Expr FunctionCall
 Expr Indexer
@@ -210,6 +214,8 @@ None Add
 None Sub 
 None Div 
 None Mult 
+None Power 
+None Mod 
 
 None NotEqual 
 None Equal 
@@ -262,6 +268,8 @@ Assign Assign
 None AssignAdd
 None AssignSub
 None AssignDiv
+None AssignMult
+None AssignPower
 None AssignMult
 None None VarDeclare
 None None FunctionCall

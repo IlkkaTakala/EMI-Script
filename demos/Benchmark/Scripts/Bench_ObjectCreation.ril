@@ -1,0 +1,31 @@
+# Benchmark: object creation and array allocation
+# Creates many objects similar to Node and stores them in an array.
+
+object BenchNode {
+    id : number = 0;
+    x : number = 0;
+    y : number = 0;
+    payload : array;
+}
+
+def benchObjectCreation(iterations : number) {
+    var out : array;
+    Array.Clear(out);
+
+    for (var i = 0; i < iterations; i++) {
+        var n = BenchNode{i, i % 100, (i / 100) % 100, []};
+        # create payload array of small size
+        Array.Resize(n.payload, 4);
+        for (var j = 0; j < 4; j++) {
+            n.payload[j] = i + j;
+        }
+        Array.Push(out, n);
+    }
+
+    # keep reference to avoid GC in case implementation frees unused objects
+    return out;
+}
+
+public def run_benchmark() {
+	benchObjectCreation(10000);
+}
