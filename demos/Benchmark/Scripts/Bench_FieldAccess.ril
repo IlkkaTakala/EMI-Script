@@ -25,5 +25,5 @@ def benchFieldAccess(iterations : number) {
 }
 
 public def run_benchmark() {
-	benchFieldAccess(1000000);
+	println(benchFieldAccess(1000000));
 }

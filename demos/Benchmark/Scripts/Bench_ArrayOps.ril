@@ -37,5 +37,5 @@ def benchArrayOps(n : number) {
 }
 
 public def run_benchmark() {
-	benchArrayOps(100000);
+	println(benchArrayOps(100000));
 }

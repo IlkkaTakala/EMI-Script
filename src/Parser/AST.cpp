@@ -353,7 +353,38 @@ void TypeConverter(NodeDataType& n, const TokenHolder& h)
 		n = false;
 		break;
 	default:
-		std::get<std::string>(n) = h.data;
+		std::string& result = std::get<std::string>(n);
+		auto& input = h.data;
+		result.reserve(input.size());
+
+		for (size_t i = 0; i < input.size(); ++i)
+		{
+			if (input[i] == '\\' && i + 1 < input.size())
+			{
+				++i; // move to escaped character
+
+				switch (input[i])
+				{
+				case 'n':  result += '\n'; break;
+				case 't':  result += '\t'; break;
+				case 'r':  result += '\r'; break;
+				case '\\': result += '\\'; break;
+				case '"':  result += '"'; break;
+				case '\'': result += '\''; break;
+				case '0':  result += '\0'; break;
+				case 'a':  result += "\a"; break;
+				case 'b':  result += "\b"; break;
+				case 'f':  result += "\f"; break;
+				case 'v':  result += "\v"; break;
+
+				default: result += input[i];
+				}
+			}
+			else
+			{
+				result += input[i];
+			}
+		}
 		break;
 	}
 }

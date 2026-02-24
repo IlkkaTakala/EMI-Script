@@ -36,8 +36,9 @@ InternalValue CopyToHost(const Variable& var)
 	{
 	case VariableType::String: {
 		auto str = var.as<String>();
-		char* out = new char[str->size()]();
+		char* out = new char[str->size() + 1]();
 		strcpy_s(out, str->size(), str->data());
+		out[str->size()] = 0;
 		return out;
 	} break;
 
@@ -180,10 +181,10 @@ void stradd(Variable& out, const Variable& lhs, const Variable& rhs)
 		auto r = rhs.as<String>();
 
 		size_t len = l->size() + r->size();
-		str = String::GetAllocator()->Make(len - 1);
+		str = String::GetAllocator()->Make(len);
 
 		memcpy(str->data(), l->data(), l->size());
-		memcpy(str->data() + l->size() - 1, r->data(), r->size());
+		memcpy(str->data() + l->size(), r->data(), r->size());
 	}
 	else {
 		auto r = toStdString(rhs);
@@ -192,8 +193,7 @@ void stradd(Variable& out, const Variable& lhs, const Variable& rhs)
 		str = String::GetAllocator()->Make(len);
 
 		memcpy(str->data(), l->data(), l->size());
-		memcpy(str->data() + l->size() - 1, r.data(), r.size());
-		str->data()[len - 1] = 0;
+		memcpy(str->data() + l->size(), r.data(), r.size());
 	}
 
 	out = str;
@@ -344,15 +344,17 @@ std::string toStdString(const Variable& in)
 {
 	switch (in.getType())
 	{
+	case VariableType::Undefined: return "Undefined";
 	case VariableType::Number: {
 		double value = in.as<double>();
 		if (trunc(value) == value && value < std::numeric_limits<int64_t>::max()) {
-			return std::to_string(static_cast<int64_t>(value)).c_str();
+			return std::to_string(static_cast<int64_t>(value));
 		}
-		return std::to_string(value).c_str();
+		return std::to_string(value);
 	}
 	case VariableType::Boolean: return in.as<bool>() ? "true" : "false";
-	case VariableType::String: return in.as<String>()->data();
+	case VariableType::String: 
+		return std::string(in.as<String>()->data(), in.as<String>()->size());
 	case VariableType::Function: return in.as<FunctionObject>()->Name.toString();
 	case VariableType::Array: {
 		std::string out = "[ ";

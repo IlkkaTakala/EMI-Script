@@ -492,7 +492,6 @@ void VM::GarbageCollect()
 Runner::Runner(VM* vm) : Owner(vm)
 {
 	Registers.reserve(64);
-	CallStack.reserve(32);
 	Running = false;
 	Paused = false;
 	TargetInstruction = 0;

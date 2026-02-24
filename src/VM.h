@@ -112,7 +112,7 @@ public:
 	void Join();
 
 	void SetRunning(bool value) { Running = value; }
-	const std::vector<CallObject>& GetCallStack() const { return CallStack; }
+	const std::list<CallObject>& GetCallStack() const { return CallStack; }
 	ScriptFunction* GetCurrentFunction() const { return CallStack.empty() ? nullptr : CallStack.back().FunctionPtr; }
 #ifdef INCLUDE_DEBUGGER
 	const uint32_t* GetCurrentPointer() const { return CurrentInstruction; }
@@ -133,7 +133,7 @@ private:
 	bool Running;
 	VM* Owner;
 	std::thread RunThread;
-	std::vector<CallObject> CallStack;
+	std::list<CallObject> CallStack;
 	RegisterStack<Variable> Registers;
 };
 

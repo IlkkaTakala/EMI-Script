@@ -70,16 +70,19 @@ public:
 		return ((value) & (QNAN | SIGN_BIT | TAG_NIL)) == (QNAN | SIGN_BIT | TAG_NIL);
 	}
 	inline bool isString() const {
-		return ((value) & (QNAN | SIGN_BIT)) == (QNAN | SIGN_BIT) && !(value & TAG_NIL);
+		return (value & (QNAN | TAG)) == QNAN;
 	}
 
 	ValueType getType() const {
 		if (isNumber()) return ValueType::Number;
-		if (isUndefined()) return ValueType::Undefined;
-		if (isString()) return ValueType::String;
-		if (isBool()) return ValueType::Boolean;
-		if (isExternal()) return ValueType::External;
-		return ValueType::Undefined;
+
+		switch (value & TAG)
+		{
+		case TAG_OBJECT: return ValueType::String;
+		case TAG_NIL: return ValueType::Undefined;
+		case TAG_BOOL: return ValueType::Boolean;
+		default: return ValueType::Undefined;
+		}
 	}
 
 	template<typename T>

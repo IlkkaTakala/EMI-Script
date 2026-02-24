@@ -26,5 +26,5 @@ public def benchConcurrencySim(tasks : number) {
 
 
 public def run_benchmark() {
-	benchConcurrencySim(10000);
+	println(benchConcurrencySim(1000));
 }

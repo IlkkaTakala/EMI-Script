@@ -149,8 +149,19 @@ Token Lexer::Analyse(std::string_view& Data)
 				else Current.Advance();
 			} break;
 
+			case '\\': {
+				Current.Advance();
+				Current.Advance();
+			} break;
+
 			case '"': {
-				InString = false;
+				if (QuoteChar == '"') InString = false;
+				else Current.Advance();
+			} break;
+
+			case '\'': {
+				if (QuoteChar == '\'') InString = false;
+				else Current.Advance();
 			} break;
 
 			default:
@@ -249,6 +260,14 @@ Token Lexer::Analyse(std::string_view& Data)
 			token = Token::Quote;
 			InString = !InQuote;
 			InQuote = InString;
+			QuoteChar = '"';
+		} break;
+
+		case '\'': {
+			token = Token::Quote;
+			InString = !InQuote;
+			InQuote = InString;
+			QuoteChar = '\'';
 		} break;
 
 		case '=': { 

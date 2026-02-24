@@ -123,6 +123,12 @@ public:
 		return *this;
 	}
 
+	template<typename T> requires std::is_class_v<T>
+	Variable& operator=(T* rhs) {
+		*this = Variable(rhs);
+		return *this;
+	}
+
 private:
 	VariableType getObjectType() const;
 };

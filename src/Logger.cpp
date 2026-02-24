@@ -3,11 +3,12 @@
 #include <fstream>
 #include <filesystem>
 
-LogService::LogService() : Output(nullptr)
+LogService::LogService(bool useLevel) : Output(nullptr)
 {
 	Output = new DefaultLogger();
 	CurrentLevel = EMI::LogLevel::Info;
 	OutputLevel = EMI::LogLevel::Debug;
+	UseLevel = useLevel;
 }
 
 void LogService::SetLogLevel(EMI::LogLevel level)

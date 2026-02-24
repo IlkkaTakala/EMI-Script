@@ -17,5 +17,5 @@ public def benchErrorHandling(n : number) {
 
 
 public def run_benchmark() {
-	benchErrorHandling(10000);
+	println(benchErrorHandling(10000));
 }

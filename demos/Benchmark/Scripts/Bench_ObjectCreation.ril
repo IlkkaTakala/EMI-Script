@@ -27,5 +27,5 @@ def benchObjectCreation(iterations : number) {
 }
 
 public def run_benchmark() {
-	benchObjectCreation(10000);
+	println(benchObjectCreation(10000));
 }

@@ -14,7 +14,7 @@ public def benchLongLoops(n : number) {
             # some math operations
             var v = arr[i];
             v = v * 2654435761 % 1024;
-            v = (v << 3) ^ (v >> 2);
+            v = v ^ 2;
             sum = sum + v;
             arr[i] = v;
         }
@@ -24,5 +24,5 @@ public def benchLongLoops(n : number) {
 
 
 public def run_benchmark() {
-	benchLongLoops(10000);
+	println(benchLongLoops(10000));
 }

@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <fstream>
 #include <sstream>
+#include <mutex>
 
 static std::string json_escape(const std::string &s) {
     std::ostringstream o;
@@ -30,12 +31,33 @@ static std::string json_escape(const std::string &s) {
     return o.str();
 }
 
+// Logger implementation that collects compile logs
+struct BenchmarkCompileLogger : public EMI::Logger {
+    std::mutex m;
+    std::string buf;
+    void Print(const char* msg) override {
+        std::lock_guard<std::mutex> lk(m);
+        if (msg) { buf += msg; buf += '\n'; }
+		std::cout << msg;
+    }
+    void PrintError(const char* msg) override {
+        std::lock_guard<std::mutex> lk(m);
+        if (msg) { buf += msg; buf += '\n'; }
+        std::cerr << msg;
+    }
+    void Clear() { std::lock_guard<std::mutex> lk(m); buf.clear(); }
+    std::string Get() { std::lock_guard<std::mutex> lk(m); return buf; }
+};
+
 int main()
 {
     using namespace std::chrono;
     std::srand((unsigned)time(nullptr));
     std::cout << "EMI Script Benchmark\n";
 
+    // Register compile logger before setting log levels so we capture compile-time messages
+    static BenchmarkCompileLogger compileLogger;
+    EMI::SetCompileLog(&compileLogger);
     EMI::SetLogLevel(EMI::LogLevel::Error);
 
     std::filesystem::path scriptsDir = "Scripts";
@@ -69,6 +91,9 @@ int main()
 
         Result res; res.path = relPath; res.compileMs = 0.0; res.compileSuccess = false; res.runMs = -1.0; res.error = "";
 
+        // Clear collected compile logs for this compile
+        compileLogger.Clear();
+
         auto t0 = high_resolution_clock::now();
         try {
             auto compileTask = vm.CompileScript(relPath.c_str());
@@ -82,7 +107,12 @@ int main()
             res.error = e.what();
             res.compileSuccess = false;
             res.compileMs = duration_cast<duration<double, std::milli>>(t1 - t0).count();
-            std::cout << "\nFailed after " << res.compileMs << " ms (exception: " << res.error << ")\n";
+            // attach compile logs
+            auto logs = compileLogger.Get();
+            if (!logs.empty()) {
+                res.error += std::string("\nCompileLog:\n") + logs;
+            }
+            std::cout << "\nFailed after " << res.compileMs << " ms (exception: " << e.what() << ")\n";
             results.push_back(res);
             continue;
         }
@@ -91,6 +121,10 @@ int main()
             res.error = "unknown error";
             res.compileSuccess = false;
             res.compileMs = duration_cast<duration<double, std::milli>>(t1 - t0).count();
+            auto logs = compileLogger.Get();
+            if (!logs.empty()) {
+                res.error += std::string("\nCompileLog:\n") + logs;
+            }
             std::cout << "\nFailed after " << res.compileMs << " ms (unknown error)\n";
             results.push_back(res);
             continue;
@@ -101,7 +135,7 @@ int main()
         std::cout << "\nDone in " << res.compileMs << " ms\n";
 
         // Attempt to run script. Try several common entrypoints
-		bool ran = false;
+        bool ran = false;
         try {
             EMI::FunctionHandle fh = vm.GetFunctionHandle("run_benchmark");
             if (!fh) throw(std::exception("run_benchmark not found!"));

@@ -58,7 +58,7 @@ inline LogService& gRuntimeError()
 
 inline LogService& gScriptLogger()
 {
-	static LogService log;
+	static LogService log(false);
 	return log;
 }
 

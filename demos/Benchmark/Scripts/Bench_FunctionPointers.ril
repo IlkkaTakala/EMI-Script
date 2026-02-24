@@ -19,5 +19,5 @@ public def benchFunctionPointers(n : number) {
 
 
 public def run_benchmark() {
-	benchFunctionPointers(10000);
+	println(benchFunctionPointers(10000));
 }

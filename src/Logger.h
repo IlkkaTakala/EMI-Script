@@ -17,7 +17,8 @@ private:
 class LogService
 {
 public:
-	explicit LogService();
+	LogService() : LogService(true) {}
+	LogService(bool useLevel);
 	void SetLogLevel(EMI::LogLevel level);
 	void SetLogger(EMI::Logger* log);
 
@@ -30,7 +31,7 @@ public:
 
 	template<typename T>
 	friend LogService& operator<<(LogService& log, const T& arg) {
-		if (log.OutputLevel > log.CurrentLevel) return log;
+		if (log.UseLevel && log.OutputLevel > log.CurrentLevel) return log;
 		std::stringstream ss;
 		ss << arg;
 		if (log.CurrentLevel < EMI::LogLevel::Warning)
@@ -44,6 +45,7 @@ private:
 	EMI::Logger* Output;
 	EMI::LogLevel CurrentLevel;
 	EMI::LogLevel OutputLevel;
+	bool UseLevel;
 
 	static constexpr std::array<const char*, 4> LogNames = { "[Debug] ", "[Info] ", "[Warning] ", "[Error] " };
 

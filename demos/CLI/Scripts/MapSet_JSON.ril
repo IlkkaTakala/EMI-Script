@@ -1,0 +1,359 @@
+# Map, Set and JSON parser for EMI script
+# Single-file implementation using EMI syntax inspired by demos/Benchmark scripts
+
+# --- Map implementation ---
+extend Global.Map:
+
+object MapContainer
+{
+    keys : array;
+    values : array;
+    equality : function;
+}
+
+public def defaultEq(a, b) { return a == b; }
+
+# Construct a new map
+public def New() {
+    var m : MapContainer;
+    Array.Clear(m.keys);
+    Array.Clear(m.values);
+    # default equality: tries simple equality (strings, numbers, booleans)
+    m.equality = defaultEq;
+    return m;
+}
+
+public def Clear(map : MapContainer) {
+    Array.Clear(map.keys);
+    Array.Clear(map.values);
+}
+
+public def Insert(map : MapContainer, key, value) {
+    var found = false;
+    var idx = 0;
+    for (item in map.keys) {
+        if (map.equality(item, key)) {
+            idx = _index_;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        idx = Array.Size(map.keys);
+        Array.Push(map.keys, key);
+    }
+    Array.Resize(map.values, Array.Size(map.keys));
+    map.values[idx] = value;
+}
+
+public def Get(map : MapContainer, key) {
+    for (item in map.keys) {
+        if (map.equality(item, key)) {
+            return map.values[_index_];
+        }
+    }
+    return null;
+}
+
+public def Has(map : MapContainer, key) {
+    for (item in map.keys) {
+        if (map.equality(item, key)) return true;
+    }
+    return false;
+}
+
+public def Erase(map : MapContainer, key) {
+    for (item in map.keys) {
+        if (map.equality(item, key)) {
+            Array.RemoveIndex(map.keys, _index_);
+            Array.RemoveIndex(map.values, _index_);
+            break;
+        }
+    }
+}
+
+public def Keys(map : MapContainer) {
+    return map.keys;
+}
+
+public def Values(map : MapContainer) {
+    return map.values;
+}
+
+public def Size(map : MapContainer) {
+    return Array.Size(map.keys);
+}
+
+# --- Set implementation (backed by Map) ---
+
+extend Global.Set:
+
+object SetContainer
+{
+    map : MapContainer;
+}
+
+public def New() {
+    var s : SetContainer;
+    s.map = Map.New();
+    return s;
+}
+
+public def Add(s : SetContainer, value) {
+    Map.Insert(s.map, value, true);
+}
+
+public def Has(s : SetContainer, value) {
+    return Map.Has(s.map, value);
+}
+
+public def Remove(s : SetContainer, value) {
+    Map.Erase(s.map, value);
+}
+
+public def Size(s : SetContainer) {
+    return Map.Size(s.map);
+}
+
+public def Clear(s : SetContainer) {
+    Map.Clear(s.map);
+}
+
+# --- JSON parser ---
+# The parser provides ParseJSONString(content) and ParseJSONFile(path)
+# ParseJSONFile will try to call File.Read(path) if provided by host; otherwise returns null
+
+extend Global.JSON:
+
+# helpers
+def _peek(s : string, i : number) {
+    if (i >= String.Length(s)) return "";
+    return String.Substring(s, i, 1);
+}
+
+def _isWhitespace(ch : string) {
+    return ch == " " || ch == "\t" || ch == "\n" || ch == "\r";
+}
+
+# advance index while whitespace
+def _skipWhitespace(s : string, idx : number) {
+    while (idx < String.Length(s) && _isWhitespace(_peek(s, idx))) {
+        ++idx;
+    }
+    return idx;
+}
+
+# parse JSON string starting at index (expects opening '"')
+def _parseString(s : string, idx : number) : array {
+    var out : array;
+    Array.Clear(out);
+    # return [value, newIndex]
+    var i = idx;
+    var len = String.Length(s);
+    # assume starting quote present
+    if (_peek(s, i) == '\"') {
+        ++i;
+    }
+    var buf = "";
+    while (i < len) {
+        var ch = _peek(s, i);
+        if (ch == '"') {
+            ++i;
+            break;
+        }
+        if (ch == "\\") {
+            ++i;
+            var esc = _peek(s, i);
+            if (esc == '"') buf = buf + '"';
+            else if (esc == '\\') buf = buf + '\\';
+            else if (esc == '/') buf = buf + '/';
+            else if (esc == 'b') buf = buf + '\b';
+            else if (esc == 'f') buf = buf + '\f';
+            else if (esc == 'n') buf = buf + '\n';
+            else if (esc == 'r') buf = buf + '\r';
+            else if (esc == 't') buf = buf + '\t';
+            else {
+                # unsupported unicode \uXXXX -> skip
+            }
+            ++i;
+            continue;
+        }
+        buf = buf + ch;
+        ++i;
+    }
+    Array.Push(out, buf);
+    Array.Push(out, i);
+    return out;
+}
+
+# parse number starting at idx
+def _parseNumber(s : string, idx : number) : array {
+    var out : array;
+    Array.Clear(out);
+    var i = idx;
+    var len = String.Length(s);
+    var start = i;
+    var ch = _peek(s, i);
+    if (ch == '-') { ++i; }
+    while (i < len) {
+        ch = _peek(s, i);
+        if (String.IsNumber(ch)) { ++i; continue; }
+        break;
+    }
+    if (_peek(s, i) == '.') {
+        ++i;
+        while (i < len) {
+            ch = _peek(s, i);
+            if (String.IsNumber(ch)) { ++i; continue; }
+            break;
+        }
+    }
+    # exponent
+    var p = _peek(s, i);
+    if (p == 'e' || p == 'E') {
+        ++i;
+        var q = _peek(s, i);
+        if (q == '+' || q == '-') ++i;
+        while (i < len) {
+            var d = _peek(s, i);
+            if (String.IsNumber(d)) { ++i; continue; }
+            break;
+        }
+    }
+    var numstr = String.Substring(s, start, i - start);
+    var num : number = 0 + numstr;
+    Array.Push(out, num);
+    Array.Push(out, i);
+    return out;
+}
+
+# parse literal true/false/null
+def _parseLiteral(s : string, idx : number) : array {
+    var out : array;
+    Array.Clear(out);
+    var i = idx;
+    if (String.Substring(s, i, 4) == "true") {
+        Array.Push(out, true);
+        Array.Push(out, i + 4);
+        return out;
+    }
+    if (String.Substring(s, i, 5) == "false") {
+        Array.Push(out, false);
+        Array.Push(out, i + 5);
+        return out;
+    }
+    if (String.Substring(s, i, 4) == "null") {
+        Array.Push(out, null);
+        Array.Push(out, i + 4);
+        return out;
+    }
+    Array.Push(out, null);
+    Array.Push(out, i);
+    return out;
+}
+
+def _parseArray(s : string, idx : number) : array {
+    var out : array; Array.Clear(out);
+    var i = idx;
+    # expect '['
+    if (_peek(s, i) == '[') ++i;
+    i = _skipWhitespace(s, i);
+    var arr : array; Array.Clear(arr);
+    if (_peek(s, i) == ']') { ++i; Array.Push(out, arr); Array.Push(out, i); return out; }
+    while (i < String.Length(s)) {
+        i = _skipWhitespace(s, i);
+        var res = _parseValue(s, i);
+        var val = res[0];
+        i = res[1];
+        Array.Push(arr, val);
+        i = _skipWhitespace(s, i);
+        var ch = _peek(s, i);
+        if (ch == ',') { ++i; continue; }
+        if (ch == ']') { ++i; break; }
+        # invalid, break
+        break;
+    }
+    Array.Push(out, arr);
+    Array.Push(out, i);
+    return out;
+}
+
+def _parseObject(s : string, idx : number) : array {
+    var out : array; Array.Clear(out);
+    var i = idx;
+    # expect '{'
+    if (_peek(s, i) == '{') ++i;
+    i = _skipWhitespace(s, i);
+    var map = Map.New();
+    if (_peek(s, i) == '}') { ++i; Array.Push(out, map); Array.Push(out, i); return out; }
+    while (i < String.Length(s)) {
+        i = _skipWhitespace(s, i);
+        # parse key (must be string)
+        if (_peek(s, i) != '"') { break; }
+        var kres = _parseString(s, i);
+        var key = kres[0];
+        i = kres[1];
+        i = _skipWhitespace(s, i);
+        if (_peek(s, i) != ':') { break; }
+        ++i;
+        i = _skipWhitespace(s, i);
+        var vres = _parseValue(s, i);
+        var val = vres[0];
+        i = vres[1];
+        Map.Insert(map, key, val);
+        i = _skipWhitespace(s, i);
+        var ch = _peek(s, i);
+        if (ch == ',') { ++i; continue; }
+        if (ch == '}') { ++i; break; }
+        break;
+    }
+    Array.Push(out, map);
+    Array.Push(out, i);
+    return out;
+}
+
+def _parseValue(s : string, idx : number) : array {
+    var out : array; Array.Clear(out);
+    var i = _skipWhitespace(s, idx);
+    var ch = _peek(s, i);
+    if (ch == '{') {
+        return _parseObject(s, i);
+    }
+    if (ch == '[') {
+        return _parseArray(s, i);
+    }
+    if (ch == '"') {
+        return _parseString(s, i);
+    }
+    if (ch == '-' || String.IsNumber(ch)) {
+        return _parseNumber(s, i);
+    }
+    # literal
+    return _parseLiteral(s, i);
+}
+
+# Public API: parse json from string content
+public def ParseJSONString(content : string) {
+    var res = _parseValue(content, 0);
+    return res[0];
+}
+
+# Try to parse a file - will attempt to call File.Read(path) if present; otherwise returns null
+public def ParseJSONFile(path : string) {
+    if (File.Read) { # checks may fail if File not present
+        var content = File.Read(path);
+        return ParseJSONString(content);
+	}
+    return null;
+}
+
+# helper run for quick tests (only runs in interactive environments)
+public def test_json() {
+    var txt = "{\"a\": 1, \"b\": [ true, false, null, \"str\\\\n\" ], \"o\": { \"x\": -3.14 } }";
+    var res = ParseJSONString(txt);
+    println("Parsed top-level type: ");
+    println(res);
+    return res;
+}
+
+# End of file

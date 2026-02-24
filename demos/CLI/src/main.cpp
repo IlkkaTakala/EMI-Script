@@ -8,6 +8,7 @@
 #include <functional>
 #include <vector>
 #include <string>
+#include <fstream>
 
 #ifndef GRAMMAR_SOURCE
 #define GRAMMAR_SOURCE "../../../.grammar"
@@ -243,11 +244,11 @@ int main(int argc, char** argv)
 		[](CommandContext& ctx, const std::vector<std::string>& params) {
 			if (params.size() == 3) {
 				auto handle = ctx.vm.GetFunctionHandle(params[1].c_str());
-				handle(params[2].c_str());
+				handle(params[2].c_str()).get<bool>();
 			}
 			if (params.size() == 2) {
 				auto handle = ctx.vm.GetFunctionHandle(params[1].c_str());
-				handle();
+				handle().get<bool>();
 			}
 			return 0;
 		}
@@ -336,3 +337,18 @@ int main(int argc, char** argv)
 	return 1;
 }
 
+std::string filedata;
+static const char* fileread(const char* path)
+{
+	if (!path) return nullptr;
+	std::ifstream file(path);
+	if (!file.is_open()) {
+		return nullptr;
+	}
+	
+	filedata = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+	return filedata.c_str();
+}
+
+EMI_REGISTER(File.Read, fileread);

@@ -7,11 +7,13 @@ public def fib(n : number) : number {
 }
 
 # tail-recursive fibonacci using accumulator
+def helper(k : number, a : number, b : number) : number {
+	if (k == 0) return a;
+	return helper(k - 1, b, a + b);
+}
+	
 public def fibTail(n : number) : number {
-    def helper(k : number, a : number, b : number) : number {
-        if (k == 0) return a;
-        return helper(k - 1, b, a + b);
-    }
+    
     return helper(n, 0, 1);
 }
 
@@ -22,9 +24,9 @@ public def benchRecursion(n : number) {
         r1 = fib(n);
     }
     var r2 = fibTail(n);
-    return Array{r1, r2};
+    return [r1, r2];
 }
 
 public def run_benchmark() {
-	benchRecursion(40);
+	println(benchRecursion(40));
 }

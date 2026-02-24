@@ -74,5 +74,6 @@ private:
 	Context Current;
 	bool InString;
 	bool InQuote;
+	char QuoteChar;
 	bool Valid;
 };
