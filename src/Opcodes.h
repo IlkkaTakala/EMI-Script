@@ -1,4 +1,5 @@
 X(Noop)
+X(Trap)
 X(Break)
 X(LoadNumber)
 X(LoadImmediate)

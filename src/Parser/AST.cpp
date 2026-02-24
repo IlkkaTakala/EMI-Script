@@ -1156,10 +1156,16 @@ void ASTWalker::handle_Id(Node* n) {
 				symbol->Sym = globalSymbol;
 				symbol->Global = true;
 				n->varType = globalSymbol->VarType;
-				if (globalSymbol->Type == SymbolType::Variable
-					|| globalSymbol->Type == SymbolType::Static
-					|| globalSymbol->Type == SymbolType::Function)
+				switch (globalSymbol->Type) {
+				case SymbolType::Variable:
+				case SymbolType::Static:
 					symbol->NeedsLoading = true;
+					break;
+				case SymbolType::Function:
+					if (n->regTarget != 255) // Dirty hack to prevent loading the function when it's being called
+						symbol->NeedsLoading = true;
+					break;
+				}
 			}
 		}
 		else {
@@ -1812,7 +1818,8 @@ void ASTWalker::handle_Else(Node* n) {
 
 void ASTWalker::handle_FunctionCall(Node* n) {
 	int type = 0;
-	GetFirstNode()
+	GetFirstNode();
+	first->regTarget = 255;
 	WalkOne(first);
 	auto name = getFullId(first);
 	if (!first->sym) {
@@ -1897,15 +1904,15 @@ function:
 	Out;
 
 	auto& arg = InstructionList.emplace_back();
-	arg.code = OpCodes::Noop;
+	arg.code = OpCodes::Trap;
 
 	switch (type)
 	{
-	case 0: arg.data = (uint32_t)index; break;
-	case 1: arg.data = (uint32_t)index; break;
-	case 2: arg.data = (uint32_t)index; break;
+	case 0: arg.param = (uint32_t)index; break;
+	case 1: arg.param = (uint32_t)index; break;
+	case 2: arg.param = (uint32_t)index; break;
 	case 3: arg.target = first->regTarget; break;
-	case 4: arg.data = (uint32_t)index; break;
+	case 4: arg.param = (uint32_t)index; break;
 	}
 }
 
@@ -2182,7 +2189,7 @@ void ASTWalker::HandleFunction(Node* n, ScriptFunction* f, CompileSymbol* s)
 	}
 
 	f->Bytecode.resize(InstructionList.size());
-	for (size_t i = 0; i < InstructionList.size(); i++) {
+	for (size_t i = 0; i < InstructionList.size(); ++i) {
 		f->Bytecode[i] = InstructionList[i].data;
 	}
 

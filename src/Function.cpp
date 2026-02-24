@@ -45,7 +45,7 @@ void ScriptFunction::Append(ScriptFunction fn)
 		} break;
 		case OpCodes::CallFunction: {
 			ins = reinterpret_cast<Instruction*>(&fn.Bytecode[++i]);
-			ins->data += (uint16_t)FunctionTableSymbols.size();
+			ins->param += (uint16_t)FunctionTableSymbols.size();
 		} break;
 		default:
 			break;

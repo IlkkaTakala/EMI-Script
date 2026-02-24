@@ -610,6 +610,9 @@ void Runner::Run()
 			}
 #undef X
 				TARGET(Noop) goto start;
+				TARGET(Trap) 
+					Error() << "Execution trap reached! Not good";
+					goto start; // @todo: We should probably break here
 				TARGET(Break) {
 					std::unique_lock lock(Owner->RunnerPauseMutex);
 					PauseDepth = (int)CallStack.size();
@@ -844,8 +847,8 @@ void Runner::Run()
 				TARGET(CallFunction) {
 					const Instruction& data = *(Instruction*)current->Ptr++;
 
-					auto& fn = current->FunctionPtr->FunctionTable[data.data];
-					auto& name = current->FunctionPtr->FunctionTableSymbols[data.data];
+					auto& fn = current->FunctionPtr->FunctionTable[data.param];
+					auto& name = current->FunctionPtr->FunctionTableSymbols[data.param];
 					if (fn == nullptr || fn->Next) {
 						auto res = Owner->GlobalSymbols.FindName(name);
 						if (res.first && res.second->Type == SymbolType::Function) {
