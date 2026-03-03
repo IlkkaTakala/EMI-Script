@@ -9,7 +9,7 @@
 #include "ankerl/unordered_dense.h"
 
 #include "EMI/EMI.h"
-#include "EmiDev/Variable.h"
+#include "EMIDev/Variable.h"
 #include "Function.h"
 #include "Intrinsic.h"
 #include "Namespace.h"

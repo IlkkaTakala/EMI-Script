@@ -1,6 +1,6 @@
 #pragma once
 #include "Defines.h"
-#include "EmiDev/Variable.h"
+#include "EMIDev/Variable.h"
 #include <vector>
 #include <Core.h>
 
