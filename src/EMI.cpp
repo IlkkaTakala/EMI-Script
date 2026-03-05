@@ -29,7 +29,7 @@ bool EMI::_internal_register(_internal_function* func)
 	fn->Host = func;
 	fn->IsPublic = true;
 	fn->Signature.Arguments.resize(func->arg_count);
-	for (int i = 0; i < func->arg_count; i++) {
+	for (size_t i = 0; i < func->arg_count; i++) {
 		fn->Signature.Arguments[i] = TypeFromValue(func->arg_types[i]);
 	}
 

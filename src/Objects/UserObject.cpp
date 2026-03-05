@@ -29,7 +29,7 @@ Variable ObjectManager::Make(VariableType type) const
 		object->RefCount++;
 
 		uint16_t idx = 0;
-		for (int i = 0; i < it->second.DefaultFields.size(); ++i) {
+		for (size_t i = 0; i < it->second.DefaultFields.size(); ++i) {
 			auto& field = it->second.DefaultFields[i];
 			auto& deftype = it->second.DefaultTypes[i];
 			if (deftype > VariableType::Boolean) {

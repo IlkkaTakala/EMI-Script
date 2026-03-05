@@ -5,9 +5,6 @@
 #ifdef WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#else 
-
-#endif
 
 ModuleWrapper ModuleLoader::LoadModule(const char* path)
 {
@@ -20,3 +17,10 @@ ModuleWrapper ModuleLoader::LoadModule(const char* path)
     loader;
     return ModuleWrapper();
 }
+
+#else 
+ModuleWrapper ModuleLoader::LoadModule(const char*)
+{
+    return ModuleWrapper();
+}
+#endif

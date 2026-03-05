@@ -148,7 +148,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, ScriptFunction*
 	ReadValue(instream, format);
 	ReadValue(instream, version);
 
-	if (strncmp(identifier, "EMI", 3) == 0 && version > EMI_VERSION || format > FORMAT_VERSION) {
+	if ((strncmp(identifier, "EMI", 3) == 0 && version > EMI_VERSION) || format > FORMAT_VERSION) {
 		gCompileError() << "Not EMI library file or version is too new";
 		return false;
 	}
@@ -206,7 +206,7 @@ bool Library::Decode(std::istream& instream, SymbolTable& table, ScriptFunction*
 					fn->Type = (FunctionType)data_u8;
 					ReadValue(in, data_u16);
 					fn->Signature.Return = (VariableType)data_u16;
-					ReadArray(in, fn->Signature.Arguments, [](std::istream& in, VariableType type) {
+					ReadArray(in, fn->Signature.Arguments, [](std::istream& in, VariableType& type) {
 						uint16_t data_u16;
 						ReadValue(in, data_u16);
 						type = (VariableType)data_u16;

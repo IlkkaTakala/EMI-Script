@@ -121,9 +121,8 @@ void VM::Interrupt()
 
 }
 
-std::string VM::FindLibrary(const char* name) const
+std::string VM::FindLibrary(const char*) const
 {
-	name;
 	return std::string();
 }
 
@@ -139,9 +138,8 @@ void VM::LoadLibrary(const char* name)
 	ModuleLoader::LoadModule(path.string().c_str());
 }
 
-void VM::LoadLibraryAsync(const char* name)
+void VM::LoadLibraryAsync(const char*)
 {
-	name;
 }
 
 bool VM::Export(const char* path, const ExportOptions& options)
@@ -164,7 +162,7 @@ bool VM::Export(const char* path, const ExportOptions& options)
 		}
 
 		ScriptFunction* fn = Units.values()[0].second.InitFunction;
-		for (int i = 1; i < Units.size(); i++) {
+		for (size_t i = 1; i < Units.size(); i++) {
 			fn->Append(*Units.values()[i].second.InitFunction);
 		}
 
@@ -518,7 +516,7 @@ void Runner::Pause(const uint32_t* ptr) {
 	CurrentInstruction = ptr;
 	Stepping = SteppingType::None;
 	std::unique_lock pauseLock(Owner->RunnerPauseMutex);
-	Owner->RunnerNotify.wait(pauseLock, [=]() { return !Paused || (Owner->PausedRunner == this && Stepping != SteppingType::None); });
+	Owner->RunnerNotify.wait(pauseLock, [this]() { return !Paused || (Owner->PausedRunner == this && Stepping != SteppingType::None); });
 }
 
 #define TARGET(Op) Op: 
@@ -573,21 +571,21 @@ void Runner::Run()
 			if (Paused) [[unlikely]] {
 				if (TargetInstruction == (uint32_t*)-1) {
 					std::unique_lock pauseLock(Owner->RunnerPauseMutex);
-					Owner->RunnerNotify.wait(pauseLock, [=]() { return !Paused || (Owner->PausedRunner == this && Stepping != SteppingType::None); });
+					Owner->RunnerNotify.wait(pauseLock, [this]() { return !Paused || (Owner->PausedRunner == this && Stepping != SteppingType::None); });
 				}
 				else {
 					switch (Stepping)
 					{
 					case SteppingType::Step:
-						if (current->Ptr > TargetInstruction && PauseDepth == CallStack.size())
+						if (current->Ptr > TargetInstruction && PauseDepth == static_cast<int>(CallStack.size()))
 							Pause(current->Ptr);
 						break;
 					case SteppingType::Up:
-						if (PauseDepth > CallStack.size())
+						if (PauseDepth > static_cast<int>(CallStack.size()))
 							Pause(current->Ptr);
 						break;
 					case SteppingType::Down:
-						if (PauseDepth < CallStack.size() || current->Ptr > TargetInstruction)
+						if (PauseDepth < static_cast<int>(CallStack.size()) || current->Ptr > TargetInstruction)
 							Pause(current->Ptr);
 						break;
 					default:
@@ -870,6 +868,7 @@ void Runner::Run()
 
 					switch (fn->Type)
 					{
+					case FunctionType::None: goto start;
 					case FunctionType::User: {
 
 						ScriptFunction* userfn = fn->Local;

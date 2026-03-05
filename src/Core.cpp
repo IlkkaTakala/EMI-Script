@@ -67,8 +67,8 @@ PathType::PathType(const char* text, PathType parent) : Path({ 0 }), Size(0)
 {
     if (text) {
 		auto parts = splits(text, '.');
-        Size = (char)parts.size();
-		for (int i = 0; i < parts.size(); i++) {
+        Size = static_cast<char>(parts.size());
+		for (int i = 0; i < static_cast<int>(parts.size()); i++) {
 			Path[Size - i - 1] = NameType(parts[i].c_str());
 		}
 
@@ -121,7 +121,7 @@ PathType& PathType::operator<<(const PathType& name) {
 
 PathType PathType::Append(const PathType& name, char off) const {
 	PathType out = *this;
-	if (Size + name.Size > Path.size()) return out;
+	if (Size + name.Size > static_cast<int>(Path.size())) return out;
 	std::copy(name.Path.begin() + off, name.Path.begin() + name.Size, out.Path.begin() + Size);
 	out.Size += name.Size - off;
 	return out;
@@ -160,7 +160,7 @@ bool PathType::IsChildOf(const PathType& name) const {
 std::string PathType::toString() const {
 	std::string out;
 	for (char i = Size - 1; i >= 0; i--) {
-		out += Path[i];
+		out += Path[i].GetName();
 		out += (i == 0 ? "" : ".");
 	}
 	return out;

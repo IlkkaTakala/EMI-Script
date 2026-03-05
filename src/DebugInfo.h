@@ -48,7 +48,7 @@ public:
 		return static_cast<int>(Scopes.size() - 1);
 	}
 	Scope* GetScope(int index) {
-		if (index < 0 || index >= Scopes.size()) return nullptr;
+		if (index < 0 || index >= static_cast<int>(Scopes.size())) return nullptr;
 		return &Scopes[index];
 	}
 

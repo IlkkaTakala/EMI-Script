@@ -191,7 +191,7 @@ namespace EMI
 	template<class F> requires (std::is_convertible_v<F, InternalValue>)
 		bool RegisterVariable(const std::string& name, F& f) {
 		
-
+		return true;
 	}
 
 	struct DebugLineInfo

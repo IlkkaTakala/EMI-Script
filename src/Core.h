@@ -62,7 +62,7 @@ public:
 		return Path;
 	}
 	auto Length() const { return Size; }
-	constexpr static size_t MaxLength() { return 5; }
+	constexpr static char MaxLength() { return 5; }
 
 	PathType Append(const PathType& name, char off = 0) const;
 	PathType Pop() const;
