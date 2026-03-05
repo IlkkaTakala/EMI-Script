@@ -160,7 +160,7 @@ bool PathType::IsChildOf(const PathType& name) const {
 std::string PathType::toString() const {
 	std::string out;
 	for (char i = Size - 1; i >= 0; i--) {
-		out += Path[i];
+		out += Path[i].toString();
 		out += (i == 0 ? "" : ".");
 	}
 	return out;
