@@ -23,7 +23,9 @@ void LogService::SetLogger(EMI::Logger* log)
 
 std::string MakePath(const std::string& path)
 {
-	return std::filesystem::absolute(path).string();
+	if (std::filesystem::is_directory(path))
+		return std::filesystem::absolute(path).string();
+	else return "";
 }
 
 void DefaultLogger::Print(const char* str)

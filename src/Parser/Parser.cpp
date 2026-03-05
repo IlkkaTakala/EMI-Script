@@ -439,9 +439,11 @@ Node* Parser::ConstructAST(CompileOptions& options)
 		ERRORCASE:
 		default: {
 			const auto& c = lex.GetContext();
-			gCompileError() << MakePath(options.Path) 
-				<< " (" << c.Row << ", " << c.Column << ")"
-				<< ": Critical error found '" << holder.data << "'. ";
+			if (options.Path.size() != 0)
+				gCompileError() << MakePath(options.Path) 
+					<< " (" << c.Row << ", " << c.Column << ")"
+					<< ": Critical error found '" << holder.data << "'. ";
+			else gCompileError() << "cli: Critical error found '" << holder.data << "'. ";
 #ifdef DEBUG
 			/*gCompileLogger() << "Expected one of: ";
 			int idx = 0;
