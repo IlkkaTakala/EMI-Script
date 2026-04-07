@@ -177,6 +177,49 @@ void mathsqrt(Variable& out, Variable* args, size_t argc) {
 	}
 }
 
+void mathfloor(Variable& out, Variable* args, size_t argc) {
+	if (argc == 1) {
+		out = floor(args[0].as<double>());
+	}
+}
+
+void mathround(Variable& out, Variable* args, size_t argc) {
+	if (argc == 1) {
+		out = static_cast<double>(std::llround(args[0].as<double>()));
+	}
+}
+
+void mathabs(Variable& out, Variable* args, size_t argc) {
+	if (argc == 1) {
+		out = std::abs(args[0].as<double>());
+	}
+}
+
+void mathmax(Variable& out, Variable* args, size_t argc) {
+	if (argc == 2) {
+		out = std::max(args[0].as<double>(), args[1].as<double>());
+	}
+}
+
+void mathmin(Variable& out, Variable* args, size_t argc) {
+	if (argc == 2) {
+		out = std::min(args[0].as<double>(), args[1].as<double>());
+	}
+}
+
+void mathclamp(Variable& out, Variable* args, size_t argc) {
+	if (argc == 3) {
+		out = std::clamp(args[0].as<double>(), args[1].as<double>(), args[2].as<double>());
+	}
+}
+
+void arrayReverse(Variable&, Variable* args, size_t argc) {
+	if (argc == 1 && args[0].getType() == VariableType::Array) {
+		auto& data = args[0].as<Array>()->data();
+		std::reverse(data.begin(), data.end());
+	}
+}
+
 
 
 auto AddFunction(const char* name, IntrinsicPtr fn, VariableType ret, std::vector<std::pair<const char*, VariableType>> args, bool hasReturn = false, bool anyargs = false) {
@@ -226,9 +269,17 @@ SymbolTable IntrinsicFunctions = { {
 	AddFunction("Array.Remove", arrayRemove,			VariableType::Undefined, { {"array", VariableType::Array }, { "value", VariableType::Undefined } }),
 	AddFunction("Array.RemoveIndex", arrayRemoveIdx,	VariableType::Undefined, { {"array", VariableType::Array }, { "index", VariableType::Number } }),
 	AddFunction("Array.Clear", arrayClear,				VariableType::Undefined, { {"array", VariableType::Array } } ),
-	AddFunction("Array.Find", arrayFind,				VariableType::Number,	 { {"array", VariableType::Array } }, true),
-	
+	AddFunction("Array.Find",    arrayFind,    VariableType::Number,    { {"array", VariableType::Array } }, true),
+	AddFunction("Array.Reverse", arrayReverse, VariableType::Undefined, { {"array", VariableType::Array } }),
+
 	AddNamespace("Math"),
-	AddFunction("Math.Sqrt", mathsqrt,					VariableType::Number,			{ { "value", VariableType::Number } }, true ),
-	AddFunction("Copy", copy,							VariableType::Undefined,		{ { "value", VariableType::Undefined } }, true ),
+	AddFunction("Math.Sqrt",  mathsqrt,  VariableType::Number, { { "value", VariableType::Number } }, true),
+	AddFunction("Math.Floor", mathfloor, VariableType::Number, { { "value", VariableType::Number } }, true),
+	AddFunction("Math.Round", mathround, VariableType::Number, { { "value", VariableType::Number } }, true),
+	AddFunction("Math.Abs",   mathabs,   VariableType::Number, { { "value", VariableType::Number } }, true),
+	AddFunction("Math.Max",   mathmax,   VariableType::Number, { { "a", VariableType::Number }, { "b", VariableType::Number } }, true),
+	AddFunction("Math.Min",   mathmin,   VariableType::Number, { { "a", VariableType::Number }, { "b", VariableType::Number } }, true),
+	AddFunction("Math.Clamp", mathclamp, VariableType::Number, { { "value", VariableType::Number }, { "min", VariableType::Number }, { "max", VariableType::Number } }, true),
+
+	AddFunction("Copy", copy, VariableType::Undefined, { { "value", VariableType::Undefined } }, true),
 } };
