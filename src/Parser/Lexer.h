@@ -24,7 +24,7 @@ struct Context
 	size_t Row{ 1 };
 	bool Valid;
 
-	Token Previous;
+	Token ContextToken;
 
 	bool Advance() {
 		switch (*Ptr) {
@@ -63,7 +63,9 @@ public:
 	void Reset();
 	bool IsValid() const { return Valid; }
 	Token GetNext(std::string_view& Data);
+	Token GetToken(std::string_view& Data);
 	const Context& GetContext() { return Current; }
+	const Context& GetTokenContext() { return Previous; }
 
 private:
 
@@ -72,6 +74,7 @@ private:
 	const char* FileData;
 	size_t Size;
 	Context Current;
+	Context Previous;
 	bool InString;
 	bool InQuote;
 	bool Valid;

@@ -106,6 +106,12 @@ Token Lexer::GetNext(std::string_view& Data)
 	return token;
 }
 
+Token Lexer::GetToken(std::string_view& Data)
+{
+	Token token = Analyse(Data);
+	return token;
+}
+
 Token Lexer::Analyse(std::string_view& Data)
 {
 	Token token(Token::None);
@@ -116,6 +122,7 @@ Token Lexer::Analyse(std::string_view& Data)
 	auto start = ptr;
 
 	if (InString && InQuote) {
+		Previous = Current;
 		while (InString && Current.Valid) {
 			switch (*(ptr))
 			{
@@ -147,13 +154,14 @@ Token Lexer::Analyse(std::string_view& Data)
 		InString = false;
 
 		Data = std::string_view(start, ptr - start - endOffset);
-		Current.Previous = token;
+		Previous.ContextToken = token;
 
 		return token;
 	}
 
 	while (is_whitespace(*ptr)) Current.Advance();
 	start = ptr;
+	Previous = Current;
 
 	if (ValidIDFirst(*ptr)) {
 		if ((*ptr == 'x' || *ptr == '.') && is_digit(*(ptr + 1))) {
@@ -284,7 +292,7 @@ Token Lexer::Analyse(std::string_view& Data)
 	}
 
 	Data = std::string_view(start, ptr - start - endOffset);
-	Current.Previous = token;
+	Previous.ContextToken = token;
 
 	return token;
 }
