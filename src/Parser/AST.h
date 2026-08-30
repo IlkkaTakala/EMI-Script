@@ -82,6 +82,8 @@ private:
 	void handle_Break(Node* n);
 	void handle_Else(Node* n);
 	void handle_FunctionCall(Node* n);
+	void handle_Try(Node* n);
+	void handle_Throw(Node* n);
 
 	void helper_Assign(Node* n, Node* last);
 

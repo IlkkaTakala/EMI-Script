@@ -338,3 +338,22 @@ std::string toStdString(const Variable& in)
 		return "Undefined";
 	}
 }
+
+std::string TypeToString(VariableType type)
+{
+	switch (type)
+	{
+	case VariableType::Undefined: return "Undefined";
+	case VariableType::Number: return "Number";
+	case VariableType::Boolean: return "Boolean";
+	case VariableType::String: return "String";
+	case VariableType::External: return "External";
+	case VariableType::Array: return "Array";
+	case VariableType::Function: return "Function";
+	default:
+		if (type >= VariableType::Object) {
+			return GetManager().GetTypeName(type).toString();
+		}
+		return "Invalid type";
+	}
+}

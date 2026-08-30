@@ -17,44 +17,20 @@ inline LogService& gCompileLogger()
 	static LogService log;
 	return log;
 }
-inline LogService& gCompileDebug()
-{
-	return gCompileLogger() << '\n' << EMI::LogLevel::Debug;
-}
-inline LogService& gCompileInfo()
-{
-	return gCompileLogger() << '\n' << EMI::LogLevel::Info;
-}
-inline LogService& gCompileWarn()
-{
-	return gCompileLogger() << '\n' << EMI::LogLevel::Warning;
-}
-inline LogService& gCompileError()
-{
-	return gCompileLogger() << '\n' << EMI::LogLevel::Error;
-}
+#define gCompileDebug() gCompileLogger().GetHandle() << EMI::LogLevel::Debug
+#define gCompileInfo() gCompileLogger().GetHandle() << EMI::LogLevel::Info
+#define gCompileWarn() gCompileLogger().GetHandle() << EMI::LogLevel::Warning
+#define gCompileError() gCompileLogger().GetHandle() << EMI::LogLevel::Error
 
 inline LogService& gRuntimeLogger()
 {
 	static LogService log;
 	return log;
 }
-inline LogService& gRuntimeDebug()
-{
-	return gRuntimeLogger() << '\n' << EMI::LogLevel::Debug;
-}
-inline LogService& gRuntimeInfo()
-{
-	return gRuntimeLogger() << '\n' << EMI::LogLevel::Info;
-}
-inline LogService& gRuntimeWarn()
-{
-	return gRuntimeLogger() << '\n' << EMI::LogLevel::Warning;
-}
-inline LogService& gRuntimeError()
-{
-	return gRuntimeLogger() << '\n' << EMI::LogLevel::Error;
-}
+#define gRuntimeDebug() gRuntimeLogger().GetHandle() << EMI::LogLevel::Debug
+#define gRuntimeInfo() gRuntimeLogger().GetHandle() << EMI::LogLevel::Info
+#define gRuntimeWarn() gRuntimeLogger().GetHandle() << EMI::LogLevel::Warning
+#define gRuntimeError() gRuntimeLogger().GetHandle() << EMI::LogLevel::Error
 
 inline LogService& gScriptLogger()
 {

@@ -14,12 +14,31 @@ private:
 
 };
 
+class LogService;
+class LogHandle
+{
+public:
+	LogHandle(LogService& log) : Log(log) {}
+	~LogHandle();
+
+	template<typename T>
+	friend inline const LogHandle& operator<<(const LogHandle& handle, const T& arg)
+	{
+		handle.Log << arg;
+		return handle;
+	}
+
+private:
+	LogService& Log;
+};
+
 class LogService
 {
 public:
 	explicit LogService();
 	void SetLogLevel(EMI::LogLevel level);
 	void SetLogger(EMI::Logger* log);
+	const LogHandle GetHandle() { return LogHandle(*this); }
 
 	LogService& operator<<(EMI::LogLevel level)
 	{
@@ -54,3 +73,4 @@ private:
 };
 
 std::string MakePath(const std::string& path);
+std::string MakeShortPath(const std::string& path);

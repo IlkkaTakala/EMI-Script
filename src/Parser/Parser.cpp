@@ -113,13 +113,17 @@ void Parser::InitializeGrammar([[maybe_unused]] const char* grammar)
 		}
 
 		if (Rules.size() != Data.size()) {
-			gCompileDebug() << "Invalid grammar";
+			gCompileDebug() << "Invalid grammar: " << Rules.size() << " rules, but " << Data.size() << " patterns";
 			return;
 		}
 
 		ParseTable_t Parse;
 		RuleTable.clear();
-		CreateParser(Parse, RuleTable, Data, Rules);
+		try {
+			CreateParser(Parse, RuleTable, Data, Rules);
+		} catch (std::exception e) {
+			gCompileError() << "Error building grammar: " << e.what();
+		}
 		Rules.clear();
 
 		if (ParseTable) {
@@ -182,10 +186,11 @@ void Parser::ThreadedParse(VM* vm)
 void Parser::Parse(VM* vm, CompileOptions& options)
 {
 	auto fullPath = MakePath(options.Path);
+	auto shortName = MakeShortPath(options.Path);
 	if (options.Data.size() == 0) {
-		gCompileDebug() << "Parsing file " << fullPath;
+		gCompileDebug() << "Parsing file " << shortName;
 		if (!std::filesystem::exists(options.Path)) {
-			gCompileWarn() << fullPath << ": File not found";
+			gCompileWarn() << shortName << ": File not found";
 			options.CompileResult.set_value(false);
 			return;
 		}
@@ -203,7 +208,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	gCompileDebug() << "Constructing AST";
 	auto root = ConstructAST(options);
 	if (!root) {
-		gCompileError() << fullPath << ": Parse failed";
+		gCompileError() << shortName << ": Parse failed";
 		options.CompileResult.set_value(false);
 		return;
 	}
@@ -211,7 +216,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 	Desugar(root);
 
 #ifdef DEBUG
-	//root->print("");
+	root->print("");
 #endif // DEBUG
 	gCompileDebug() << "Walking AST";
 	ASTWalker ast(vm, root, fullPath, options.UserOptions);
@@ -225,7 +230,7 @@ void Parser::Parse(VM* vm, CompileOptions& options)
 		options.CompileResult.set_value(true);
 	}
 	else {
-		gCompileError() << "Errors present, compile failed: " << fullPath;
+		gCompileError() << "Errors present, compile failed: " << shortName;
 		options.CompileResult.set_value(false);
 	}
 }
@@ -370,7 +375,7 @@ Node* Parser::ConstructAST(CompileOptions& options)
 				if (data.mergeToken == old.token) {
 					if (next.ptr) delete next.ptr;
 					next.ptr = old.ptr;
-					if (data.nodeType != Token::None) next.ptr->type = data.nodeType;
+					if (data.nodeType != Token::None && next.ptr) next.ptr->type = data.nodeType;
 				}
 				else {
 					if (old.ptr) {
@@ -440,7 +445,7 @@ Node* Parser::ConstructAST(CompileOptions& options)
 		default: {
 			const auto& c = lex.GetContext();
 			if (options.Path.size() != 0)
-				gCompileError() << MakePath(options.Path) 
+				gCompileError() << MakeShortPath(options.Path) 
 					<< " (" << c.Row << ", " << c.Column << ")"
 					<< ": Critical error found '" << holder.data << "'. ";
 			else gCompileError() << "cli: Critical error found '" << holder.data << "'. ";

@@ -29,7 +29,7 @@ Variable Node::ToVariable() const
 }
 
 inline bool IsControl(Token t) {
-	return t == Token::Return || t == Token::Break || t == Token::Continue;
+	return t == Token::Return || t == Token::Break || t == Token::Continue || t == Token::Throw;
 }
 
 inline bool IsConstant(Token t) {
@@ -435,6 +435,8 @@ ASTWalker::ASTWalker(VM* in_vm, Node* n, const std::string& file, const EMI::Opt
 	TokenJumpTable[(int)Token::Break] = &ASTWalker::handle_Break;
 	TokenJumpTable[(int)Token::Else] = &ASTWalker::handle_Else;
 	TokenJumpTable[(int)Token::FunctionCall] = &ASTWalker::handle_FunctionCall;
+	TokenJumpTable[(int)Token::Try] = &ASTWalker::handle_Try;
+	TokenJumpTable[(int)Token::Throw] = &ASTWalker::handle_Throw;
 }
 
 ASTWalker::~ASTWalker()
@@ -535,6 +537,7 @@ void ASTWalker::Run()
 				symbol->setType(SymbolType::Object);
 				auto object = new UserDefinedType{};
 				symbol->UserObject = object;
+				symbol->VarType = object->Type;
 
 				for (auto& field : c->children) {
 					Symbol flags;
@@ -1384,7 +1387,7 @@ void ASTWalker::handle_VarDeclare(Node* n) {
 		if (n->children.size() == 2) {
 			GetLastNode()
 			if (last->varType == NodeType || NodeType == VariableType::Undefined) {
-				sym->Sym->VarType = NodeType = last->varType;
+				sym->Sym->VarType = NodeType = last->varType; // @TODO: This could be simplified
 				if (!last->sym) {
 					sym->Register = n->regTarget = last->regTarget;
 				}
@@ -1460,7 +1463,7 @@ void ASTWalker::handle_ObjectInit(Node* n) {
 	auto& arg = InstructionList.emplace_back();
 	arg.code = OpCodes::Noop;
 	arg.param = (uint16_t)index;
-
+	NodeType = static_cast<VariableType>(static_cast<size_t>(VariableType::Object) + index);
 }
 
 void ASTWalker::handle_Return(Node* n) {
@@ -1816,6 +1819,83 @@ function:
 	case 3: arg.target = first->regTarget; break;
 	case 4: arg.data = (uint32_t)index; break;
 	}
+}
+
+void ASTWalker::handle_Try(Node* n)
+{
+	size_t Start = InstructionList.size();
+	WalkOne(n->children[0]);
+	std::vector<size_t> jumps(n->children.size(), 0);
+	{
+		Op(JumpForward);
+		jumps[0] = n->instruction;
+	}
+	size_t End = InstructionList.size();
+
+	for (int i = 1; i < n->children.size(); ++i) {
+		auto c = n->children[i];
+		if (c->children.size() != 2) {
+			Error("Invalid catch block");
+			continue;
+		}
+		auto& name = std::get<std::string>(c->children[0]->data);
+		uint8_t reg = 255;
+		auto& next = CurrentScope->children.emplace_back();
+		next.parent = CurrentScope;
+		CurrentScope = &next;
+		auto regs = Registers;
+		if (!name.empty()) {
+			reg = GetFirstFree();
+		}
+		for (auto& type : c->children[0]->children) {
+			handle_Typename(type);
+			ExceptionHandler handler{};
+			handler.Target = static_cast<uint32_t>(InstructionList.size());
+			handler.Start = static_cast<uint32_t>(Start);
+			handler.End = static_cast<uint32_t>(End);
+			handler.Type = static_cast<uint32_t>(type->varType) - static_cast<uint32_t>(VariableType::Object);
+			handler.Register = reg;
+			CurrentFunction->ExceptionHandlers.push_back(handler);
+		}
+		if (!name.empty()) {
+			auto symbol = FindOrCreateLocalSymbol(name.c_str());
+			VariableType varType = VariableType::Undefined;
+			SymbolFlags flags = SymbolFlags::None;
+			if (c->children[0]->children.size() == 1) {
+				varType = c->children[0]->children[0]->varType;
+				flags = SymbolFlags::Typed;
+			} 
+			symbol->Sym = new Symbol();
+			symbol->Sym->VarType = varType;
+			symbol->Sym->Flags = flags;
+			symbol->Sym->setType(SymbolType::Variable);
+			symbol->Resolved = true;
+			symbol->Register = reg;
+		}
+
+		WalkOne(c->children[1]);
+		n->line = c->line;
+		Op(JumpForward);
+		jumps[i] = n->instruction;
+
+		CurrentScope = CurrentScope->parent;
+		Registers = regs;
+	}
+	FreeChildren;
+
+	for (auto& jump : jumps) {
+		InstructionList[jump].param = InstructionList.size() - jump - 1;
+	}
+}
+
+void ASTWalker::handle_Throw(Node* n)
+{
+	GetFirstNode();
+	WalkOne(first);
+	FreeChildren;
+	n->line = first->line;
+	Op(Throw);
+	SetOut(n) = first->regTarget;
 }
 
 uint8_t ASTWalker::WalkStore(Node* n) {

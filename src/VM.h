@@ -53,6 +53,8 @@ struct CompileOptions
 struct CallObject 
 {
 	ScriptFunction* FunctionPtr;
+	FunctionSymbol* Symbol;
+	const uint32_t* Previous;
 	const uint32_t* Ptr;
 	const uint32_t* End;
 	size_t CallingInstruction;
@@ -113,6 +115,7 @@ public:
 
 	void SetRunning(bool value) { Running = value; }
 	const std::vector<CallObject>& GetCallStack() const { return CallStack; }
+	std::vector<std::string> GetStackTrace() const;
 	ScriptFunction* GetCurrentFunction() const { return CallStack.empty() ? nullptr : CallStack.back().FunctionPtr; }
 #ifdef INCLUDE_DEBUGGER
 	const uint32_t* GetCurrentPointer() const { return CurrentInstruction; }
@@ -163,7 +166,7 @@ public:
 	void* GetFunctionID(const std::string& name);
 
 	size_t CallFunction(FunctionHandle handle, const std::span<InternalValue>& args);
-	size_t DirectCallFunction(ScriptFunction* symbol, const std::vector<VariableType>& argTypes, const std::span<InternalValue>& args);
+	size_t DirectCallFunction(FunctionSymbol* symbol, ScriptFunction* fn, const std::vector<VariableType>& argTypes, const std::span<InternalValue>& args);
 	InternalValue GetReturnValue(size_t index);
 	bool WaitForResult(void* ptr);
 

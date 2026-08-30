@@ -9,6 +9,7 @@
 #include <math.h>
 #include <thread>
 #include <algorithm>
+#include "Exception.h"
 
 void print(Variable&, Variable* args, size_t argc) {
 	if (argc > 0) {
@@ -30,6 +31,7 @@ void printLn(Variable& out, Variable* args, size_t argc) {
 void delay(Variable&, Variable* args, size_t argc) {
 	if (argc > 0) {
 		std::this_thread::sleep_for(std::chrono::milliseconds((size_t)toNumber(args[0])));
+		throw RuntimeException("Exception", "Invalid call");
 	}
 }
 

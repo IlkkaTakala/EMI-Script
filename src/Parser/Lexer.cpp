@@ -23,6 +23,9 @@ ankerl::unordered_dense::map<std::string_view, Token> TokenMap = {
 	{"while", Token::While },
 	{"break", Token::Break },
 	{"continue", Token::Continue },
+	{"try", Token::Try },
+	{"catch", Token::Catch },
+	{"throw", Token::Throw },
 	{"extend", Token::Extend },
 	{"using", Token::Using },
 	{"import", Token::Import },
@@ -265,7 +268,7 @@ Token Lexer::Analyse(std::string_view& Data)
 			switch (*ptr) {
 				case '|': { token = Token::Or; } break; 
 				case '>': { token = Token::Router; } break; 
-				default: token = Token::Error;
+				default: token = Token::BitwiseOr;
 			}
 		} break;
 
@@ -274,7 +277,12 @@ Token Lexer::Analyse(std::string_view& Data)
 			if (*ptr == '&') {
 				token = Token::And;
 			}
-			else token = Token::Error; 
+			else token = Token::BitwiseAnd; 
+		} break;
+
+		case '^': {
+			Current.Advance();
+			token = Token::BitwiseXor;
 		} break;
 
 		case '#': { 

@@ -46,7 +46,7 @@ MStmt Scope MStmt
 MStmt None
 Stmt Expr Semi
 Stmt Flow
-Stmt Setter Semi
+Stmt Throw Expr Semi
 
 Expr Expr Add Add
 Expr Expr Sub Sub
@@ -117,8 +117,6 @@ Expr ObjectInit
 
 ObjectInit Identifier Lcurly CallParams Rcurly
 
-Setter Set ValueId
-
 Control Return Expr
 Control Return
 Control Continue
@@ -127,14 +125,24 @@ Control Break
 Flow IfFlow
 Flow ForFlow
 Flow WhileFlow
+Flow TryFlow
 
 IfFlow If Lparenthesis Expr Rparenthesis FlowBlock ElseFlow
 ForFlow For Lparenthesis Expr Semi Expr Semi Expr Rparenthesis FlowBlock ElseFlow
 ForFlow For Lparenthesis Expr Rparenthesis FlowBlock ElseFlow
 ForFlow For Lparenthesis Id In Expr Rparenthesis FlowBlock ElseFlow
 WhileFlow While Lparenthesis Expr Rparenthesis FlowBlock
+TryFlow Try FlowBlock MCatchBlock
 ElseFlow Else FlowBlock
 ElseFlow None
+
+MCatchBlock CatchBlock MCatchBlock
+MCatchBlock CatchBlock
+CatchBlock Catch Lparenthesis CatchList Rparenthesis Scope
+CatchList CatchException
+CatchList CatchException BitwiseOr CatchList
+CatchList CatchList Id
+CatchException Id
 
 FlowBlock Stmt
 FlowBlock Scope
@@ -201,7 +209,7 @@ None Scope MStmt
 None Scope 
 None None Expr
 None None Flow
-None None Setter
+None Throw
 
 None Increment
 None Decrement 
@@ -272,8 +280,6 @@ None None ObjectInit
 
 .
 
-ValueId
-
 None Return
 None Return
 None Continue
@@ -282,14 +288,24 @@ None Break
 None None IfFlow
 None None ForFlow
 None None WhileFlow
+None None TryFlow
 
 None If
 None For
 None For
 Id For
 None While
+None Try MCatchBlock
 None Else
 None Else
+
+None None MCatchBlock
+None CatchBlock
+.
+.
+None None CatchList
+Id None CatchList
+Id
 
 None None Stmt 
 None None Scope 

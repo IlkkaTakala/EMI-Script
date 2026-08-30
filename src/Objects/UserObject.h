@@ -21,6 +21,8 @@ public:
 	~UserObject();
 
 	void Clear();
+	void SetField(const NameType& name, Variable var);
+	Variable GetField(const NameType& name) const;
 
 	static Allocator<UserObject>* GetAllocator();
 
@@ -70,6 +72,7 @@ public:
 	Variable Make(VariableType type) const ;
 
 	bool GetType(UserDefinedType*& type, const PathType& name);
+	PathType GetTypeName(VariableType type);
 
 	bool GetPropertyIndex(uint16_t& out, const NameType& name, VariableType type);
 	bool GetPropertySymbol(Symbol*& symbol, const NameType& name, VariableType type);

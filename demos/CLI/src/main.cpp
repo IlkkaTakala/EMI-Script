@@ -243,11 +243,11 @@ int main(int argc, char** argv)
 		[](CommandContext& ctx, const std::vector<std::string>& params) {
 			if (params.size() == 3) {
 				auto handle = ctx.vm.GetFunctionHandle(params[1].c_str());
-				handle(params[2].c_str());
+				handle(params[2].c_str()).get<void>();
 			}
 			if (params.size() == 2) {
 				auto handle = ctx.vm.GetFunctionHandle(params[1].c_str());
-				handle();
+				handle().get<void>();
 			}
 			return 0;
 		}
@@ -296,7 +296,7 @@ int main(int argc, char** argv)
 		bool run = true;
 		std::string input;
 		while (run) {
-			printf("\nemi: ");
+			printf("emi: ");
 			std::getline(std::cin, input);
 			auto res = parseArgs(input);
 			if (res.size() < 1) continue;

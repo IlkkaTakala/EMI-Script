@@ -1,4 +1,5 @@
 #include "Function.h"
+#include "Helpers.h"
 
 // @todo: Fix this, doesn't work with sets!!!
 void ScriptFunction::Append(ScriptFunction fn)
@@ -66,6 +67,30 @@ void ScriptFunction::Append(ScriptFunction fn)
 
 	RegisterCount = std::max(RegisterCount, fn.RegisterCount);
 	Bytecode.insert(Bytecode.end(), fn.Bytecode.begin(), fn.Bytecode.end());
+}
+
+std::string FunctionSignature::toString() const
+{
+	std::string str = "(";
+	if (AnyNumArgs) {
+		str += "...";
+	}
+	else {
+		for (size_t i = 0; i < ArgumentNames.size(); i++) {
+			str += ArgumentNames[i];
+			if (Arguments[i] != VariableType::Undefined) {
+				str += " : " + TypeToString(Arguments[i]);
+			}
+			if (i < ArgumentNames.size() - 1) {
+				str += ", ";
+			}
+		}
+	}
+	str += ")";
+	if (HasReturn) {
+		str += " : " + TypeToString(Return);
+	}
+	return str;
 }
 
 FunctionSymbol::~FunctionSymbol()

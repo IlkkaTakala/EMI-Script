@@ -28,3 +28,5 @@ double toNumber(const Variable& in);
 class String;
 String* toString(const Variable& in);
 std::string toStdString(const Variable& in);
+
+std::string TypeToString(VariableType type);

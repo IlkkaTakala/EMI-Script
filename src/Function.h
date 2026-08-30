@@ -83,6 +83,8 @@ struct FunctionSignature
 	std::vector<NameType> ArgumentNames;
 	bool HasReturn;
 	bool AnyNumArgs;
+
+	std::string toString() const;
 };
 
 struct FunctionSymbol
@@ -118,6 +120,15 @@ struct FunctionTable
 	}
 };
 
+struct ExceptionHandler
+{
+	uint32_t Start;
+	uint32_t End;
+	uint32_t Type;
+	uint32_t Target;
+	uint8_t Register;
+};
+
 struct ScriptFunction
 {
 	PathType Name;
@@ -134,6 +145,8 @@ struct ScriptFunction
 	std::vector<NameType> PropertyTableSymbols;
 	std::vector<PathTypeQuery> TypeTableSymbols;
 	std::vector<PathTypeQuery> GlobalTableSymbols;
+
+	std::vector<ExceptionHandler> ExceptionHandlers;
 
 	ScopeType* FunctionScope;
 

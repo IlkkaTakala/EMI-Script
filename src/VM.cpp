@@ -11,6 +11,7 @@
 #include "EMLibFormat.h"
 #include "ModuleLoader.h"
 #include "Parser/AST.h"
+#include "Exception.h"
 
 VM::VM()
 {
@@ -232,10 +233,10 @@ size_t VM::CallFunction(FunctionHandle handle, const std::span<InternalValue>& a
 		return (size_t)-1;
 	}
 
-	return DirectCallFunction(sym->Local, sym->Signature.Arguments, args);
+	return DirectCallFunction(sym, sym->Local, sym->Signature.Arguments, args);
 }
 
-size_t VM::DirectCallFunction(ScriptFunction* fn, const std::vector<VariableType>& argTypes, const std::span<InternalValue>& args)
+size_t VM::DirectCallFunction(FunctionSymbol* symbol, ScriptFunction* fn, const std::vector<VariableType>& argTypes, const std::span<InternalValue>& args)
 {
 	if (!fn) {
 		gRuntimeWarn() << "Invalid function handle";
@@ -244,6 +245,7 @@ size_t VM::DirectCallFunction(ScriptFunction* fn, const std::vector<VariableType
 
 	CallObject& call = CallQueue.emplace(fn);
 
+	call.Symbol = symbol;
 	call.Arguments.reserve(args.size());
 	for (size_t i = 0; i < argTypes.size() && i < args.size(); i++) {
 		auto val = CopyToVM(args[i]);
@@ -346,7 +348,7 @@ void VM::AddCompileUnit(const std::string& path, const SymbolTable& space, Scrip
 		Units[path].InitFunction = InitFunction;
 		//GlobalSymbols.Table.insert(space.Table.begin(), space.Table.end());
 	}
-	size_t idx = DirectCallFunction(InitFunction, {}, {});
+	size_t idx = DirectCallFunction(nullptr, InitFunction, {}, {});
 	GetReturnValue(idx);
 }
 
@@ -511,6 +513,20 @@ void Runner::Join()
 	RunThread.join();
 }
 
+std::vector<std::string> Runner::GetStackTrace() const
+{
+	std::vector<std::string> trace{};
+	for (auto it = CallStack.rbegin(); it != CallStack.rend(); ++it) {
+		auto& fn = *it;
+		auto debugs = Owner->DebugInformation.GetFunction(fn.FunctionPtr->Name);
+		int line = debugs->GetLineForInstruction(static_cast<int>(fn.Previous - fn.FunctionPtr->Bytecode.data()));
+		std::string args = "";
+		trace.push_back(fn.FunctionPtr->Name.toString() + (fn.Symbol ? fn.Symbol->Signature.toString() : "()") 
+			+ " (" + debugs->File.string() + ":" + std::to_string(line) + ")");
+	}
+	return trace;
+}
+
 void Runner::Pause(const uint32_t* ptr) {
 	TargetInstruction = (uint32_t*)-1;
 	CurrentInstruction = ptr;
@@ -520,8 +536,8 @@ void Runner::Pause(const uint32_t* ptr) {
 }
 
 #define TARGET(Op) Op: 
-#define Error() gRuntimeError() << current->FunctionPtr->Name << " (" << FunctionDebug->GetLineForInstruction(int(current->Ptr - current->FunctionPtr->Bytecode.data())) << "):  "
-#define Warn() gRuntimeWarn() << current->FunctionPtr->Name << " (" << FunctionDebug->GetLineForInstruction(int(current->Ptr - current->FunctionPtr->Bytecode.data())) << "):  "
+#define Error() gRuntimeError() << current->FunctionPtr->Name << "(" << FunctionDebug->GetLineForInstruction(int(current->Previous - current->FunctionPtr->Bytecode.data())) << "):  "
+#define Warn() gRuntimeWarn() << current->FunctionPtr->Name << "(" << FunctionDebug->GetLineForInstruction(int(current->Previous - current->FunctionPtr->Bytecode.data())) << "):  "
 
 void Runner::Run()
 {
@@ -562,6 +578,7 @@ void Runner::Run()
 
 #define NUMS current->FunctionPtr->NumberTable.values()
 #define STRS current->FunctionPtr->StringTable
+		try {
 		out:
 		while (interrupt && Running) {
 
@@ -595,7 +612,12 @@ void Runner::Run()
 				}
 			}
 #endif
-			const Instruction& byte = *(Instruction*)current->Ptr++;
+			if (current->Ptr > current->End) [[unlikely]] {
+				Error() << "Instruction pointer out of bounds!";
+				goto end;
+			}
+			current->Previous = current->Ptr++;
+			const Instruction& byte = *(Instruction*)current->Previous;
 
 #define X(x) case OpCodes::x: goto x;
 			switch (byte.code)
@@ -906,6 +928,7 @@ void Runner::Run()
 
 						auto offset = current->StackOffset + byte.in1;
 						auto& call = CallStack.emplace_back(userfn); // @todo: do this better, too slow
+						call.Symbol = fn;
 						call.StackOffset = offset;
 						call.CallingInstruction = current->Ptr - current->FunctionPtr->Bytecode.data();
 						Registers.reserve(call.StackOffset + userfn->RegisterCount);
@@ -920,12 +943,23 @@ void Runner::Run()
 						for (int i = 0; i < byte.in2; ++i) {
 							args[i] = makeHostArg(Registers[byte.in1 + i]);
 						}
-						InternalValue ret = (*fn->Host)(byte.in2, args.data());
-						Registers[byte.target] = CopyToVM(ret);
+						try {
+							InternalValue ret = (*fn->Host)(byte.in2, args.data());
+							Registers[byte.target] = CopyToVM(ret);
+						} catch (const RuntimeException& e) {
+							Registers[byte.target] = e.ToVMException();
+							goto Throw;
+						}
 						break;
 					}
 					case FunctionType::Intrinsic: {
-						fn->Intrinsic(Registers[byte.target], &Registers[byte.in1], byte.in2);
+						try {
+							fn->Intrinsic(Registers[byte.target], &Registers[byte.in1], byte.in2);
+						}
+						catch (const RuntimeException& e) {
+							Registers[byte.target] = e.ToVMException();
+							goto Throw;
+						}
 						break;
 					}
 					}
@@ -992,6 +1026,7 @@ void Runner::Run()
 
 						auto offset = current->StackOffset + byte.in1;
 						auto& call = CallStack.emplace_back(ptr); // @todo: do this better, too slow
+						call.Symbol = fnsym;
 						call.StackOffset = offset;
 						call.CallingInstruction = current->Ptr - current->FunctionPtr->Bytecode.data();
 						Registers.reserve(call.StackOffset + ptr->RegisterCount);
@@ -1006,13 +1041,24 @@ void Runner::Run()
 						for (int i = 0; i < byte.in2; ++i) {
 							args[i] = makeHostArg(Registers[byte.in1 + i]);
 						}
-						InternalValue ret = (*ptr)(byte.in2, args.data());
-						Registers[byte.target] = CopyToVM(ret);
+						try {
+							InternalValue ret = (*ptr)(byte.in2, args.data());
+							Registers[byte.target] = CopyToVM(ret);
+						} catch (const RuntimeException& e) {
+							Registers[byte.target] = e.ToVMException();
+							goto Throw;
+						}
 					} break;
 
 					case FunctionType::Intrinsic: {
 						auto ptr = fnsym->Intrinsic;
-						ptr(Registers[byte.target], &Registers[byte.in1], byte.in2);
+						try {
+							ptr(Registers[byte.target], &Registers[byte.in1], byte.in2);
+						}
+						catch (const RuntimeException& e) {
+							Registers[byte.target] = e.ToVMException();
+							goto Throw;
+						}
 					} break;
 
 					case FunctionType::None: {
@@ -1257,12 +1303,84 @@ void Runner::Run()
 					Registers[byte.target] = toNumber(Registers[byte.in1]) >= toNumber(Registers[byte.in2]);
 				} goto start;
 
+				TARGET(Throw) {
+
+					auto trace = GetStackTrace();
+					VariableType exceptionType = Registers[byte.target].getType();
+
+					while (!CallStack.empty()) {
+						const CallObject& top = CallStack.back();
+						size_t inst = top.Ptr - top.FunctionPtr->Bytecode.data();
+
+						ExceptionHandler* handle = nullptr;
+						for (auto& handler : top.FunctionPtr->ExceptionHandlers) {
+							if (handler.Start <= inst) {
+								if (handler.End >= inst) {
+									auto& type = top.FunctionPtr->TypeTable[handler.Type];
+									if (type == VariableType::Undefined) {
+										auto& name = top.FunctionPtr->TypeTableSymbols[handler.Type];
+										auto res = Owner->GlobalSymbols.FindName(name);
+										if (res.second && res.second->Type == SymbolType::Object) {
+											UserDefinedType* usertype = res.second->UserObject;
+											type = usertype->Type;
+										}
+										else {
+											Error() << "Type not defined: " << name;
+											continue;
+										}
+									}
+
+									if (exceptionType != type) continue;
+
+									handle = &handler;
+								}
+								else {
+									break;
+								}
+							}
+						}
+
+						if (handle) {
+							current = &CallStack.back();
+							current->Ptr = current->FunctionPtr->Bytecode.data() + handle->Target;
+
+							if (handle->Register != 255) {
+								Variable variable = Registers[byte.target];
+								Registers.to(current->StackOffset);
+								Registers[handle->Register] = variable;
+							}
+							else {
+								Registers.to(current->StackOffset);
+							}
+							goto start;
+						}
+
+						if (CallStack.size() == 1) {
+							break;
+						}
+
+						CallStack.pop_back();
+					}
+
+					gRuntimeError() << "Unhandled exception: " << GetManager().GetTypeName(Registers[byte.target].getType()) << toStdString(Registers[byte.target]);
+					for (auto& str : trace) {
+						gRuntimeLogger() << "\t" << str << "\n";
+					}
+					goto end;
+
+				} goto start;
 		}
 	end:
-		if (hasReturn) {
-
+		if (!hasReturn) {
+			Owner->ReturnPromiseValues[current->PromiseIndex].set_value({});
 		}
-
+		}
+		catch (const std::exception& e) {
+			gRuntimeError() << "Unhandled exception: " << e.what();
+			Owner->ReturnPromiseValues[current->PromiseIndex].set_value({});
+			CallStack.clear();
+			Registers.to(0);
+		}
 	}
 }
 
@@ -1271,6 +1389,7 @@ CallObject::CallObject(ScriptFunction* function)
 	PromiseIndex = 0;
 	FunctionPtr = function;
 	StackOffset = 0;
+	CallingInstruction = 0;
 	Ptr = function->Bytecode.data();
 	End = function->Bytecode.data() + function->Bytecode.size();
 }

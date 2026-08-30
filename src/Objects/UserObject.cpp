@@ -63,6 +63,14 @@ bool ObjectManager::GetType(UserDefinedType*& type, const PathType& name)
 	return true;
 }
 
+PathType ObjectManager::GetTypeName(VariableType type)
+{
+	for (const auto& [key, value] : NameToType)
+		if (value == type)
+			return key;
+	return {};
+}
+
 bool ObjectManager::GetPropertyIndex(uint16_t& out, const NameType& name, VariableType type)
 {
 	if (auto it = BaseTypes.find(type); it != BaseTypes.end()) {
@@ -139,6 +147,25 @@ void UserObject::Clear()
 {
 	for (int i = 0; i < DataCount; ++i) {
 		Data[i].setUndefined();
+	}
+}
+
+void UserObject::SetField(const NameType& name, Variable var)
+{
+	uint16_t idx = 0;
+	if (GetManager().GetPropertyIndex(idx, name, Type)) {
+		Data[idx] = var;
+	}
+}
+
+Variable UserObject::GetField(const NameType& name) const
+{
+	uint16_t idx = 0;
+	if (GetManager().GetPropertyIndex(idx, name, Type)) {
+		return Data[idx];
+	}
+	else {
+		return Variable();
 	}
 }
 

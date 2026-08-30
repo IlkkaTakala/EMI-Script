@@ -23,8 +23,15 @@ void LogService::SetLogger(EMI::Logger* log)
 
 std::string MakePath(const std::string& path)
 {
-	if (std::filesystem::is_directory(path))
+	if (std::filesystem::is_regular_file(path))
 		return std::filesystem::absolute(path).string();
+	else return "";
+}
+
+std::string MakeShortPath(const std::string& path)
+{
+	if (std::filesystem::is_regular_file(path))
+		return std::filesystem::path(path).filename().string();
 	else return "";
 }
 
@@ -36,4 +43,9 @@ void DefaultLogger::Print(const char* str)
 void DefaultLogger::PrintError(const char* str)
 {
 	std::cerr << str;
+}
+
+LogHandle::~LogHandle()
+{
+	Log << "\n";
 }
